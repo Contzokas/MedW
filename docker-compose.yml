@@ -1,47 +1,99 @@
+name: medw
+
+networks:
+  medw-internal:
+    # Internal network: ollama and chromadb ports are not published to host (NFR5, NFR7, NFR20)
+  medw-external:
+    # External network: backend and frontend exposed to host
+
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
+    container_name: medw-ollama
+    networks:
+      - medw-internal
     volumes:
       - ollama_data:/root/.ollama
-    restart: unless-stopped
-    # Uncomment the below lines if you have an NVIDIA GPU and installed nvidia-container-toolkit
-    deploy:
-       resources:
-         reservations:
-           devices:
-             - driver: nvidia
-               count: 1
-               capabilities: [gpu]
-
-  # This service waits for ollama to start and automatically pulls the biomistral model from Hugging Face
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: ollama-pull-mistral
-    depends_on:
-      - ollama
+      - ./docker/ollama-entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
     environment:
-      - OLLAMA_HOST=ollama:11434
-    entrypoint: >
-      sh -c "echo 'Waiting for Ollama to be ready...' && 
-             sleep 10 && 
-             echo 'Pulling mistral model from HuggingFace...' && 
-             ollama pull hf.co/LoneStriker/Mistral-7B-GGUF && 
-             echo 'Model pulled successfully!'"
-    restart: "no"
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mistral:7b}
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q \"${OLLAMA_MODEL:-mistral:7b}\" || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 600s  # 10 min — model pull on first run can take time
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   chromadb:
-    image: chromadb/chroma:latest
-    container_name: chromadb
-    ports:
-      - "8000:8000"
+    image: chromadb/chroma:1.5.7
+    container_name: medw-chromadb
+    networks:
+      - medw-internal
     volumes:
       - chroma_data:/chroma/chroma
     environment:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
+      - CHROMA_SERVER_PORT=8000
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')\" || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medw-backend
+    networks:
+      - medw-internal
+      - medw-external
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: medw-frontend
+    networks:
+      - medw-external
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

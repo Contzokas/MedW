@@ -33,7 +33,7 @@ tempOutputFile: '/tmp/tea-trace-coverage-matrix-{{timestamp}}.json'
 
 ## CONTEXT BOUNDARIES:
 
-- Available context: requirements from Step 1, tests from Step 2, traceability matrix from Step 3
+- Available context: resolved oracle items from Step 1, tests from Step 2, traceability matrix from Step 3
 - Focus: gap analysis and matrix completion
 - Limits: do not make gate decision (Phase 2 responsibility)
 
@@ -145,11 +145,15 @@ Use the heuristics inventory from Step 2 and mapped criteria from Step 3 to flag
 const endpointCoverageGaps = coverageHeuristics?.endpoints_without_tests || [];
 const authCoverageGaps = coverageHeuristics?.auth_missing_negative_paths || [];
 const errorPathGaps = coverageHeuristics?.criteria_happy_path_only || [];
+const uiJourneyGaps = coverageHeuristics?.ui_journeys_without_e2e || [];
+const uiStateGaps = coverageHeuristics?.ui_states_missing_coverage || [];
 
 const heuristicGapCounts = {
   endpoints_without_tests: endpointCoverageGaps.length,
   auth_missing_negative_paths: authCoverageGaps.length,
   happy_path_only_criteria: errorPathGaps.length,
+  ui_journeys_without_e2e: uiJourneyGaps.length,
+  ui_states_missing_coverage: uiStateGaps.length,
 };
 ```
 
@@ -162,6 +166,48 @@ Heuristics are advisory but must influence gap severity and recommendations, esp
 **Based on gap analysis:**
 
 ```javascript
+const progressDoc = fs.existsSync('{outputFile}') ? fs.readFileSync('{outputFile}', 'utf8') : '';
+const progressFrontmatterMatch = progressDoc.match(/^---\n([\s\S]*?)\n---/);
+const progressFrontmatter = progressFrontmatterMatch ? yaml.parse(progressFrontmatterMatch[1]) : {};
+
+const isUnresolved = (value) => typeof value === 'string' && value.startsWith('{') && value.endsWith('}');
+const normalizeResolvedToken = (value) => {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized || normalized === 'auto' || isUnresolved(normalized)) return null;
+  return normalized;
+};
+const firstResolvedToken = (...values) => {
+  for (const value of values) {
+    const normalized = normalizeResolvedToken(value);
+    if (normalized) return normalized;
+  }
+  return null;
+};
+
+const oracleResolutionMode =
+  firstResolvedToken(runtime.getOracleResolutionMode?.(), progressFrontmatter.oracleResolutionMode) || 'formal_requirements';
+const resolvedCoverageBasis =
+  firstResolvedToken(runtime.getResolvedCoverageBasis?.(), progressFrontmatter.coverageBasis) ||
+  {
+    formal_requirements: 'acceptance_criteria',
+    spec_artifact: 'openapi_endpoints',
+    external_pointer: 'acceptance_criteria',
+    synthetic_source: 'user_journeys',
+  }[oracleResolutionMode] ||
+  'acceptance_criteria';
+const resolvedOracleConfidence =
+  firstResolvedToken(runtime.getResolvedOracleConfidence?.(), progressFrontmatter.oracleConfidence) ||
+  {
+    formal_requirements: 'high',
+    spec_artifact: 'high',
+    external_pointer: 'medium',
+    synthetic_source: 'medium',
+  }[oracleResolutionMode] ||
+  'medium';
+const oracleSources = runtime.getOracleSources?.() || progressFrontmatter.oracleSources || [];
+const externalPointerStatus =
+  firstResolvedToken(runtime.getExternalPointerStatus?.(), progressFrontmatter.externalPointerStatus) || 'not_used';
 const recommendations = [];
 
 // Critical gaps (P0)
@@ -215,12 +261,36 @@ if (errorPathGaps.length > 0) {
   });
 }
 
+if (uiJourneyGaps.length > 0) {
+  recommendations.push({
+    priority: 'HIGH',
+    action: `Add E2E or component coverage for ${uiJourneyGaps.length} inferred UI journey(s)`,
+    requirements: uiJourneyGaps.map((r) => r.id || r.route || r.journey || 'unknown'),
+  });
+}
+
+if (uiStateGaps.length > 0) {
+  recommendations.push({
+    priority: 'MEDIUM',
+    action: `Add loading/empty/error/permission state coverage for ${uiStateGaps.length} UI journey(s)`,
+    requirements: uiStateGaps.map((r) => r.id || r.route || r.journey || 'unknown'),
+  });
+}
+
 // Quality issues
 recommendations.push({
   priority: 'LOW',
   action: 'Run /bmad:tea:test-review to assess test quality',
   requirements: [],
 });
+
+if (oracleResolutionMode === 'synthetic_source') {
+  recommendations.push({
+    priority: 'MEDIUM',
+    action: 'Promote inferred journeys into formal acceptance criteria when the team confirms they reflect intended behavior',
+    requirements: traceabilityMatrix.map((r) => r.id),
+  });
+}
 ```
 
 ---
@@ -375,8 +445,15 @@ const coverageMatrix = {
   trace_target: traceTarget,
   collection_mode: '{collection_mode}',
   allow_gate: '{allow_gate}',
-  coverage_basis: '{coverage_basis}',
-  summary_confidence: '{summary_confidence}',
+  coverage_basis: resolvedCoverageBasis,
+  summary_confidence: resolvedOracleConfidence,
+  oracle: {
+    resolution_mode: oracleResolutionMode,
+    confidence: resolvedOracleConfidence,
+    sources: oracleSources,
+    external_pointer_status: externalPointerStatus,
+    synthetic: oracleResolutionMode === 'synthetic_source',
+  },
 
   requirements: traceabilityMatrix, // Full matrix from Step 3
 
@@ -408,6 +485,8 @@ const coverageMatrix = {
     endpoint_gaps: endpointCoverageGaps,
     auth_negative_path_gaps: authCoverageGaps,
     happy_path_only_gaps: errorPathGaps,
+    ui_journey_gaps: uiJourneyGaps,
+    ui_state_gaps: uiStateGaps,
     counts: heuristicGapCounts,
   },
 

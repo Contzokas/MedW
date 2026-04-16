@@ -1,7 +1,11 @@
 ---
-stepsCompleted: [step-01-init, step-02-discovery, step-02b-vision, step-02c-executive-summary, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type, step-08-scoping, step-09-functional, step-10-nonfunctional, step-11-polish, step-12-complete]
-inputDocuments: ['project_prompt.md']
+stepsCompleted: [step-01-init, step-02-discovery, step-02b-vision, step-02c-executive-summary, step-03-success, step-04-journeys, step-05-domain, step-06-innovation, step-07-project-type, step-08-scoping, step-09-functional, step-10-nonfunctional, step-11-polish, step-12-complete, step-e-01-discovery, step-e-02-review, step-e-03-edit]
+inputDocuments: []
 workflowType: 'prd'
+lastEdited: '2026-04-16'
+editHistory:
+  - date: '2026-04-16'
+    changes: 'Migrated from BioMistral to Mistral 7B due to JSON output constraints and triage inconsistencies. Emphasized GDPR and health data constraints.'
 classification:
   projectType: web_app + api_backend
   domain: healthcare
@@ -24,8 +28,8 @@ MEDΩ addresses a structural inefficiency in ΕΣΥ: ~7 million annual appointme
 
 **What Makes This Special:** Standard triage tools stop at urgency classification. MEDΩ goes further — AI-powered symptom analysis enables precision doctor matching, routing patients to the most fitting physician for their specific presentation. This transforms triage from a safety gate into an active care-routing engine, reducing wrong-specialty visits, ED overcrowding, and wasted clinical resources.
 
-**Stack:** BioMistral-7B via Ollama + LangChain/ChromaDB (RAG) + FastAPI + Next.js/React + Docker + NVIDIA B200
-**Constraints:** On-premise inference only (GDPR Article 9); no fine-tuning; prompt engineering + RAG only
+**Stack:** Mistral-7B via Ollama + LangChain/ChromaDB (RAG) + FastAPI + Next.js/React + Docker + NVIDIA B200
+**Constraints:** On-premise inference only (GDPR Article 9 EU health data protection); no fine-tuning; prompt engineering + RAG only
 
 ---
 
@@ -72,7 +76,7 @@ MEDΩ addresses a structural inefficiency in ΕΣΥ: ~7 million annual appointme
 
 **Must-Have Capabilities:**
 - Greek symptom input form (`/` route, Next.js)
-- `POST /api/v1/triage` → BioMistral + RAG → MTS level + specialty + doctor + reasoning
+- `POST /api/v1/triage` → Mistral-7B + RAG → MTS level + specialty + doctor + reasoning
 - Mocked doctor dataset (static JSON fixture)
 - Medical disclaimer on every results screen (drafted by Stella)
 - Simulated finddoctors.gov.gr redirect
@@ -113,7 +117,7 @@ Dimitris, 52, wakes with chest tightness and mild shortness of breath. He doesn'
 
 **Opening:** Anxious, unsure whether to go to the ER or book an appointment. He types in Greek — *"πόνος στο στήθος, δυσκολία στην αναπνοή, ζαλάδα"*.
 
-**Rising Action:** MEDΩ processes his input through BioMistral + RAG. Within seconds: MTS Level 2 (Urgent), Cardiology, Dr. Παπαδόπουλος — Cardiologist, available today. Reasoning shown: *"Symptoms indicate possible cardiac event — urgent cardiology evaluation recommended."*
+**Rising Action:** MEDΩ processes his input through Mistral-7B + RAG. Within seconds: MTS Level 2 (Urgent), Cardiology, Dr. Παπαδόπουλος — Cardiologist, available today. Reasoning shown: *"Symptoms indicate possible cardiac event — urgent cardiology evaluation recommended."*
 
 **Climax:** He sees not just a category but a specific doctor to go to. Uncertainty dissolves — he has a clear action.
 
@@ -166,10 +170,10 @@ A non-technical evaluator watches the live demo: patient form → Greek symptom 
 
 ### Technical Constraints
 
-- **On-premise only** — BioMistral via Ollama, ChromaDB local; no cloud inference
+- **On-premise only (EU GDPR Health Data)** — Mistral-7B via Ollama, ChromaDB local; no cloud inference
 - **No fine-tuning** — prompt engineering + RAG only
 - **Data containment** — patient input not transmitted outside the deployment environment, including logs
-- **Greek language risk** — BioMistral-7B multilingual capacity for Greek medical terminology is an open risk; must be validated in the first development sprint
+- **Greek language risk** — Mistral 7B multilingual capacity for Greek medical terminology is an open risk; must be validated in the first development sprint
 
 ### Integration
 
@@ -180,7 +184,7 @@ A non-technical evaluator watches the live demo: patient form → Greek symptom 
 
 | Risk | Mitigation |
 |---|---|
-| BioMistral accuracy below 80% in Greek | Test in sprint 1; fallback: translate to English for inference, return Greek result |
+| Mistral 7B accuracy below 80% in Greek | Test in sprint 1; fallback: translate to English for inference, return Greek result |
 | MTS misclassification during live demo | Use pre-validated symptom scenarios only during demo |
 | Latency > 10s during demo | Pre-warm Ollama; test on B200 before demo day |
 | Missing medical disclaimer | Stella owns text; blocked until delivered; required before demo |
@@ -191,7 +195,7 @@ A non-technical evaluator watches the live demo: patient form → Greek symptom 
 
 ### Innovation Areas
 
-- **LLM-powered clinical triage at national scale** — BioMistral-7B applied to MTS within ΕΣΥ; no equivalent exists in the Greek public health system today
+- **LLM-powered clinical triage at national scale** — Mistral 7B applied to MTS within ΕΣΥ; no equivalent exists in the Greek public health system today
 - **Precision doctor matching** — moves beyond specialty routing to patient-specific physician recommendations based on symptom profile and availability
 - **RAG-only on-premise medical AI** — demonstrates ≥80% MTS accuracy using prompt engineering + RAG on a 7B model without fine-tuning, on NVIDIA B200 infrastructure
 
@@ -205,7 +209,7 @@ A non-technical evaluator watches the live demo: patient form → Greek symptom 
 
 | Risk | Fallback |
 |---|---|
-| BioMistral underperforms on Greek medical text | English inference pipeline with Greek result output |
+| Mistral 7B underperforms on Greek medical text | English inference pipeline with Greek result output |
 | RAG retrieval misses relevant clinical context | Expand ChromaDB corpus; tune chunk size and retrieval k |
 | Doctor matching insufficient for demo credibility | Scope to specialty matching; label precision matching as post-MVP roadmap |
 
@@ -287,7 +291,7 @@ MEDΩ is a Next.js SPA (two routes) backed by a FastAPI REST API, deployed as se
 
 ### AI & Knowledge Pipeline
 
-- **FR13:** System can process Greek-language symptom text through BioMistral-7B for MTS classification
+- **FR13:** System can process Greek-language symptom text through Mistral 7B for MTS classification
 - **FR14:** System can augment LLM inference with clinical context retrieved from a local ChromaDB knowledge base
 - **FR15:** System returns a triage result using base LLM knowledge when RAG retrieval returns low-confidence results
 

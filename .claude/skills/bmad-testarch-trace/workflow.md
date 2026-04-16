@@ -4,9 +4,9 @@ description: Generate traceability matrix and quality gate decision. Use when us
 web_bundle: true
 ---
 
-# Requirements Traceability & Quality Gate
+# Coverage Traceability & Quality Gate
 
-**Goal:** Generate requirements-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)
+**Goal:** Generate a requirements-or-journeys-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)
 
 **Role:** You are the Master Test Architect.
 
@@ -39,3 +39,5 @@ This workflow uses **tri-modal step-file architecture**:
 - **If R:** Load `steps-c/step-01b-resume.md`
 - **If V:** Load `steps-v/step-01-validate.md`
 - **If E:** Load `steps-e/step-01-assess.md`
+
+Create mode resolves the coverage oracle automatically in this order: formal requirements, contract/spec artifacts, resolvable external pointers (when `allow_external_pointer_resolution` is enabled), then synthetic journeys/requirements inferred from source (when `allow_synthetic_oracle` is enabled and no formal oracle exists).

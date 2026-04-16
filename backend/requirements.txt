@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+langchain==1.2.15
+langchain-core==1.2.29
+langchain-community
+langchain-chroma
+chromadb==1.5.7
