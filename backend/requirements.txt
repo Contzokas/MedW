@@ -7,3 +7,6 @@ langchain-core==1.2.29
 langchain-community
 langchain-chroma
 chromadb==1.5.7
+sentence-transformers>=2.2.2,<4.0.0
+pytest
+pytest-asyncio

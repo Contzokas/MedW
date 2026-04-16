@@ -1,10 +1,13 @@
 {
   "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_rag_service.py -v)",
+      "Bash(python -m pytest -v)"
+    ],
     "additionalDirectories": [
       "/home/dd/Sync/Projects/MedW/_bmad-output/planning-artifacts"
-    ],
-    "allow": [
-      "WebSearch"
     ]
   }
 }

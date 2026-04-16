@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-16
-last_updated: 2026-04-16  # Epic 1 retrospective completed
+last_updated: 2026-04-16  # Story 2-1 code review and patches complete, status → done
 project: MedW
 project_key: NOKEY
 tracking_system: file-system
@@ -50,8 +50,8 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: AI Triage Pipeline
-  epic-2: backlog
-  2-1-chromadb-corpus-seeding-and-rag-service: backlog
+  epic-2: in-progress
+  2-1-chromadb-corpus-seeding-and-rag-service: done
   2-2-biomistral-llm-service-via-ollama: backlog
   2-3-triage-service-orchestration-and-fallback-chain: backlog
   2-4-mocked-doctor-dataset-and-doctor-service: backlog
