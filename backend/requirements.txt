@@ -1,2 +1,9 @@
-# Dependencies — populated in Story 1.2
-# Key packages: fastapi, uvicorn, langchain==1.2.15, langchain-core==1.2.29, chromadb==1.5.7
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+langchain==1.2.15
+langchain-core==1.2.29
+langchain-community
+langchain-chroma
+chromadb==1.5.7

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-16
-last_updated: 2026-04-16  # Story 1.2 moved to ready-for-dev
+last_updated: 2026-04-16  # Story 1.2 moved to review
 project: MedW
 project_key: NOKEY
 tracking_system: file-system
@@ -45,7 +45,7 @@ development_status:
   # Epic 1: Project Foundation & Deployable Stack
   epic-1: in-progress
   1-1-monorepo-scaffold-and-project-structure: done
-  1-2-fastapi-base-application-and-health-endpoint: ready-for-dev
+  1-2-fastapi-base-application-and-health-endpoint: done
   1-3-docker-compose-full-stack-with-ordered-startup: backlog
   epic-1-retrospective: optional
 
