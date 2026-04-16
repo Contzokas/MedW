@@ -40,6 +40,25 @@ def test_parse_response_raises_on_out_of_range_mts_level():
         _parse_response(bad)
 
 
+def test_parse_response_raises_on_mts_label_mismatch():
+    # mts_level=1 requires "Immediate", not "Non-urgent" — clinically dangerous inconsistency
+    mismatched = '{"mts_level": 1, "mts_label": "Non-urgent", "specialty": "Καρδιολογία", "reasoning": "test"}'
+    with pytest.raises(LLMParseError, match="mts_label mismatch"):
+        _parse_response(mismatched)
+
+
+def test_parse_response_raises_on_empty_specialty():
+    empty_specialty = '{"mts_level": 2, "mts_label": "Very Urgent", "specialty": "", "reasoning": "test"}'
+    with pytest.raises(LLMParseError, match="non-empty string"):
+        _parse_response(empty_specialty)
+
+
+def test_parse_response_raises_on_float_mts_level():
+    float_level = '{"mts_level": 1.6, "mts_label": "Immediate", "specialty": "Καρδιολογία", "reasoning": "test"}'
+    with pytest.raises(LLMParseError, match="float"):
+        _parse_response(float_level)
+
+
 async def test_classify_returns_dict_with_mocked_chain(monkeypatch):
     def mock_invoke(symptoms, context):
         return VALID_JSON

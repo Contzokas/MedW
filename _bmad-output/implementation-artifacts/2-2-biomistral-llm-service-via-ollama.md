@@ -1,6 +1,6 @@
 # Story 2.2: Mistral LLM Service via Ollama
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -28,24 +28,46 @@ So that the AI pipeline can produce MTS classifications, specialty recommendatio
 
 ## Tasks / Subtasks
 
-- [ ] Add `OLLAMA_MODEL` to `backend/app/core/config.py` (AC: #1)
-  - [ ] `OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "mistral:7b")`
+- [x] Add `OLLAMA_MODEL` to `backend/app/core/config.py` (AC: #1)
+  - [x] `OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "mistral:7b")`
 
-- [ ] Create `backend/app/services/llm_service.py` (AC: #1–#6)
-  - [ ] Define `LLMParseError` exception class
-  - [ ] Implement `_build_chain()` — returns `ChatPromptTemplate | ChatOllama | StrOutputParser` LCEL chain
-  - [ ] Implement `_invoke_chain_sync(symptoms: str, context: str) -> str` — synchronous chain invocation (monkeypatch target for tests)
-  - [ ] Implement `_parse_response(raw: str) -> dict` — regex-extract JSON from raw string, validate required fields and `mts_level` range, raise `LLMParseError` on any failure
-  - [ ] Implement `async def classify(symptoms: str, context: str) -> dict` — calls `asyncio.to_thread(_invoke_chain_sync, ...)` then `_parse_response`; wraps non-parse exceptions in `LLMParseError`
-  - [ ] Add Greek validation TODO comment (see Dev Notes below)
-  - [ ] Verify no log statement references the `symptoms` variable or its content
+- [x] Create `backend/app/services/llm_service.py` (AC: #1–#6)
+  - [x] Define `LLMParseError` exception class
+  - [x] Implement `_build_chain()` — returns `ChatPromptTemplate | ChatOllama | StrOutputParser` LCEL chain
+  - [x] Implement `_invoke_chain_sync(symptoms: str, context: str) -> str` — synchronous chain invocation (monkeypatch target for tests)
+  - [x] Implement `_parse_response(raw: str) -> dict` — regex-extract JSON from raw string, validate required fields and `mts_level` range, raise `LLMParseError` on any failure
+  - [x] Implement `async def classify(symptoms: str, context: str) -> dict` — calls `asyncio.to_thread(_invoke_chain_sync, ...)` then `_parse_response`; wraps non-parse exceptions in `LLMParseError`
+  - [x] Add Greek validation TODO comment (see Dev Notes below)
+  - [x] Verify no log statement references the `symptoms` variable or its content
 
-- [ ] Create `backend/tests/test_triage_service.py` (AC: #7)
-  - [ ] Test: `_parse_response` returns correct dict for well-formed JSON string
-  - [ ] Test: `_parse_response` raises `LLMParseError` on non-JSON string
-  - [ ] Test: `_parse_response` raises `LLMParseError` when required field is missing
-  - [ ] Test: `_parse_response` raises `LLMParseError` when `mts_level` is out of range (e.g., 6)
-  - [ ] Test: `classify()` returns correct dict when `_invoke_chain_sync` is monkeypatched to return valid JSON
+- [x] Create `backend/tests/test_triage_service.py` (AC: #7)
+  - [x] Test: `_parse_response` returns correct dict for well-formed JSON string
+  - [x] Test: `_parse_response` raises `LLMParseError` on non-JSON string
+  - [x] Test: `_parse_response` raises `LLMParseError` when required field is missing
+  - [x] Test: `_parse_response` raises `LLMParseError` when `mts_level` is out of range (e.g., 6)
+  - [x] Test: `classify()` returns correct dict when `_invoke_chain_sync` is monkeypatched to return valid JSON
+
+### Review Findings
+
+- [x] [Review][Patch] `mts_label` not cross-validated against canonical `MTS_LABELS` mapping — model can return `mts_level=1, mts_label="Non-urgent"` and pass unchallenged; also no test for this case [backend/app/services/llm_service.py:64-84]
+- [x] [Review][Patch] Greedy regex `re.search(r"\{.*\}", raw, re.DOTALL)` matches first `{` to last `}`, corrupting extraction when model emits prose-wrapped or multi-object output [backend/app/services/llm_service.py:66]
+- [x] [Review][Patch] No timeout on `ChatOllama` HTTP call — stalled Ollama request blocks thread-pool workers indefinitely [backend/app/services/llm_service.py:53]
+- [x] [Review][Patch] Symptom content may leak into logs via `exc_info=True` exception chain and `LLMParseError(f"JSON decode failed: {exc}")` embedding raw LLM output (NFR5/NFR6) [backend/app/services/llm_service.py:97, 72]
+- [x] [Review][Patch] `_parse_response` raises `LLMParseError` silently with no `logger.warning` — parse failures leave no diagnostic trace in logs [backend/app/services/llm_service.py:67-84]
+- [x] [Review][Patch] `mts_label`, `specialty`, `reasoning` accepted as-is with no emptiness or type check — model can return `null` or `""` and it passes [backend/app/services/llm_service.py:74-76]
+- [x] [Review][Patch] `int(data["mts_level"])` silently truncates float from JSON (e.g., `1.6 → 1`) instead of rejecting it [backend/app/services/llm_service.py:80]
+- [x] [Review][Defer] `_build_chain()` reconstructed per call — no module-level singleton; performance concern [backend/app/services/llm_service.py:57] — deferred, pre-existing
+- [x] [Review][Defer] Empty `symptoms`/`context` input not guarded in `classify()` — validation belongs at the Story 2.3 API boundary — deferred, pre-existing
+- [x] [Review][Defer] No retry/circuit-breaker around Ollama call — resilience is an orchestration concern for Story 2.3 — deferred, pre-existing
+- [x] [Review][Defer] `temperature=0` not externalised to config — deliberate design choice per spec; externalising adds complexity without clear benefit — deferred, pre-existing
+- [x] [Review][Defer] Test does not assert `asyncio.to_thread` was invoked — implementation detail, outcome is fully covered — deferred, pre-existing
+
+### Review Findings (Round 2 — patch verification)
+
+- [x] [Review][Patch] `exc_info=True` removed from `classify()` error log — stacktrace lost for production diagnosis; restore with type-name-only message for PHI safety [backend/app/services/llm_service.py:142]
+- [x] [Review][Patch] `mts_label` non-empty guard in field-loop is dead code — mismatch check always fires first for any non-canonical value [backend/app/services/llm_service.py:128-132]
+- [x] [Review][Patch] `OLLAMA_TIMEOUT` silently falls back to 30 on invalid env value with no warning; also accepts 0/negative without guard [backend/app/core/config.py:5-8]
+- [x] [Review][Defer] `_extract_json_object` returns first JSON object when model emits multiple — prompt design and field validation act as safety net [backend/app/services/llm_service.py:51-77] — deferred, pre-existing
 
 ## Dev Notes
 
@@ -383,10 +405,25 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation followed story spec exactly.
+
 ### Completion Notes List
 
+- Added `OLLAMA_MODEL` env-driven config to `config.py`; default `"mistral:7b"` per Story 2.1 learnings (spec drift resolved before PR merge).
+- Created `llm_service.py` with LCEL chain (`ChatPromptTemplate | ChatOllama | StrOutputParser`), `_invoke_chain_sync` extracted as named function for monkeypatching, `_parse_response` using `re.search` to handle Mistral prose wrapping, and `classify` async wrapper via `asyncio.to_thread`.
+- `LLMParseError` raised for both parse failures and chain invocation failures — Story 2.3 catches this single type.
+- No `symptoms` or `context` content logged at any level (AC #6 / NFR5/NFR6 compliant).
+- Greek validation TODO comment added per AC #5.
+- Created `test_triage_service.py` with 8 tests covering all parse paths and async classify paths via monkeypatching.
+- Full test suite: 11/11 passed (3 existing rag tests + 8 new triage tests), zero regressions.
+
 ### File List
+
+- `backend/app/core/config.py` — modified: added `OLLAMA_MODEL`
+- `backend/app/services/llm_service.py` — created
+- `backend/tests/test_triage_service.py` — created
 
 ## Change Log
 
 - 2026-04-16: Story 2.2 created via bmad-create-story workflow. Status → ready-for-dev.
+- 2026-04-16: Story 2.2 implemented by claude-sonnet-4-6. All 3 tasks complete, 11/11 tests pass. Status → review.
