@@ -1,18 +1,18 @@
 # Story 1.3: Docker Compose Full Stack with Ordered Startup
 
-Status: review
+Status: done
 
 ## Story
 
 As an operator,
 I want `docker compose up` to bring up all four services in dependency order with GPU support,
-So that BioMistral is fully loaded in Ollama before the backend accepts traffic, eliminating cold-start risk during the live demo.
+So that Mistral 7B is fully loaded in Ollama before the backend accepts traffic, eliminating cold-start risk during the live demo.
 
 ## Acceptance Criteria
 
 1. **Given** the monorepo scaffold and FastAPI base from Stories 1.1–1.2
    **When** `docker compose up` is executed on target NVIDIA B200 hardware
-   **Then** `docker/ollama-entrypoint.sh` starts the Ollama server, pulls `biomistral:7b`, and exits with code 0 only after the model is confirmed present via `ollama list | grep biomistral`
+   **Then** `docker/ollama-entrypoint.sh` starts the Ollama server, pulls `mistral:7b`, and exits with code 0 only after the model is confirmed present via `ollama list | grep mistral`
 
 2. **And** the `ollama` service healthcheck passes before the `chromadb` service starts (`depends_on: ollama: condition: service_healthy`)
 
@@ -468,3 +468,14 @@ _none_
 
 - 2026-04-16: Story created via bmad-create-story workflow.
 - 2026-04-16: Story implemented by claude-sonnet-4-6. Completed docker/ollama-entrypoint.sh, backend/Dockerfile, frontend/Dockerfile, frontend/.dockerignore, and replaced docker-compose.yml with full 4-service ordered-startup orchestration.
+
+### Review Findings
+
+- [x] [Review][Decision] Model mismatch in healthcheck (`mistral:7b` vs `biomistral:7b`) — AC 1 specifies `biomistral`, but the architecture was recently updated to `mistral:7b`. The code checks for `mistral`. Should the AC be updated, or the code reverted to `biomistral`? -> Updated AC to use `mistral:7b`
+- [x] [Review][Patch] `medw-internal` network is missing `internal: true` flag [docker-compose.yml:5]
+- [x] [Review][Patch] `ollama-entrypoint.sh` lacks robust backgrounding and `wait` [docker/ollama-entrypoint.sh]
+- [x] [Review][Patch] `chromadb` healthcheck uses TCP socket instead of HTTP 200 [docker-compose.yml:40]
+- [x] [Review][Patch] Missing `backend/.dockerignore` [backend/Dockerfile:12]
+- [x] [Review][Defer] `backend` and `frontend` containers run as `root` — deferred, pre-existing
+- [x] [Review][Defer] Missing `frontend` healthcheck in docker-compose.yml — deferred, pre-existing
+- [x] [Review][Defer] Next.js `NEXT_PUBLIC_API_URL` hardcoded fallback — deferred, pre-existing

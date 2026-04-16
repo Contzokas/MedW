@@ -43,10 +43,10 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: Project Foundation & Deployable Stack
-  epic-1: in-progress
+  epic-1: done
   1-1-monorepo-scaffold-and-project-structure: done
   1-2-fastapi-base-application-and-health-endpoint: done
-  1-3-docker-compose-full-stack-with-ordered-startup: review
+  1-3-docker-compose-full-stack-with-ordered-startup: done
   epic-1-retrospective: optional
 
   # Epic 2: AI Triage Pipeline
