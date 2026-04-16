@@ -17,12 +17,14 @@ fi
 
 echo "Ollama API ready."
 
-echo "Pulling mistral model (this may take several minutes on first run)..."
-ollama pull mistral
+OLLAMA_MODEL="${OLLAMA_MODEL:-mistral:7b}"
 
-echo "Verifying mistral is present..."
-until ollama list | grep -q mistral || ! kill -0 $OLLAMA_PID 2>/dev/null; do
-  echo "  mistral not confirmed yet, retrying..."
+echo "Pulling ${OLLAMA_MODEL} model (this may take several minutes on first run)..."
+ollama pull "${OLLAMA_MODEL}"
+
+echo "Verifying ${OLLAMA_MODEL} is present..."
+until ollama list | grep -q "${OLLAMA_MODEL}" || ! kill -0 $OLLAMA_PID 2>/dev/null; do
+  echo "  ${OLLAMA_MODEL} not confirmed yet, retrying..."
   sleep 5
 done
 
@@ -31,5 +33,5 @@ if ! kill -0 $OLLAMA_PID 2>/dev/null; then
     exit 1
 fi
 
-echo "mistral loaded and ready."
+echo "${OLLAMA_MODEL} loaded and ready."
 wait $OLLAMA_PID

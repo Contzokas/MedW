@@ -2,8 +2,7 @@ name: medw
 
 networks:
   medw-internal:
-    # Internal network: ollama and chromadb are invisible from host (NFR5, NFR7, NFR20)
-    internal: true
+    # Internal network: ollama and chromadb ports are not published to host (NFR5, NFR7, NFR20)
   medw-external:
     # External network: backend and frontend exposed to host
 
@@ -17,8 +16,10 @@ services:
       - ollama_data:/root/.ollama
       - ./docker/ollama-entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mistral:7b}
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -qw mistral || exit 1"]
+      test: ["CMD-SHELL", "ollama list | grep -q \"${OLLAMA_MODEL:-mistral:7b}\" || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 10
