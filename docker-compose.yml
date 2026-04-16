@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  ollama:
+    # Implemented in Story 1.3
+    image: ollama/ollama
+    # GPU config added in Story 1.3
+
+  chromadb:
+    # Implemented in Story 1.3
+    image: chromadb/chroma:1.5.7
+
+  backend:
+    # Implemented in Stories 1.2–1.3
+    build: ./backend
+
+  frontend:
+    # Implemented in Story 1.3
+    build: ./frontend

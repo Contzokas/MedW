@@ -1,0 +1,2 @@
+# Dependencies — populated in Story 1.2
+# Key packages: fastapi, uvicorn, langchain==1.2.15, langchain-core==1.2.29, chromadb==1.5.7
