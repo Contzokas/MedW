@@ -27,7 +27,7 @@ FR9: System can present an alternative doctor recommendation when no exact speci
 FR10: Nurse can view a live queue of all triage submissions in real time
 FR11: Nurse can see per-submission details: patient ID, MTS level, recommended specialty, timestamp
 FR12: System pushes new triage entries to the dashboard without requiring page refresh
-FR13: System can process Greek-language symptom text through BioMistral-7B for MTS classification
+FR13: System can process Greek-language symptom text through Mistral-7B for MTS classification
 FR14: System can augment LLM inference with clinical context retrieved from a local ChromaDB knowledge base
 FR15: System returns a triage result using base LLM knowledge when RAG retrieval returns low-confidence results
 FR16: System can serve a mocked doctor list filterable by specialty
@@ -61,14 +61,14 @@ NFR13: System returns a triage result using base LLM knowledge when RAG retrieva
 - **Real-time mechanism:** SSE via FastAPI `StreamingResponse` with `text/event-stream`; client uses native browser `EventSource`; no WebSocket library
 - **In-memory triage queue:** Python list protected by `asyncio.Lock`; owned by `core/queue.py`; resets on container restart (NFR6)
 - **ChromaDB corpus seeding:** FastAPI lifespan event calls `rag_service.seed_corpus_if_empty()` at startup; idempotent; embedding model: `all-MiniLM-L6-v2`
-- **Docker startup ordering:** ollama → chromadb → backend → frontend; each gated by healthcheck; ollama custom entrypoint (`docker/ollama-entrypoint.sh`) pulls `biomistral:7b` and signals readiness
+- **Docker startup ordering:** ollama → chromadb → backend → frontend; each gated by healthcheck; ollama custom entrypoint (`docker/ollama-entrypoint.sh`) pulls `mistral:7b` and signals readiness
 - **NVIDIA GPU runtime:** `deploy.resources.reservations.devices` configured in docker-compose.yml
 - **Patient data logging prohibition:** Symptom text must never appear in log output at any log level; enforced at code level in all services
 - **AI pipeline error handling:** All exceptions in `/api/v1/triage` must be caught; return degraded-but-valid 200 response (never HTTP 500) on patient-facing routes
 - **API contract fidelity:** All API JSON fields snake_case; no envelope wrappers; matches PRD contract exactly
 - **Frontend imports:** `@/` absolute imports only; relative imports forbidden
 - **Backend separation:** Business logic in `services/` only; router files contain route definitions only
-- **Greek language validation (Sprint 1):** BioMistral-7B Greek medical terminology quality must be validated in Sprint 1; fallback strategy: translate input to English for inference, return result in Greek
+- **Greek language validation (Sprint 1):** Mistral-7B Greek medical terminology quality must be validated in Sprint 1; fallback strategy: translate input to English for inference, return result in Greek
 - **LangChain versions:** `langchain==1.2.15`, `langchain-core==1.2.29`, LCEL pipeline style
 
 ### UX Design Requirements
@@ -90,7 +90,7 @@ FR9:  Epic 3 — Fallback doctor recommendation
 FR10: Epic 4 — Live nurse dashboard queue
 FR11: Epic 4 — Per-submission detail view
 FR12: Epic 4 — SSE push (no page refresh)
-FR13: Epic 2 — Greek LLM processing via BioMistral
+FR13: Epic 2 — Greek LLM processing via Mistral
 FR14: Epic 2 — ChromaDB RAG augmentation
 FR15: Epic 2 — Base LLM fallback when RAG fails
 FR16: Epic 2 — Filterable mocked doctor list (GET /api/v1/doctors)
@@ -111,7 +111,7 @@ The full monorepo is scaffolded, all four Docker services start in the correct o
 **Key NFRs:** NFR4, NFR5, NFR7, NFR8, NFR12
 
 ### Epic 2: AI Triage Pipeline
-The backend AI engine accepts a Greek symptom string, runs it through BioMistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, matched doctor, and reasoning via `POST /api/v1/triage`. The mocked doctor dataset is loaded and the three-tier fallback chain ensures a valid result is always returned. Verified via API client.
+The backend AI engine accepts a Greek symptom string, runs it through Mistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, matched doctor, and reasoning via `POST /api/v1/triage`. The mocked doctor dataset is loaded and the three-tier fallback chain ensures a valid result is always returned. Verified via API client.
 **FRs covered:** FR2, FR3, FR4, FR5, FR13, FR14, FR15, FR16, FR17
 > Note: FR4, FR16, FR17 are covered by Story 2.4 (Doctor Service); FR2, FR3, FR5, FR13–FR15 by Stories 2.1–2.3; all wired together in Story 2.5.
 **Key NFRs:** NFR1, NFR13
@@ -182,13 +182,13 @@ So that I can verify the backend service is accepting traffic and confirm operat
 
 As an operator,
 I want `docker compose up` to bring up all four services in dependency order with GPU support,
-So that BioMistral is fully loaded in Ollama before the backend accepts traffic, eliminating cold-start risk during the live demo.
+So that Mistral is fully loaded in Ollama before the backend accepts traffic, eliminating cold-start risk during the live demo.
 
 **Acceptance Criteria:**
 
 **Given** the monorepo scaffold and FastAPI base from Stories 1.1–1.2
 **When** `docker compose up` is executed on target NVIDIA B200 hardware
-**Then** `docker/ollama-entrypoint.sh` starts the Ollama server, pulls `biomistral:7b`, and exits with code 0 only after the model is confirmed present via `ollama list | grep biomistral`
+**Then** `docker/ollama-entrypoint.sh` starts the Ollama server, pulls `mistral:7b`, and exits with code 0 only after the model is confirmed present via `ollama list | grep mistral`
 **And** the `ollama` service healthcheck passes before the `chromadb` service starts
 **And** the `chromadb` service healthcheck (HTTP 200 on `/api/v1/heartbeat`) passes before the `backend` service starts
 **And** the `backend` service starts only after chromadb is healthy, and its health check (`GET /api/v1/health`) passes before `frontend` starts
@@ -203,13 +203,13 @@ So that BioMistral is fully loaded in Ollama before the backend accepts traffic,
 
 ## Epic 2: AI Triage Pipeline
 
-The backend AI engine accepts a Greek symptom string, runs it through BioMistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, and reasoning via `POST /api/v1/triage`. The three-tier fallback chain ensures a valid result is always returned. Verified via API client.
+The backend AI engine accepts a Greek symptom string, runs it through Mistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, and reasoning via `POST /api/v1/triage`. The three-tier fallback chain ensures a valid result is always returned. Verified via API client.
 
 ### Story 2.1: ChromaDB Corpus Seeding & RAG Service
 
 As a developer,
 I want a ChromaDB collection seeded with clinical context documents at startup,
-So that the AI pipeline can retrieve relevant medical context to augment BioMistral inference.
+So that the AI pipeline can retrieve relevant medical context to augment Mistral inference.
 
 **Acceptance Criteria:**
 
@@ -224,17 +224,17 @@ So that the AI pipeline can retrieve relevant medical context to augment BioMist
 
 ---
 
-### Story 2.2: BioMistral LLM Service via Ollama
+### Story 2.2: Mistral LLM Service via Ollama
 
 As a developer,
-I want an LLM service that sends structured prompts to BioMistral-7B via Ollama and parses structured triage output,
+I want an LLM service that sends structured prompts to Mistral-7B via Ollama and parses structured triage output,
 So that the AI pipeline can produce MTS classifications, specialty recommendations, and reasoning in Greek.
 
 **Acceptance Criteria:**
 
-**Given** a running Ollama service with `biomistral:7b` loaded
+**Given** a running Ollama service with `mistral:7b` loaded
 **When** `llm_service.classify(symptoms: str, context: str) -> dict` is called
-**Then** a LangChain LCEL chain constructs a prompt combining the symptom text and retrieved context, targeting BioMistral-7B via the Ollama LangChain community integration
+**Then** a LangChain LCEL chain constructs a prompt combining the symptom text and retrieved context, targeting Mistral-7B via the Ollama LangChain community integration
 **And** the prompt instructs the model to return a JSON-parseable response containing `mts_level` (integer 1–5), `mts_label` (string), `specialty` (string), and `reasoning` (string)
 **And** the output parser extracts these fields from the model response; if JSON parsing fails, a `LLMParseError` is raised
 **And** `mts_label` maps correctly to the MTS standard: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent
@@ -435,7 +435,7 @@ So that hackathon evaluators understand the product and the basis for the €10,
 
 **Given** the completed MVP is functional and the architecture document exists
 **When** `docs/proposal.md` is written
-**Then** the document covers: problem statement (7M annual wrong-specialty ΕΣΥ appointments), proposed solution (AI-powered MTS triage + precision doctor matching), technical architecture summary (BioMistral-7B + RAG + FastAPI + Next.js + Docker + NVIDIA B200), GDPR compliance approach (on-premise inference, synthetic data), and value proposition (open-source, replicable by EU public health systems)
+**Then** the document covers: problem statement (7M annual wrong-specialty ΕΣΥ appointments), proposed solution (AI-powered MTS triage + precision doctor matching), technical architecture summary (Mistral-7B + RAG + FastAPI + Next.js + Docker + NVIDIA B200), GDPR compliance approach (on-premise inference, synthetic data), and value proposition (open-source, replicable by EU public health systems)
 **And** the document references measurable success criteria from the PRD: ≥80% MTS classification accuracy, <10s triage response, <2s dashboard latency
 **And** the document is written in clear, non-technical language accessible to a non-technical evaluator
 **And** the document includes a section on what the €10,000 prize would fund (post-hackathon Phase 2 development)
@@ -455,7 +455,7 @@ So that anyone can understand, set up, and run MEDΩ from the repository without
 **Given** the full stack is deployable via `docker compose up`
 **When** `README.md` is completed
 **Then** the README includes: project name and one-paragraph description, prerequisites (Docker with NVIDIA runtime, `docker compose`, NVIDIA GPU), setup instructions (`git clone` → `cp .env.example .env` → `docker compose up`), environment variable table documenting all variables from `.env.example`, demo run instructions (how to access patient form at `:3000` and nurse dashboard at `:3000/dashboard`), and a link to `docs/proposal.md`
-**And** the README includes a note that Ollama will pull `biomistral:7b` on first startup (~4GB) and that pre-warming is automatic
+**And** the README includes a note that Ollama will pull `mistral:7b` on first startup (~4GB) and that pre-warming is automatic
 **And** `LICENSE` contains the full Apache 2.0 license text with the correct copyright holder
 **And** a scan of the repository confirms no `.env` files, API keys, credentials, or secrets are committed — only `.env.example` with placeholder values (NFR8)
 **And** the README is written in English (per `document_output_language` config)

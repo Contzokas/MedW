@@ -20,10 +20,10 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 **Functional Requirements:**
 23 FRs across 6 categories:
-- Symptom Triage (FR1–FR6): Greek free-text input → BioMistral + RAG → MTS level + specialty + doctor + reasoning
+- Symptom Triage (FR1–FR6): Greek free-text input → Mistral + RAG → MTS level + specialty + doctor + reasoning
 - Patient Results & Routing (FR7–FR9): Single results screen with fallback doctor matching
 - Nurse Dashboard (FR10–FR12): Live real-time queue, push updates, no page refresh
-- AI & Knowledge Pipeline (FR13–FR15): BioMistral-7B via Ollama, ChromaDB RAG, graceful fallback to base LLM
+- AI & Knowledge Pipeline (FR13–FR15): Mistral-7B via Ollama, ChromaDB RAG, graceful fallback to base LLM
 - Doctor Dataset (FR16–FR17): Static JSON fixture, specialty + availability filtering
 - System & Operations (FR18–FR23): Docker Compose, health check, data isolation, documentation
 
@@ -41,10 +41,10 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 ### Technical Constraints & Dependencies
 
-- **On-premise only** (GDPR Article 9): BioMistral-7B via Ollama, ChromaDB local; zero external inference calls
-- **No fine-tuning**: Prompt engineering + RAG only; model capabilities fixed at BioMistral-7B
+- **On-premise only** (GDPR Article 9): Mistral-7B via Ollama, ChromaDB local; zero external inference calls
+- **No fine-tuning**: Prompt engineering + RAG only; model capabilities fixed at Mistral-7B
 - **GPU infrastructure**: NVIDIA B200; Ollama must leverage GPU; container startup sequence must ensure model load before accepting traffic
-- **Greek language risk**: BioMistral-7B multilingual capacity for Greek medical terminology is an open risk; validation must occur in sprint 1
+- **Greek language risk**: Mistral-7B multilingual capacity for Greek medical terminology is an open risk; validation must occur in sprint 1
 - **Static doctor dataset**: Static JSON fixture at startup; no live API for MVP
 - **No authentication**: Demo environment; open access only
 
@@ -171,7 +171,7 @@ npx create-next-app@latest frontend \
 ### Infrastructure & Deployment
 
 - **LangChain:** `langchain==1.2.15`, `langchain-core==1.2.29`, `langchain-community` (Ollama), `langchain-chroma` (ChromaDB). LCEL pipeline style.
-- **Docker service order:** `ollama` starts first → healthcheck confirms BioMistral model loaded → `backend` starts → `frontend` starts. Enforces NFR4.
+- **Docker service order:** `ollama` starts first → healthcheck confirms Mistral model loaded → `backend` starts → `frontend` starts. Enforces NFR4.
 - **GPU:** NVIDIA runtime with `deploy.resources.reservations.devices` in docker-compose.yml.
 - **Ports:** frontend :3000 (host), backend :8000 (host/dev), ollama :11434 (internal), chromadb :8001 (internal).
 - **CI/CD:** None for MVP — time constraint. Manual Docker Compose deploy on target hardware.
@@ -183,7 +183,7 @@ npx create-next-app@latest frontend \
 1. Monorepo scaffold + Docker Compose skeleton
 2. FastAPI base + health endpoint + SSE queue foundation
 3. ChromaDB corpus loading + RAG pipeline
-4. BioMistral/Ollama integration + triage endpoint
+4. Mistral/Ollama integration + triage endpoint
 5. Doctor matching service
 6. Next.js patient form + results screen
 7. Next.js nurse dashboard + EventSource SSE client
@@ -309,9 +309,9 @@ logger.info(f"Symptoms: {symptoms}")  # ✗ NEVER
 ```
 
 **Fallback chain for triage (FR15/NFR13):**
-1. RAG + BioMistral → full response
-2. RAG fails → BioMistral base knowledge only → response with `"rag_used": false`
-3. BioMistral fails → MTS Level 3 (Urgent) safe default + generic specialty + disclaimer
+1. RAG + Mistral → full response
+2. RAG fails → Mistral base knowledge only → response with `"rag_used": false`
+3. Mistral fails → MTS Level 3 (Urgent) safe default + generic specialty + disclaimer
 
 **Greek text — hardcoded in JSX for MVP:**
 No i18n translation keys or constants files for labels.
@@ -391,7 +391,7 @@ medw/
     │   ├── services/
     │   │   ├── triage_service.py    ← orchestrates LLM + RAG + doctor; writes to queue (FR2–5, FR13–15)
     │   │   ├── rag_service.py       ← ChromaDB retrieval + fallback (FR14, FR15)
-    │   │   ├── llm_service.py       ← Ollama/BioMistral via LangChain LCEL (FR13, FR5)
+    │   │   ├── llm_service.py       ← Ollama/Mistral via LangChain LCEL (FR13, FR5)
     │   │   └── doctor_service.py    ← fixture loading, specialty filter, fallback match (FR9, FR16, FR17)
     │   ├── schemas/
     │   │   ├── triage.py            ← TriageRequest, TriageResponse, QueueEntry (Pydantic)
@@ -458,7 +458,7 @@ triage.py (router)
 | FR8 — Simulated redirect | `DoctorCard.tsx` → `redirect_url` from response |
 | FR9 — Fallback doctor | `doctor_service.py` fallback branch |
 | FR10–12 — Nurse dashboard | `dashboard/page.tsx`, `TriageQueue.tsx`, `useTriageStream.ts`, `core/queue.py` |
-| FR13 — Greek LLM | `llm_service.py` (BioMistral via Ollama LCEL chain) |
+| FR13 — Greek LLM | `llm_service.py` (Mistral via Ollama LCEL chain) |
 | FR14 — RAG augmentation | `rag_service.py`, `data/corpus/` |
 | FR15 — RAG fallback | `triage_service.py` (try/except around RAG call) |
 | FR16–17 — Doctor dataset | `doctor_service.py`, `data/doctors.json`, `routers/doctors.py` |
@@ -478,7 +478,7 @@ Browser → POST /api/v1/triage
   → routers/triage.py
   → triage_service.py
       → rag_service.py    → ChromaDB (context retrieval)
-      → llm_service.py    → Ollama/BioMistral (inference)
+      → llm_service.py    → Ollama/Mistral (inference)
       → doctor_service.py → doctors.json (specialty match)
       → core/queue.py     (append summary entry)
   ← TriageResponse JSON
@@ -492,7 +492,7 @@ Simultaneously:
 
 **Docker Compose Startup Sequence:**
 ```
-ollama (pulls BioMistral model, healthcheck: model loaded)
+ollama (pulls Mistral model, healthcheck: model loaded)
   → chromadb (healthcheck: HTTP 200 on /api/v1/heartbeat)
   → backend (lifespan: load doctors.json + seed ChromaDB corpus)
   → frontend (serves Next.js, connects to backend via NEXT_PUBLIC_API_URL)
@@ -511,19 +511,19 @@ All 23 FRs and 13 NFRs are architecturally supported. Full mapping documented in
 ### Gap Analysis & Resolutions
 
 **Gap 1 — Ollama model pull (resolved):**
-The `ollama` Docker service uses a custom entrypoint script (`docker/ollama-entrypoint.sh`) that starts the server, pulls `biomistral:7b`, then signals readiness. The docker-compose healthcheck verifies the model is present via `ollama list | grep biomistral` before the `backend` service starts.
+The `ollama` Docker service uses a custom entrypoint script (`docker/ollama-entrypoint.sh`) that starts the server, pulls `mistral:7b`, then signals readiness. The docker-compose healthcheck verifies the model is present via `ollama list | grep mistral` before the `backend` service starts.
 
 Add to project structure:
 ```
 docker/
-└── ollama-entrypoint.sh    ← pull biomistral:7b + start server
+└── ollama-entrypoint.sh    ← pull mistral:7b + start server
 ```
 
 **Gap 2 — ChromaDB corpus seeding (resolved):**
 FastAPI `lifespan` event in `main.py` calls `rag_service.seed_corpus_if_empty()` at startup. This is idempotent — checks for existing documents before ingesting `data/corpus/` files. No manual step required.
 
 **Gap 3 — Greek language fallback (documented):**
-Sprint 1 must validate BioMistral-7B Greek medical terminology quality. If accuracy < 80%, fallback: translate symptom input to English before LLM inference, return result in Greek. This is a `llm_service.py` implementation decision to be confirmed in sprint 1.
+Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy < 80%, fallback: translate symptom input to English before LLM inference, return result in Greek. This is a `llm_service.py` implementation decision to be confirmed in sprint 1.
 
 ### Architecture Completeness Checklist
 
