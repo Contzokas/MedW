@@ -1,20 +1,36 @@
-# Environment
-.env
-*.env.local
-.env.*.local
+# Virtual environment
+venv/
+env/
 
 # Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-# Node
-node_modules/
-.next/
-out/
+# Environment variables
+.env
+.env.local
 
-# Misc
+# Ollama models
+models/
+
+# ChromaDB
+chroma_db/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
 *.log
+
+# Data (μην ανεβάζεις datasets στο GitHub)
+data/mimic/
+data/synthea/output/
+EOF
