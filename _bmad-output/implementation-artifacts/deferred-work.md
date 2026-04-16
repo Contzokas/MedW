@@ -28,3 +28,7 @@
 - **No retry/circuit-breaker around Ollama**: Transient Ollama restarts surface immediately as errors — resilience patterns (retry, circuit-breaker) are an orchestration concern for Story 2.3.
 - **`temperature=0` not externalised**: Deliberate design choice for deterministic JSON output; externalising to config adds complexity without clear benefit at hackathon scope.
 - **Test does not assert `asyncio.to_thread` path**: `classify()` test monkeypatches `_invoke_chain_sync` but does not verify the thread-dispatch mechanism was used — implementation detail, outcome fully covered.
+
+## Deferred from: code review of 2-3-triage-service-orchestration-and-fallback-chain (2026-04-17)
+
+- Unbounded queue list growth [backend/app/core/queue.py] — deferred, pre-existing memory leak without current max size spec

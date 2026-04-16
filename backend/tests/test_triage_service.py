@@ -85,3 +85,87 @@ async def test_classify_wraps_chain_exception_in_llm_parse_error(monkeypatch):
     monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
     with pytest.raises(LLMParseError, match="LLM service error"):
         await classify("πόνος", "context")
+
+
+# ── Story 2.3: triage_service tests ──────────────────────────────────────────
+from unittest.mock import AsyncMock
+
+from app.services.triage_service import classify as triage_classify
+from app.services.rag_service import RAGUnavailableError as _RAGUnavailableError
+from app.services.llm_service import LLMParseError as _LLMParseError
+from app.core import queue as queue_module
+
+_VALID_LLM_RESULT = {
+    "mts_level": 2,
+    "mts_label": "Very Urgent",
+    "specialty": "Καρδιολογία",
+    "reasoning": "Πόνος στο στήθος.",
+}
+
+
+@pytest.fixture(autouse=True)
+def reset_queue():
+    queue_module._queue.clear()
+    yield
+    queue_module._queue.clear()
+
+
+async def test_triage_tier1_rag_and_llm_success(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="context"))
+    monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(return_value=_VALID_LLM_RESULT))
+    result = await triage_classify("πόνος στο στήθος", "patient-001")
+    assert result.rag_used is True
+    assert result.mts_level == 2
+    assert result.specialty == "Καρδιολογία"
+
+
+async def test_triage_tier2_rag_unavailable_falls_back_to_llm(monkeypatch):
+    mock_llm = AsyncMock(return_value=_VALID_LLM_RESULT)
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=_RAGUnavailableError("down")))
+    monkeypatch.setattr("app.services.triage_service.llm_classify", mock_llm)
+    result = await triage_classify("πόνος", "patient-002")
+    assert result.rag_used is False
+    assert result.mts_level == 2
+    mock_llm.assert_called_once_with(symptoms="πόνος", context="")
+
+
+async def test_triage_tier3_llm_parse_error_returns_safe_default(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(side_effect=_LLMParseError("bad")))
+    result = await triage_classify("πόνος", "patient-003")
+    assert result.mts_level == 3
+    assert result.specialty == "Γενική Ιατρική"
+    assert result.rag_used is False
+
+
+async def test_triage_tier3_unexpected_exception_returns_safe_default(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=RuntimeError("boom")))
+    result = await triage_classify("πόνος", "patient-004")
+    assert result.mts_level == 3
+    assert result.specialty == "Γενική Ιατρική"
+
+
+async def test_triage_classify_never_raises(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=Exception("catastrophic")))
+    result = await triage_classify("πόνος", "patient-005")  # must not raise
+    assert result is not None
+
+
+async def test_triage_queue_entry_appended_on_success(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(return_value=_VALID_LLM_RESULT))
+    await triage_classify("πόνος", "patient-006")
+    entries = await queue_module.get_all_entries()
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.patient_id == "patient-006"
+    assert entry.mts_level == 2
+    assert entry.specialty == "Καρδιολογία"
+    assert "symptoms" not in str(entry)
+
+
+async def test_triage_queue_not_appended_on_tier3(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=Exception("fail")))
+    await triage_classify("πόνος", "patient-007")
+    entries = await queue_module.get_all_entries()
+    assert len(entries) == 0
