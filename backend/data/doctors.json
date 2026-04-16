@@ -1,0 +1,14 @@
+[
+  {"name": "Δρ. Αλέξανδρος Παπαδόπουλος", "specialty": "Καρδιολογία", "availability": true},
+  {"name": "Δρ. Μαρία Νικολάου", "specialty": "Καρδιολογία", "availability": false},
+  {"name": "Δρ. Γεώργιος Κωνσταντίνου", "specialty": "Ορθοπεδική", "availability": true},
+  {"name": "Δρ. Ελένη Σταματίου", "specialty": "Νευρολογία", "availability": true},
+  {"name": "Δρ. Νικόλαος Ανδρέου", "specialty": "Πνευμονολογία", "availability": true},
+  {"name": "Δρ. Σοφία Δημητρίου", "specialty": "Γαστρεντερολογία", "availability": false},
+  {"name": "Δρ. Κωνσταντίνος Παπανδρέου", "specialty": "Γενική Ιατρική", "availability": true},
+  {"name": "Δρ. Χριστίνα Βασιλείου", "specialty": "Γενική Ιατρική", "availability": true},
+  {"name": "Δρ. Αθηνά Μιχαηλίδου", "specialty": "Δερματολογία", "availability": true},
+  {"name": "Δρ. Σπύρος Αντωνίου", "specialty": "Παθολογία", "availability": false},
+  {"name": "Δρ. Ανδρέας Μαρκόπουλος", "specialty": "Ουρολογία", "availability": false},
+  {"name": "Δρ. Αναστασία Οικονόμου", "specialty": "Ψυχιατρική", "availability": true}
+]

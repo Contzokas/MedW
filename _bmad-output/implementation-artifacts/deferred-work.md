@@ -32,3 +32,7 @@
 ## Deferred from: code review of 2-3-triage-service-orchestration-and-fallback-chain (2026-04-17)
 
 - Unbounded queue list growth [backend/app/core/queue.py] — deferred, pre-existing memory leak without current max size spec
+
+## Deferred from: code review of 2-4-mocked-doctor-dataset-and-doctor-service (2026-04-16)
+
+- Specialty query normalization in doctors route/service [backend/app/routers/doctors.py:10] — trigger: leading/trailing whitespace or case variants in query can return false-empty results; deferred as low risk and outside explicit AC scope.
