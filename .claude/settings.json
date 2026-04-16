@@ -4,7 +4,13 @@
       "WebSearch",
       "Bash(pip install *)",
       "Bash(python -m pytest tests/test_rag_service.py -v)",
-      "Bash(python -m pytest -v)"
+      "Bash(python -m pytest -v)",
+      "Bash(python -m pytest tests/test_triage_service.py -v)",
+      "Bash(pip list *)",
+      "Bash(docker-compose ps *)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/pytest tests/test_triage_service.py -v)"
     ],
     "additionalDirectories": [
       "/home/dd/Sync/Projects/MedW/_bmad-output/planning-artifacts"
