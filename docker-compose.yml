@@ -1,19 +1,49 @@
-version: "3.9"
-
 services:
   ollama:
-    # Implemented in Story 1.3
-    image: ollama/ollama
-    # GPU config added in Story 1.3
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # Uncomment the below lines if you have an NVIDIA GPU and installed nvidia-container-toolkit
+    deploy:
+       resources:
+         reservations:
+           devices:
+             - driver: nvidia
+               count: 1
+               capabilities: [gpu]
+
+  # This service waits for ollama to start and automatically pulls the biomistral model from Hugging Face
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-pull-mistral
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: >
+      sh -c "echo 'Waiting for Ollama to be ready...' && 
+             sleep 10 && 
+             echo 'Pulling mistral model from HuggingFace...' && 
+             ollama pull hf.co/LoneStriker/Mistral-7B-GGUF && 
+             echo 'Model pulled successfully!'"
+    restart: "no"
 
   chromadb:
-    # Implemented in Story 1.3
-    image: chromadb/chroma:1.5.7
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
 
-  backend:
-    # Implemented in Stories 1.2–1.3
-    build: ./backend
-
-  frontend:
-    # Implemented in Story 1.3
-    build: ./frontend
+volumes:
+  ollama_data:
+  chroma_data:
