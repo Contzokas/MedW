@@ -81,7 +81,7 @@ _No UX Design document was provided for this project. No UX-DRs extracted._
 FR1:  Epic 3 — Greek symptom input form (frontend)
 FR2:  Epic 2 — MTS classification (AI pipeline)
 FR3:  Epic 2 — Specialty recommendation (AI pipeline)
-FR4:  Epic 3 — Doctor matching (patient results screen)
+FR4:  Epic 2 — Doctor matching (doctor service + triage endpoint)
 FR5:  Epic 2 — Reasoning generation (AI pipeline)
 FR6:  Epic 3 — Medical disclaimer display (results screen)
 FR7:  Epic 3 — Complete results screen
@@ -93,8 +93,8 @@ FR12: Epic 4 — SSE push (no page refresh)
 FR13: Epic 2 — Greek LLM processing via BioMistral
 FR14: Epic 2 — ChromaDB RAG augmentation
 FR15: Epic 2 — Base LLM fallback when RAG fails
-FR16: Epic 3 — Filterable mocked doctor list (GET /api/v1/doctors)
-FR17: Epic 3 — Specialty-aligned doctor matching
+FR16: Epic 2 — Filterable mocked doctor list (GET /api/v1/doctors)
+FR17: Epic 2 — Specialty-aligned doctor matching
 FR18: Epic 1 — Docker Compose 4-service deployment
 FR19: Epic 1 — Health check endpoint
 FR20: Epic 1 — Network isolation / data containment
@@ -111,13 +111,14 @@ The full monorepo is scaffolded, all four Docker services start in the correct o
 **Key NFRs:** NFR4, NFR5, NFR7, NFR8, NFR12
 
 ### Epic 2: AI Triage Pipeline
-The backend AI engine accepts a Greek symptom string, runs it through BioMistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, and reasoning via `POST /api/v1/triage`. The three-tier fallback chain ensures a valid result is always returned. Verified via API client.
-**FRs covered:** FR2, FR3, FR5, FR13, FR14, FR15
+The backend AI engine accepts a Greek symptom string, runs it through BioMistral-7B + ChromaDB RAG, and returns a structured MTS level, specialty, matched doctor, and reasoning via `POST /api/v1/triage`. The mocked doctor dataset is loaded and the three-tier fallback chain ensures a valid result is always returned. Verified via API client.
+**FRs covered:** FR2, FR3, FR4, FR5, FR13, FR14, FR15, FR16, FR17
+> Note: FR4, FR16, FR17 are covered by Story 2.4 (Doctor Service); FR2, FR3, FR5, FR13–FR15 by Stories 2.1–2.3; all wired together in Story 2.5.
 **Key NFRs:** NFR1, NFR13
 
 ### Epic 3: Patient Triage Experience
 A patient can open the `/` route, enter symptoms in Greek, and receive a complete results screen: MTS level, recommended specialty, matched doctor, reasoning explanation, medical disclaimer, and a simulated finddoctors.gov.gr redirect. Fallback doctor matching handles missing specialty cases gracefully.
-**FRs covered:** FR1, FR4, FR6, FR7, FR8, FR9, FR16, FR17
+**FRs covered:** FR1, FR6, FR7, FR8, FR9
 **Key NFRs:** NFR3, NFR9, NFR10, NFR11
 
 ### Epic 4: Nurse Real-Time Dashboard
@@ -264,32 +265,7 @@ So that the triage pipeline always returns a valid result and never surfaces a b
 
 ---
 
-### Story 2.4: POST /api/v1/triage Endpoint
-
-As a developer,
-I want the triage API endpoint wired to the triage service with validated Pydantic schemas,
-So that the complete API contract from the PRD is met and the endpoint can be tested end-to-end via an API client.
-
-**Acceptance Criteria:**
-
-**Given** `triage_service` from Story 2.3 is implemented
-**When** `POST /api/v1/triage` is called with `{ "symptoms": "string", "patient_id": "string" }`
-**Then** `backend/app/schemas/triage.py` defines `TriageRequest` (symptoms: str, patient_id: str) and `TriageResponse` (mts_level: int, mts_label: str, specialty: str, doctor: dict, reasoning: str, redirect_url: str) as Pydantic models
-**And** `backend/app/routers/triage.py` contains only the route definition — all business logic is delegated to `triage_service`
-**And** the endpoint calls `triage_service.classify` and returns the `TriageResponse` as JSON with HTTP 200
-**And** the endpoint never returns HTTP 500 — all exceptions from the service layer are already handled by Story 2.3's fallback chain
-**And** the response JSON uses snake_case field names matching the PRD contract exactly: `mts_level`, `mts_label`, `specialty`, `doctor`, `reasoning`, `redirect_url`
-**And** the response is a flat JSON object — no envelope wrapper (`{ data: ..., success: ... }` is forbidden)
-**And** `GET /api/v1/health` continues to return `{ "status": "ok" }` confirming both endpoints are registered
-**And** end-to-end manual test via `curl` or the `/docs` Swagger UI: submitting `{ "symptoms": "πόνος στο στήθος", "patient_id": "test-001" }` returns a valid `TriageResponse` with all required fields populated
-
----
-
-## Epic 3: Patient Triage Experience
-
-A patient can open the `/` route, enter symptoms in Greek, and receive a complete results screen: MTS level, recommended specialty, matched doctor, reasoning explanation, medical disclaimer, and a simulated finddoctors.gov.gr redirect. Fallback doctor matching handles missing specialty cases gracefully.
-
-### Story 3.1: Mocked Doctor Dataset & Doctor Service
+### Story 2.4: Mocked Doctor Dataset & Doctor Service
 
 As a developer,
 I want the doctor dataset loaded at startup and accessible via a filterable API endpoint,
@@ -310,7 +286,32 @@ So that the triage pipeline can match a doctor to each result and the frontend c
 
 ---
 
-### Story 3.2: Greek Symptom Input Form
+### Story 2.5: POST /api/v1/triage Endpoint
+
+As a developer,
+I want the triage API endpoint wired to the triage service with validated Pydantic schemas,
+So that the complete API contract from the PRD is met and the endpoint can be tested end-to-end via an API client.
+
+**Acceptance Criteria:**
+
+**Given** `triage_service` from Story 2.3 and `doctor_service` from Story 2.4 are implemented
+**When** `POST /api/v1/triage` is called with `{ "symptoms": "string", "patient_id": "string" }`
+**Then** `backend/app/schemas/triage.py` defines `TriageRequest` (symptoms: str, patient_id: str) and `TriageResponse` (mts_level: int, mts_label: str, specialty: str, doctor: dict, reasoning: str, redirect_url: str) as Pydantic models
+**And** `backend/app/routers/triage.py` contains only the route definition — all business logic is delegated to `triage_service`
+**And** the endpoint calls `triage_service.classify` and returns the `TriageResponse` as JSON with HTTP 200
+**And** the endpoint never returns HTTP 500 — all exceptions from the service layer are already handled by Story 2.3's fallback chain
+**And** the response JSON uses snake_case field names matching the PRD contract exactly: `mts_level`, `mts_label`, `specialty`, `doctor`, `reasoning`, `redirect_url`
+**And** the response is a flat JSON object — no envelope wrapper (`{ data: ..., success: ... }` is forbidden)
+**And** `GET /api/v1/health` continues to return `{ "status": "ok" }` confirming both endpoints are registered
+**And** end-to-end manual test via `curl` or the `/docs` Swagger UI: submitting `{ "symptoms": "πόνος στο στήθος", "patient_id": "test-001" }` returns a valid `TriageResponse` with all required fields populated
+
+---
+
+## Epic 3: Patient Triage Experience
+
+A patient can open the `/` route, enter symptoms in Greek, and receive a complete results screen: MTS level, recommended specialty, matched doctor, reasoning explanation, medical disclaimer, and a simulated finddoctors.gov.gr redirect. The doctor service (Epic 2, Story 2.4) and triage endpoint (Epic 2, Story 2.5) are prerequisites.
+
+### Story 3.1: Greek Symptom Input Form
 
 As a patient,
 I want a Greek-language symptom input form at the root route,
@@ -325,14 +326,14 @@ So that I can describe my symptoms in Greek and submit them for triage without n
 **And** on submit, the form calls `POST /api/v1/triage` via `frontend/app/lib/api.ts` with `{ symptoms, patient_id }` where `patient_id` is a client-generated anonymous UUID
 **And** while the request is in flight, the submit button is disabled and a loading indicator is shown — the patient cannot submit twice (local `isLoading` state via `useState`, not global state)
 **And** if the API call fails (network error or non-200 response), an inline error message is displayed in Greek without crashing the page
-**And** on success, the triage response is passed to the results view (Story 3.3 component)
+**And** on success, the triage response is passed to the results view (Story 3.2 component)
 **And** all API calls use the `fetch` API via `frontend/app/lib/api.ts` — no Axios or React Query
 **And** all imports in frontend TypeScript files use the `@/` prefix — no relative imports
 **And** the page initial load completes in < 3 seconds on the demo machine (NFR3)
 
 ---
 
-### Story 3.3: Triage Results Screen with Disclaimer
+### Story 3.2: Triage Results Screen with Disclaimer
 
 As a patient,
 I want to see my complete triage result — MTS level, specialty, doctor, reasoning, and a medical disclaimer — on a single screen,
@@ -355,7 +356,7 @@ So that I understand my urgency level and have a clear next action without needi
 
 ---
 
-### Story 3.4: Simulated finddoctors.gov.gr Redirect
+### Story 3.3: Simulated finddoctors.gov.gr Redirect
 
 As a patient,
 I want to follow a link from my triage result to a simulated finddoctors.gov.gr page scoped to my recommended doctor and specialty,
