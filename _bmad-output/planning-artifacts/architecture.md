@@ -148,7 +148,7 @@ npx create-next-app@latest frontend \
 
 - **Auth:** None. Open access — demo environment only.
 - **CORS:** `allow_origins=["*"]` — explicitly scoped to demo. Post-MVP must be locked to specific origins.
-- **Network isolation:** Ollama (:11434) and ChromaDB (:8001) bound to Docker internal network only. No host-exposed inference endpoints.
+- **Network isolation:** Ollama (:11434) and ChromaDB (:8000) bound to Docker internal network only. No host-exposed inference endpoints.
 - **Secrets:** All config via environment variables; no credentials committed to repo (per NFR8).
 - **Patient data logging:** Symptom text explicitly excluded from all log statements at code level.
 
@@ -173,7 +173,7 @@ npx create-next-app@latest frontend \
 - **LangChain:** `langchain==1.2.15`, `langchain-core==1.2.29`, `langchain-community` (Ollama), `langchain-chroma` (ChromaDB). LCEL pipeline style.
 - **Docker service order:** `ollama` starts first → healthcheck confirms Mistral model loaded → `backend` starts → `frontend` starts. Enforces NFR4.
 - **GPU:** NVIDIA runtime with `deploy.resources.reservations.devices` in docker-compose.yml.
-- **Ports:** frontend :3000 (host), backend :8000 (host/dev), ollama :11434 (internal), chromadb :8001 (internal).
+- **Ports:** frontend :3000 (host), backend :8000 (host/dev), ollama :11434 (internal), chromadb :8000 (internal).
 - **CI/CD:** None for MVP — time constraint. Manual Docker Compose deploy on target hardware.
 - **Monitoring:** None for MVP. FastAPI `/api/v1/health` provides readiness signal.
 
@@ -422,7 +422,7 @@ medw/
 | Doctor list | `GET /api/v1/doctors` | Frontend `api.ts` |
 | Health check | `GET /api/v1/health` | Docker Compose healthcheck |
 | Ollama API | `http://ollama:11434` | `llm_service.py` only — internal |
-| ChromaDB API | `http://chromadb:8001` | `rag_service.py` only — internal |
+| ChromaDB API | `http://chromadb:8000` | `rag_service.py` only — internal |
 
 **Service Boundaries:**
 
