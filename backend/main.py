@@ -33,5 +33,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+import traceback
+import sys
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "trace": traceback.format_exc()}
+    )
+
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")
+from app.routers import triage
+app.include_router(triage.router, prefix="/api/v1")
