@@ -34,3 +34,9 @@ Thumbs.db
 data/mimic/
 data/synthea/output/
 EOF
+
+# Python ignore
+backend/__pycache__/
+backend/.pytest_cache/
+back
+backend/.venv/
