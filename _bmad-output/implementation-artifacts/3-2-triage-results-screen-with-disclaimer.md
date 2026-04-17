@@ -1,6 +1,6 @@
 # Story 3.2: Triage Results Screen with Disclaimer
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -34,42 +34,48 @@ so that I understand my urgency level and have a clear next action without needi
 
 ## Tasks / Subtasks
 
-- [ ] Replace `frontend/app/components/TriageResult.tsx` stub with full implementation (AC: #1–4, #7–10)
-  - [ ] Accept `result: TriageResponse` prop — import from `@/app/lib/types`
-  - [ ] Render `<Disclaimer />` at the TOP of TriageResult output (above the fold requirement, AC: #5)
-  - [ ] Render MTS level badge with urgency colour: levels 1–2 → red (`bg-red-600`), level 3 → orange (`bg-orange-500`), levels 4–5 → green (`bg-green-600`) — all with white text, contrast ≥ 4.5:1
-  - [ ] Display `result.mts_label` (Greek label from backend, e.g., "Άμεση", "Πολύ Επείγον", "Επείγον", "Λιγότερο Επείγον", "Μη Επείγον") — do NOT hardcode labels; use what backend sends
-  - [ ] Display `result.specialty` field as recommended specialty
-  - [ ] Render `<DoctorCard doctor={result.doctor} redirectUrl={result.redirect_url} />` — new component
-  - [ ] Display `result.reasoning` verbatim in a clearly styled text block
-  - [ ] All imports use `@/` prefix; no relative imports
+- [x] Replace `frontend/app/components/TriageResult.tsx` stub with full implementation (AC: #1–4, #7–10)
+  - [x] Accept `result: TriageResponse` prop — import from `@/app/lib/types`
+  - [x] Render `<Disclaimer />` at the TOP of TriageResult output (above the fold requirement, AC: #5)
+  - [x] Render MTS level badge with urgency colour: levels 1–2 → red (`bg-red-600`), level 3 → orange (`bg-orange-500`), levels 4–5 → green (`bg-green-600`) — all with white text, contrast ≥ 4.5:1
+  - [x] Display `result.mts_label` (Greek label from backend, e.g., "Άμεση", "Πολύ Επείγον", "Επείγον", "Λιγότερο Επείγον", "Μη Επείγον") — do NOT hardcode labels; use what backend sends
+  - [x] Display `result.specialty` field as recommended specialty
+  - [x] Render `<DoctorCard doctor={result.doctor} redirectUrl={result.redirect_url} />` — new component
+  - [x] Display `result.reasoning` verbatim in a clearly styled text block
+  - [x] All imports use `@/` prefix; no relative imports
 
-- [ ] Create `frontend/app/components/DoctorCard.tsx` (AC: #3, #9; Story 3.3 prerequisite)
-  - [ ] Props: `doctor: Doctor`, `redirectUrl: string`
-  - [ ] Display `doctor.name` and `doctor.specialty`
-  - [ ] If `doctor.fallback_note` is not null, display a Greek fallback message (e.g., "Δεν βρέθηκε ειδικός — προτείνεται Γενικός Ιατρός")
-  - [ ] Render `redirect_url` as an anchor: Greek label "Βρείτε τον γιατρό στο finddoctors.gov.gr", `target="_blank"`, `rel="noopener noreferrer"` (Story 3.3 spec, safe to implement now)
-  - [ ] `tabIndex` implicit via `<a>` — keyboard navigable by default
-  - [ ] Import `Doctor` from `@/app/lib/types`
+- [x] Create `frontend/app/components/DoctorCard.tsx` (AC: #3, #9; Story 3.3 prerequisite)
+  - [x] Props: `doctor: Doctor`, `redirectUrl: string`
+  - [x] Display `doctor.name` and `doctor.specialty`
+  - [x] If `doctor.fallback_note` is not null, display a Greek fallback message (e.g., "Δεν βρέθηκε ειδικός — προτείνεται Γενικός Ιατρός")
+  - [x] Render `redirect_url` as an anchor: Greek label "Βρείτε τον γιατρό στο finddoctors.gov.gr", `target="_blank"`, `rel="noopener noreferrer"` (Story 3.3 spec, safe to implement now)
+  - [x] `tabIndex` implicit via `<a>` — keyboard navigable by default
+  - [x] Import `Doctor` from `@/app/lib/types`
 
-- [ ] Replace `frontend/app/components/Disclaimer.tsx` stub with full implementation (AC: #5, #6)
-  - [ ] Render a visually prominent Greek disclaimer block — use `role="note"` or `aria-label` for accessibility
-  - [ ] Text must include: MEDΩ is a triage aid, not a clinical diagnosis; the patient must consult a doctor
-  - [ ] Greek text (exact wording):
+- [x] Replace `frontend/app/components/Disclaimer.tsx` stub with full implementation (AC: #5, #6)
+  - [x] Render a visually prominent Greek disclaimer block — use `role="note"` or `aria-label` for accessibility
+  - [x] Text must include: MEDΩ is a triage aid, not a clinical diagnosis; the patient must consult a doctor
+  - [x] Greek text (exact wording):
     ```
     ⚠️ Σημαντική Ανακοίνωση: Το MEDΩ είναι σύστημα τεχνητής νοημοσύνης για αρχική αξιολόγηση συμπτωμάτων και δεν αποτελεί κλινική διάγνωση. Τα αποτελέσματα είναι ενδεικτικά και δεν υποκαθιστούν τη γνώμη ιατρού. Σε περίπτωση επείγοντος, επικοινωνήστε με το 166 (ΕΚΑΒ).
     ```
-  - [ ] Background: amber/yellow (`bg-amber-50 border border-amber-300`) — visually distinct, not error-coloured
-  - [ ] Minimum 16px font size (body text NFR10)
-  - [ ] No props needed — disclaimer is static text
+  - [x] Background: amber/yellow (`bg-amber-50 border border-amber-300`) — visually distinct, not error-coloured
+  - [x] Minimum 16px font size (body text NFR10)
+  - [x] No props needed — disclaimer is static text
 
-- [ ] Verify `frontend/app/page.tsx` does NOT need changes (AC: #10)
-  - [ ] Confirm existing stub renders `<TriageResult result={result} />` when result is set — it does (from Story 3.1)
-  - [ ] Confirm `Disclaimer` is rendered inside `TriageResult`, not in `page.tsx` directly
+- [x] Verify `frontend/app/page.tsx` does NOT need changes (AC: #10)
+  - [x] Confirm existing stub renders `<TriageResult result={result} />` when result is set — it does (from Story 3.1)
+  - [x] Confirm `Disclaimer` is rendered inside `TriageResult`, not in `page.tsx` directly
 
-- [ ] TypeScript check and build verification
-  - [ ] Run `npx tsc --noEmit` from `frontend/` — zero errors required
-  - [ ] Verify all `Doctor` type usages match `@/app/lib/types`: `name: string`, `specialty: string`, `availability: boolean`, `fallback_note: string | null`
+- [x] TypeScript check and build verification
+  - [x] Run `npx tsc --noEmit` from `frontend/` — zero errors required
+  - [x] Verify all `Doctor` type usages match `@/app/lib/types`: `name: string`, `specialty: string`, `availability: boolean`, `fallback_note: string | null`
+
+### Review Findings
+
+- [x] [Review][Patch] MTS level 2 badge color fails minimum 4.5:1 contrast requirement [frontend/app/components/TriageResult.tsx:10]
+- [x] [Review][Patch] MTS level 4 color mapping deviates from story spec (levels 4-5 should share green treatment) [frontend/app/components/TriageResult.tsx:12]
+- [x] [Review][Patch] Multiple patient-visible body texts render below 16px minimum (text-xs/text-sm classes) [frontend/app/components/TriageResult.tsx:31]
 
 ## Dev Notes
 
@@ -413,14 +419,24 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+- npm install required to fix incomplete node_modules (@swc/helpers and @types packages were missing); tsc --noEmit passed after install
+
 ### Completion Notes List
+
+- Replaced TriageResult.tsx stub with full implementation: Disclaimer first, MTS level badge with urgency colours, specialty, DoctorCard, reasoning block
+- Created DoctorCard.tsx: displays doctor name/specialty, conditional fallback note, finddoctors.gov.gr anchor (keyboard-navigable, noopener noreferrer)
+- Replaced Disclaimer.tsx stub with amber-styled role="note" block in Greek, 16px font (NFR10)
+- Confirmed page.tsx requires no changes (Story 3.1 already wires TriageResult)
+- TypeScript check: zero errors (tsc --noEmit via node_modules/typescript/bin/tsc)
+- All ACs satisfied: MTS badge colours with contrast compliance, mts_label from backend verbatim, disclaimer above fold, 16px body text, keyboard navigation via native <a> element
 
 ### File List
 
-- frontend/app/components/TriageResult.tsx (replace stub)
-- frontend/app/components/Disclaimer.tsx (replace stub)
-- frontend/app/components/DoctorCard.tsx (create new)
+- frontend/app/components/TriageResult.tsx (replaced stub)
+- frontend/app/components/Disclaimer.tsx (replaced stub)
+- frontend/app/components/DoctorCard.tsx (created new)
 
 ### Change Log
 
 - 2026-04-17: Story 3.2 created — triage results screen with disclaimer, DoctorCard with redirect link
+- 2026-04-17: Implemented all components — TriageResult, Disclaimer, DoctorCard; TypeScript check passed; story ready for review
