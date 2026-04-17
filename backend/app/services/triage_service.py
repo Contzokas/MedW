@@ -21,7 +21,7 @@ _SAFE_REDIRECT = (
 
 _SAFE_DEFAULT = TriageResponse(
     mts_level=3,
-    mts_label="Urgent",
+    mts_label="Επείγον",
     specialty=_GP_SPECIALTY,
     doctor=Doctor(
         name=_GP_NAME,
@@ -62,7 +62,7 @@ async def classify(symptoms: str, patient_id: str) -> TriageResponse:
         raise
     except Exception as exc:
         logger.error("Triage pipeline failure: %s", type(exc).__name__)
-        return _SAFE_DEFAULT.model_copy()
+        result = _SAFE_DEFAULT.model_copy()
 
     timestamp = datetime.now(tz=timezone.utc).isoformat()
     try:

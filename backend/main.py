@@ -1,7 +1,5 @@
-from contextlib import asynccontextmanager
 import logging
-import os
-import traceback
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -38,15 +36,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception for %s %s", request.method, request.url.path)
-    content: dict = {"detail": "Internal server error"}
-    if _DEBUG:
-        content["trace"] = traceback.format_exc()
-    return JSONResponse(status_code=500, content=content)
-
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")

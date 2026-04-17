@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { QueueEntry } from "@/app/lib/types";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Dashboard() {
-  const [queue, setQueue] = useState<any[]>([]);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
 
   const fetchQueue = async () => {
     try {
@@ -20,10 +23,17 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchQueue();
+    const initialFetch = setTimeout(() => {
+      void fetchQueue();
+    }, 0);
     // Poll every 3 seconds
-    const interval = setInterval(fetchQueue, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      void fetchQueue();
+    }, 3000);
+    return () => {
+      clearTimeout(initialFetch);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
