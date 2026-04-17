@@ -5,6 +5,8 @@ import { QueueEntry } from "@/app/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function Dashboard() {
   const [queue, setQueue] = useState<QueueEntry[]>([]);
 
@@ -46,7 +48,7 @@ export default function Dashboard() {
             <thead className="bg-gray-100">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ώρα (UTC)
+                  Ώρα (Τοπική)
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Patient ID

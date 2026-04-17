@@ -13,6 +13,8 @@ from app.services.rag_service import seed_corpus_if_empty
 load_dotenv()  # Load .env if present (development only)
 logger = logging.getLogger(__name__)
 
+_DEBUG = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
