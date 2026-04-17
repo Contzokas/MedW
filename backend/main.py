@@ -1,9 +1,12 @@
 from contextlib import asynccontextmanager
 import logging
+import os
+import traceback
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.routers import doctors, health
 from app.services import doctor_service
@@ -11,6 +14,8 @@ from app.services.rag_service import seed_corpus_if_empty
 
 load_dotenv()  # Load .env if present (development only)
 logger = logging.getLogger(__name__)
+
+_DEBUG = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
 
 
 @asynccontextmanager
@@ -33,16 +38,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from fastapi.responses import JSONResponse
-import traceback
-import sys
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "trace": traceback.format_exc()}
-    )
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception for %s %s", request.method, request.url.path)
+    content: dict = {"detail": "Internal server error"}
+    if _DEBUG:
+        content["trace"] = traceback.format_exc()
+    return JSONResponse(status_code=500, content=content)
+
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")

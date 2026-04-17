@@ -90,9 +90,19 @@ def _build_chain():
     return prompt | llm | StrOutputParser()
 
 
+# Module-level lazy singleton — chain is built once and reused across requests.
+_chain = None
+
+
+def _get_chain():
+    global _chain
+    if _chain is None:
+        _chain = _build_chain()
+    return _chain
+
+
 def _invoke_chain_sync(symptoms: str, context: str) -> str:
-    chain = _build_chain()
-    return chain.invoke({"symptoms": symptoms, "context": context})
+    return _get_chain().invoke({"symptoms": symptoms, "context": context})
 
 
 def _parse_response(raw: str) -> dict:

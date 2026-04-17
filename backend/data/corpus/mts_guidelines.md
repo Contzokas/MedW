@@ -20,7 +20,7 @@ Minor conditions that need attention but are not immediately dangerous.
 Symptoms: mild pain (1–4/10), minor lacerations, sore throat, mild fever (<38.5°C), ear pain, mild headache without neurological signs, minor musculoskeletal injuries, skin rashes without systemic symptoms, urinary symptoms without fever.
 Action: Assessment within 1 hour.
 
-## MTS Level 5 — Non-Urgent (Μη Επείγον) — Target: 2 hours
+## MTS Level 5 — Non-urgent (Μη Επείγον) — Target: 2 hours
 Conditions that can safely wait for assessment.
 Symptoms: chronic conditions without acute exacerbation, minor complaints, prescription refills, minor skin irritation, well-controlled chronic pain, follow-up queries.
 Action: Assessment within 2 hours when acute cases are managed.

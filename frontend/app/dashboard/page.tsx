@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function Dashboard() {
   const [queue, setQueue] = useState<any[]>([]);
 
   const fetchQueue = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/queue");
+      const res = await fetch(`${API_BASE}/api/v1/triage/queue`);
       if (res.ok) {
         const data = await res.json();
         setQueue(data);
@@ -36,7 +38,7 @@ export default function Dashboard() {
             <thead className="bg-gray-100">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ώρα (UTC)
+                  Ώρα (Τοπική)
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Patient ID

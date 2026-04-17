@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Head from "next/head";
+import { FormEvent } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
   const [symptoms, setSymptoms] = useState("");
@@ -9,19 +11,18 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setResult(null);
 
     try {
-      // In Docker Compose, the frontend runs on the host interacting with backend at localhost:8000 
-      // or mapped via proxy. But since we are calling from browser, we must use localhost:8000
-      const res = await fetch("http://localhost:8000/api/v1/triage", {
+      const patient_id = crypto.randomUUID();
+      const res = await fetch(`${API_BASE}/api/v1/triage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symptoms }),
+        body: JSON.stringify({ symptoms, patient_id }),
       });
 
       if (!res.ok) {
@@ -106,7 +107,10 @@ export default function Home() {
                   {result.doctor ? (
                     <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
                       <p className="font-semibold text-blue-900">Dr. {result.doctor.name}</p>
-                      <p className="text-blue-800">{result.doctor.specialty} - {result.doctor.hospital}</p>
+                      <p className="text-blue-800">{result.doctor.specialty}</p>
+                      {result.doctor.fallback_note && (
+                        <p className="text-yellow-700 text-xs mt-1">{result.doctor.fallback_note}</p>
+                      )}
                       {result.redirect_url && (
                         <a
                           href={result.redirect_url}

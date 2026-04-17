@@ -13,17 +13,25 @@ COLLECTION_NAME = "clinical_context"
 CORPUS_DIR = Path(__file__).parent.parent.parent / "data" / "corpus"
 TOP_K = 3
 
+# Module-level lazy singletons — initialised once on first use to avoid
+# per-request overhead (SentenceTransformer load is hundreds of ms+).
+_chroma_client = None
+_embedding_fn = None
+
 
 class RAGUnavailableError(Exception):
     pass
 
 
 def _get_collection():
-    client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-    embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-    return client.get_or_create_collection(
+    global _chroma_client, _embedding_fn
+    if _chroma_client is None:
+        _chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    if _embedding_fn is None:
+        _embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    return _chroma_client.get_or_create_collection(
         name=COLLECTION_NAME,
-        embedding_function=embedding_fn,
+        embedding_function=_embedding_fn,
     )
 
 
@@ -73,4 +81,4 @@ async def retrieve_context(symptoms: str) -> str:
         return await asyncio.to_thread(_retrieve_sync, symptoms)
     except Exception as exc:
         logger.error("ChromaDB retrieval failed: %s", exc, exc_info=True)
-        raise RAGUnavailableError(f"ChromaDB unavailable: {exc}") from exc
+        raise RAGUnavailableError("ChromaDB unavailable") from exc
