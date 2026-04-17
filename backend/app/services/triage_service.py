@@ -19,7 +19,7 @@ _SAFE_REDIRECT = (
 
 _SAFE_DEFAULT = TriageResponse(
     mts_level=3,
-    mts_label="Urgent",
+    mts_label="Επείγον",
     specialty=_GP_SPECIALTY,
     doctor={"name": _GP_NAME, "specialty": _GP_SPECIALTY, "availability": True, "fallback_note": "Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό."},
     reasoning="Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό.",
