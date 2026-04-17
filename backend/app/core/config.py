@@ -13,3 +13,7 @@ try:
     CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))
 except ValueError:
     CHROMA_PORT: int = 8000
+try:
+    QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))
+except ValueError:
+    QUEUE_MAX_ENTRIES: int = 1000

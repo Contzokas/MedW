@@ -1,8 +1,10 @@
 import asyncio
+from collections import deque
 
+from app.core.config import QUEUE_MAX_ENTRIES
 from app.schemas.triage import QueueEntry
 
-_queue: list[QueueEntry] = []
+_queue: deque[QueueEntry] = deque(maxlen=QUEUE_MAX_ENTRIES)
 _lock: asyncio.Lock | None = None
 
 
@@ -20,4 +22,4 @@ async def append_entry(entry: QueueEntry) -> None:
 
 async def get_all_entries() -> list[QueueEntry]:
     async with _get_lock():
-        return [entry.model_copy() for entry in _queue]
+        return [entry.model_copy() for entry in list(_queue)]
