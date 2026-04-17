@@ -1,5 +1,6 @@
 import pytest
 import chromadb
+from chromadb import EmbeddingFunction, Documents, Embeddings
 
 from app.services.rag_service import (
     COLLECTION_NAME,
@@ -13,17 +14,27 @@ from app.services.rag_service import (
 )
 
 
+class _DummyEmbeddingFn(EmbeddingFunction):
+    """Zero-vector embeddings for unit tests — no sentence_transformers needed."""
+    def __init__(self) -> None:
+        pass
+
+    def name(self) -> str:
+        return "dummy"
+
+    def __call__(self, input: Documents) -> Embeddings:
+        return [[0.0] * 384 for _ in input]
+
+
 @pytest.fixture
 def in_memory_chroma(monkeypatch):
     """Replace HttpClient with in-memory ChromaDB client for unit tests."""
     client = chromadb.EphemeralClient()  # in-memory client for unit tests
 
     def fake_get_collection():
-        from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-        embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
         return client.get_or_create_collection(
             name=COLLECTION_NAME,
-            embedding_function=embedding_fn,
+            embedding_function=_DummyEmbeddingFn(),
         )
 
     monkeypatch.setattr("app.services.rag_service._get_collection", fake_get_collection)

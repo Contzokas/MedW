@@ -1,0 +1,108 @@
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from httpx import AsyncClient, ASGITransport
+
+from main import app
+from app.schemas.triage import TriageResponse
+
+_MOCK_RESPONSE = TriageResponse(
+    mts_level=2,
+    mts_label="Very Urgent",
+    specialty="Καρδιολογία",
+    doctor={"name": "Δρ. Τεστ", "specialty": "Καρδιολογία", "availability": True, "fallback_note": None},
+    reasoning="Τεστ αιτιολόγηση.",
+    redirect_url="https://finddoctors.gov.gr/search?specialty=%CE%9A%CE%B1%CF%81%CE%B4%CE%B9%CE%BF%CE%BB%CE%BF%CE%B3%CE%AF%CE%B1&doctor=%CE%94%CF%81.+%CE%A4%CE%B5%CF%83%CF%84",
+    rag_used=True,
+)
+
+
+@pytest.fixture()
+async def client():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.mark.asyncio
+async def test_triage_post_returns_200_with_all_fields(client):
+    with patch("app.services.triage_service.classify", new_callable=AsyncMock) as mock_classify:
+        mock_classify.return_value = _MOCK_RESPONSE
+        response = await client.post(
+            "/api/v1/triage",
+            json={"symptoms": "πόνος στο στήθος", "patient_id": "test-001"},
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["mts_level"] == 2
+    assert data["mts_label"] == "Very Urgent"
+    assert data["specialty"] == "Καρδιολογία"
+    assert "doctor" in data
+    assert "redirect_url" in data
+    assert "reasoning" in data
+    assert "rag_used" in data
+
+
+@pytest.mark.asyncio
+async def test_triage_response_is_flat_no_envelope(client):
+    with patch("app.services.triage_service.classify", new_callable=AsyncMock) as mock_classify:
+        mock_classify.return_value = _MOCK_RESPONSE
+        response = await client.post(
+            "/api/v1/triage",
+            json={"symptoms": "πόνος στο στήθος", "patient_id": "test-001"},
+        )
+    data = response.json()
+    assert "data" not in data
+    assert "success" not in data
+    assert "detail" not in data
+
+
+@pytest.mark.asyncio
+async def test_health_still_returns_ok(client):
+    response = await client.get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_triage_queue_returns_list(client):
+    with patch("app.core.queue.get_all_entries", new_callable=AsyncMock) as mock_queue:
+        mock_queue.return_value = []
+        response = await client.get("/api/v1/triage/queue")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_triage_missing_symptoms_returns_422(client):
+    response = await client.post(
+        "/api/v1/triage",
+        json={"patient_id": "test-001"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_triage_missing_patient_id_returns_422(client):
+    response = await client.post(
+        "/api/v1/triage",
+        json={"symptoms": "πόνος στο στήθος"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_triage_empty_symptoms_returns_422(client):
+    response = await client.post(
+        "/api/v1/triage",
+        json={"symptoms": "   ", "patient_id": "test-001"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_triage_empty_patient_id_returns_422(client):
+    response = await client.post(
+        "/api/v1/triage",
+        json={"symptoms": "πόνος στο στήθος", "patient_id": "   "},
+    )
+    assert response.status_code == 422
