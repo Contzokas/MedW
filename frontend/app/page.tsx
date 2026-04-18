@@ -15,18 +15,18 @@ export default function Home() {
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
             <button
               onClick={() => setResult(null)}
-              className="hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-md"
+              className="hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-600 rounded-lg"
               title="Επιστροφή στην αρχική"
             >
               MED<span className="text-blue-600">Ω</span>
             </button>
           </h1>
-          <p className="mt-4 text-lg text-slate-600">
+          <p className="mt-6 text-xl font-medium text-slate-700">
             Έξυπνο σύστημα αξιολόγησης συμπτωμάτων και καθοδήγησης
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-100 sm:p-10 transition-all duration-300">
+        <div className="overflow-hidden rounded-3xl bg-white p-8 shadow-2xl ring-1 ring-slate-200 sm:p-12 transition-all duration-300">
           {result === null ? (
             <TriageForm onResult={setResult} />
           ) : (
@@ -34,8 +34,13 @@ export default function Home() {
           )}
         </div>
 
-        <div className="mt-10 text-center text-sm text-slate-500">
-          <p>Σε περίπτωση απειλητικής για τη ζωή ανάγκης, καλέστε αμέσως το <span className="font-bold text-red-600">166</span>.</p>
+        <div className="mt-10 rounded-2xl border-2 border-red-200 bg-red-50 p-6 text-center shadow-sm">
+          <p className="text-lg font-medium text-red-900">
+            Σε περίπτωση απειλητικής για τη ζωή ανάγκης, καλέστε αμέσως το
+          </p>
+          <p className="mt-2 text-4xl font-black tracking-widest text-red-700">
+            166
+          </p>
         </div>
       </div>
     </main>
