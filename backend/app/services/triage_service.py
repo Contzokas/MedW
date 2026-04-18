@@ -63,6 +63,7 @@ async def classify(symptoms: str, patient_id: str) -> TriageResponse:
     except Exception as exc:
         logger.error("Triage pipeline failure: %s", type(exc).__name__)
         result = _SAFE_DEFAULT.model_copy()
+        return result
 
     timestamp = datetime.now(tz=timezone.utc).isoformat()
     try:

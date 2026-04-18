@@ -10,5 +10,13 @@
   {"name": "Δρ. Αθηνά Μιχαηλίδου", "specialty": "Δερματολογία", "availability": true},
   {"name": "Δρ. Σπύρος Αντωνίου", "specialty": "Παθολογία", "availability": false},
   {"name": "Δρ. Ανδρέας Μαρκόπουλος", "specialty": "Ουρολογία", "availability": false},
-  {"name": "Δρ. Αναστασία Οικονόμου", "specialty": "Ψυχιατρική", "availability": true}
+  {"name": "Δρ. Αναστασία Οικονόμου", "specialty": "Ψυχιατρική", "availability": true},
+  {"name": "Δρ. Μαρία Παπαγεωργίου", "specialty": "Γυναικολογία", "availability": true},
+  {"name": "Δρ. Ιωάννης Μητρόπουλος", "specialty": "Παιδιατρική", "availability": false},
+  {"name": "Δρ. Κατερίνα Λάμπρου", "specialty": "Οφθαλμολογία", "availability": true},
+  {"name": "Δρ. Βασίλειος Σαμαράς", "specialty": "Ωτορινολαρυγγολογία", "availability": true},
+  {"name": "Δρ. Φωτεινή Καρρά", "specialty": "Ενδοκρινολογία", "availability": true},
+  {"name": "Δρ. Δημήτριος Αλεξίου", "specialty": "Παθολογία", "availability": true},
+  {"name": "Δρ. Πελαγία Ρήγα", "specialty": "Γενική Χειρουργική", "availability": false},
+  {"name": "Δρ. Θεόδωρος Γαλάνης", "specialty": "Καρδιολογία", "availability": true}
 ]

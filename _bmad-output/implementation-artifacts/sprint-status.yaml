@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-16
-last_updated: 2026-04-17  # Story 3.3 done
+last_updated: 2026-04-18  # Story 4.2 done
 project: MedW
 project_key: NOKEY
 tracking_system: file-system
@@ -59,16 +59,16 @@ development_status:
   epic-2-retrospective: done
 
   # Epic 3: Patient Triage Experience
-  epic-3: in-progress
+  epic-3: done
   3-1-greek-symptom-input-form: done
   3-2-triage-results-screen-with-disclaimer: done
   3-3-simulated-finddoctors-gov-gr-redirect: done
   epic-3-retrospective: optional
 
   # Epic 4: Nurse Real-Time Dashboard
-  epic-4: backlog
-  4-1-sse-triage-queue-stream-endpoint: backlog
-  4-2-nurse-dashboard-ui-with-live-queue: backlog
+  epic-4: in-progress
+  4-1-sse-triage-queue-stream-endpoint: done
+  4-2-nurse-dashboard-ui-with-live-queue: done
   epic-4-retrospective: optional
 
   # Epic 5: Documentation & Hackathon Submission

@@ -64,12 +64,18 @@ async def test_health_still_returns_ok(client):
 
 
 @pytest.mark.asyncio
-async def test_triage_queue_returns_list(client):
-    with patch("app.core.queue.get_all_entries", new_callable=AsyncMock) as mock_queue:
-        mock_queue.return_value = []
+async def test_triage_queue_sse_headers(client):
+    """SSE endpoint responds with correct content-type and headers."""
+    async def _finite_generator():
+        yield "event: triage_update\ndata: {}\n\n"
+
+    with patch("app.routers.triage._sse_queue_generator", return_value=_finite_generator()):
         response = await client.get("/api/v1/triage/queue")
+
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert "text/event-stream" in response.headers["content-type"]
+    assert response.headers.get("cache-control") == "no-cache"
+    assert response.headers.get("connection") == "keep-alive"
 
 
 @pytest.mark.asyncio
