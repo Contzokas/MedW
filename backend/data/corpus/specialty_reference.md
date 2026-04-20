@@ -42,3 +42,23 @@ MTS correlation: Level 2 for anaphylactic rash with systemic symptoms; Level 4�
 ## Ψυχιατρική (Psychiatry)
 Symptoms: acute agitation, suicidal ideation, self-harm, severe anxiety, psychotic symptoms, acute confusion.
 MTS correlation: Level 2 for immediate risk; Level 3 for acute psychiatric crisis.
+
+## Ωτορινολαρυγγολογία (Otolaryngology / ENT)
+Symptoms: ear pain, hearing loss, tinnitus, severe sore throat, difficulty swallowing (throat related), persistent nosebleed (epistaxis), nasal congestion, hoarseness.
+Conditions: otitis media, tonsillitis, peritonsillar abscess, sinusitis, epistaxis.
+MTS correlation: Level 2 for airway compromise or uncontrollable epistaxis; Level 4 for mild ear pain or sore throat.
+
+## Οφθαλμολογία (Ophthalmology)
+Symptoms: sudden vision loss, eye pain, severe eye redness, double vision (diplopia), flashes of light, floaters, chemical exposure to eye.
+Conditions: acute angle-closure glaucoma, retinal detachment, conjunctivitis, corneal abrasion.
+MTS correlation: Level 2 for sudden vision loss or chemical burns; Level 3 for severe eye pain; Level 4 for mild redness/itching.
+
+## Γυναικολογία / Μαιευτική (Gynecology / Obstetrics)
+Symptoms: severe pelvic pain, abnormal vaginal bleeding, pregnancy-related pain or bleeding, severe menstrual cramps, vaginal discharge.
+Conditions: ectopic pregnancy, miscarriage, pelvic inflammatory disease, ovarian torsion.
+MTS correlation: Level 1 for eclampsia; Level 2 for severe bleeding or suspected ectopic pregnancy; Level 4 for mild pelvic pain.
+
+## Χειρουργική (General Surgery)
+Symptoms: severe localized abdominal pain with rebound tenderness, acute trauma, vomiting blood, severe localized swelling or abscess.
+Conditions: appendicitis, bowel obstruction, perforated ulcer, acute cholecystitis, trauma.
+MTS correlation: Level 1–2 for acute surgical abdomen or major trauma; Level 3 for localized abscess.
