@@ -36,3 +36,15 @@
 ## Deferred from: code review of 2-4-mocked-doctor-dataset-and-doctor-service (2026-04-16)
 
 - Specialty query normalization in doctors route/service [backend/app/routers/doctors.py:10] — trigger: leading/trailing whitespace or case variants in query can return false-empty results; deferred as low risk and outside explicit AC scope.
+
+## Deferred from: code review of spec-dark-light-theme-toggle (2026-04-20)
+
+- UUID generation browser compatibility [frontend/app/components/TriageForm.tsx:25] — crypto.randomUUID() not supported in older browsers (Safari < 15.4, IE). Pre-existing issue outside theme scope.
+- Date formatting locale fallback [frontend/app/dashboard/components/TriageQueueItem.tsx:32] — toLocaleTimeString("el-GR") assumes Greek locale support without error handling. Pre-existing i18n issue.
+- Theme context not wrapped in error boundary [frontend/app/layout.tsx:33] — Whether to wrap ThemeProvider in error boundary requires broader architectural consideration about error handling strategy.
+- Theme context re-renders all children on toggle [frontend/app/lib/theme-context.tsx:59-63] — Context API behavior causes all children re-render on theme change. Requires memoization strategy evaluation.
+- Theme toggle function not debounced [frontend/app/lib/theme-context.tsx:50-52] — Rapid clicks on toggle could cause multiple state updates. Debouncing is optimization, not critical.
+- Emergency alert high-contrast concerns [frontend/app/page.tsx:35-42] — Emergency alert uses destructive/10 background which may be too subtle in some themes. Requires UX testing to determine if visibility adequate.
+- Theme value validation before storage — User decision: validation not required. Theme will only be light/dark.
+- localStorage quota exceeded handling — User decision: validation/error handling not a concern for this implementation.
+- Theme value validation in localStorage — User decision: validation not required for light/dark only themes.

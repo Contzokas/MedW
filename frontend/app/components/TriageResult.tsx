@@ -7,11 +7,11 @@ interface TriageResultProps {
 }
 
 const MTS_COLORS: Record<number, string> = {
-  1: "bg-red-600 text-white",
-  2: "bg-red-600 text-white",
-  3: "bg-orange-500 text-white",
-  4: "bg-green-600 text-white",
-  5: "bg-green-600 text-white",
+  1: "bg-destructive text-destructive-foreground",
+  2: "bg-destructive text-destructive-foreground",
+  3: "bg-warning text-warning-foreground",
+  4: "bg-success text-success-foreground",
+  5: "bg-success text-success-foreground",
 }
 
 export default function TriageResult({ result }: TriageResultProps) {
@@ -29,27 +29,27 @@ export default function TriageResult({ result }: TriageResultProps) {
           {result.mts_level}
         </span>
         <div>
-          <p className="text-base font-medium uppercase tracking-wide text-gray-500">
+          <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
             Επίπεδο Επείγοντος (MTS)
           </p>
-          <p className="text-2xl font-bold text-gray-900">{result.mts_label}</p>
+          <p className="text-2xl font-bold text-foreground">{result.mts_label}</p>
         </div>
       </div>
 
       <div>
-        <p className="text-base font-medium uppercase tracking-wide text-gray-500">
+        <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
           Συνιστώμενη Ειδικότητα
         </p>
-        <p className="mt-1 text-lg font-semibold text-gray-900">{result.specialty}</p>
+        <p className="mt-1 text-lg font-semibold text-foreground">{result.specialty}</p>
       </div>
 
       <DoctorCard doctor={result.doctor} redirectUrl={result.redirect_url} />
 
       <div>
-        <p className="text-base font-medium uppercase tracking-wide text-gray-500">
+        <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
           Αιτιολόγηση
         </p>
-        <p className="mt-1 text-base text-gray-700 leading-relaxed">{result.reasoning}</p>
+        <p className="mt-1 text-base text-foreground leading-relaxed">{result.reasoning}</p>
       </div>
     </div>
   )
