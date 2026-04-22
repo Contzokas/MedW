@@ -370,7 +370,6 @@ jobs:
                   cpuMemoryRequest: "32G", cpuMemoryLimit: "32G",
                   gpuDevicesRequest: 1
                 },
-                nodePools: ["NVIDIA-B200"],
                 environmentVariables: [
                   {name: "OLLAMA_MODEL", value: "mistral:7b"},
                   {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
