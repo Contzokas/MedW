@@ -1,0 +1,256 @@
+name: Build & Deploy to Run:ai
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - feature/deploy-to-runai
+  workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
+
+env:
+  REGISTRY: ghcr.io
+  ORG: contzokas
+  RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
+  RUNAI_PROJECT: medo
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 0: Resolve branch → image tag + workload suffix
+  #   main                    → tag=latest  suffix=""
+  #   dev                     → tag=dev     suffix="-dev"
+  #   feature/deploy-to-runai → tag=test    suffix="-test"
+  #   any other branch        → tag=test    suffix="-test"
+  # ─────────────────────────────────────────────────────────────────────────
+  setup:
+    name: Resolve deployment environment
+    runs-on: ubuntu-latest
+    outputs:
+      tag:    ${{ steps.resolve.outputs.tag }}
+      suffix: ${{ steps.resolve.outputs.suffix }}
+      env:    ${{ steps.resolve.outputs.env }}
+    steps:
+      - name: Resolve tag and suffix from branch
+        id: resolve
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Branch: $BRANCH"
+
+          if [ "$BRANCH" = "main" ]; then
+            TAG="latest"
+            SUFFIX=""
+            ENV="production"
+          elif [ "$BRANCH" = "dev" ]; then
+            TAG="dev"
+            SUFFIX="-dev"
+            ENV="development"
+          else
+            TAG="test"
+            SUFFIX="-test"
+            ENV="test"
+          fi
+
+          echo "tag=$TAG"       >> $GITHUB_OUTPUT
+          echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
+          echo "env=$ENV"       >> $GITHUB_OUTPUT
+
+          echo "──────────────────────────────────"
+          echo "  Branch : $BRANCH"
+          echo "  Tag    : $TAG"
+          echo "  Suffix : ${SUFFIX:-(none)}"
+          echo "  Env    : $ENV"
+          echo "──────────────────────────────────"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1 & 2: Build images (parallel)
+  # ─────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build backend → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.tag }}
+            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-frontend:
+    name: Build frontend → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.tag }}
+            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://backend:8000' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3: Deploy via Run:ai CLI
+  #
+  # Workload names are suffixed by branch:
+  #   feature/deploy-to-runai → medw-ollama-test, medw-backend-test, ...
+  #   dev                     → medw-ollama-dev,  medw-backend-dev,  ...
+  #   main                    → medw-ollama,       medw-backend,       ...
+  #
+  # Required secrets (Settings → Secrets → Actions):
+  #   RUNAI_CLIENT_ID     — from https://runai.kiefersa.gr → Settings → Application → New Application
+  #   RUNAI_CLIENT_SECRET — same place (copy the secret immediately, shown only once)
+  #
+  # Why application credentials over API token?
+  #   ✓ Don’t expire (tokens are short-lived JWTs)
+  #   ✓ Designed for non-interactive/CI use
+  #   ✓ Can be scoped to specific permissions
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
+    runs-on: ubuntu-latest
+    needs: [setup, build-backend, build-frontend]
+    environment: ${{ needs.setup.outputs.env }}
+    env:
+      TAG:    ${{ needs.setup.outputs.tag }}
+      SUFFIX: ${{ needs.setup.outputs.suffix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Run:ai CLI
+        run: |
+          curl -L https://github.com/run-ai/runai-cli/releases/latest/download/runai-cli-linux-amd64.tar.gz \
+            | tar xz
+          sudo mv runai /usr/local/bin/runai
+          runai version
+
+      - name: Authenticate to Run:ai (CLI v2)
+        run: |
+          # v2: set control plane URL first, then login via env vars
+          runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
+          RUNAI_CLIENT_ID="${{ secrets.RUNAI_CLIENT_ID }}" \
+          RUNAI_CLIENT_SECRET="${{ secrets.RUNAI_CLIENT_SECRET }}" \
+          runai login
+
+      - name: Set Run:ai project
+        run: runai project set ${{ env.RUNAI_PROJECT }}
+
+      - name: Show deployment plan
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Environment : ${{ needs.setup.outputs.env }}"
+          echo "  Branch      : ${{ github.ref_name }}"
+          echo "  Image tag   : ${{ env.TAG }}"
+          echo "  Suffix      : ${{ env.SUFFIX || '(none — production)' }}"
+          echo "  Workloads   :"
+          echo "    medw-chromadb${{ env.SUFFIX }}"
+          echo "    medw-backend${{ env.SUFFIX }}"
+          echo "    medw-frontend${{ env.SUFFIX }}"
+          echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Deploy ChromaDB
+        run: |
+          runai submit medw-chromadb${{ env.SUFFIX }} \
+            --image chromadb/chroma:1.5.7 \
+            --cpu 1 --memory 2G \
+            --project ${{ env.RUNAI_PROJECT }} \
+            -e IS_PERSISTENT=TRUE \
+            -e ANONYMIZED_TELEMETRY=FALSE \
+            -e CHROMA_SERVER_PORT=8000 \
+            --service-type ClusterIP \
+            --port 8000 \
+            --persistent-volume-claim chroma-pvc${{ env.SUFFIX }}:/chroma/chroma \
+            || true
+
+      - name: Deploy Backend
+        run: |
+          runai submit medw-backend${{ env.SUFFIX }} \
+            --image ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.TAG }} \
+            --cpu 1 --memory 1G \
+            --project ${{ env.RUNAI_PROJECT }} \
+            -e OLLAMA_HOST=http://medw-ollama${{ env.SUFFIX }}:11434 \
+            -e OLLAMA_MODEL=mistral:7b \
+            -e OLLAMA_TIMEOUT=30 \
+            -e CHROMA_HOST=medw-chromadb${{ env.SUFFIX }} \
+            -e CHROMA_PORT=8000 \
+            --service-type ClusterIP \
+            --port 8000 \
+            || true
+
+      - name: Deploy Frontend
+        run: |
+          runai submit medw-frontend${{ env.SUFFIX }} \
+            --image ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.TAG }} \
+            --cpu 1 --memory 512M \
+            --project ${{ env.RUNAI_PROJECT }} \
+            --service-type NodePort \
+            --port 3000 \
+            || true
+
+      - name: Deploy Ollama (B200 GPU)
+        run: |
+          runai submit medw-ollama${{ env.SUFFIX }} \
+            --image ollama/ollama:latest \
+            --gpu 1 \
+            --node-type NVIDIA-B200 \
+            --cpu 8 --memory 32G \
+            --project ${{ env.RUNAI_PROJECT }} \
+            -e OLLAMA_MODEL=mistral:7b \
+            -e OLLAMA_FLASH_ATTENTION=1 \
+            -e OLLAMA_NUM_PARALLEL=4 \
+            -e OLLAMA_MAX_LOADED_MODELS=1 \
+            --service-type ClusterIP \
+            --port 11434 \
+            --persistent-volume-claim ollama-pvc${{ env.SUFFIX }}:/root/.ollama \
+            --command -- /bin/bash /entrypoint.sh \
+            || true
+
+      - name: Show workload status
+        if: always()
+        run: runai workload list

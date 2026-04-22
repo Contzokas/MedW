@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medw-chromadb
+  namespace: runai-medo
+  labels:
+    app: medw-chromadb
+    app.kubernetes.io/part-of: medw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medw-chromadb
+  template:
+    metadata:
+      labels:
+        app: medw-chromadb
+    spec:
+      containers:
+        - name: chromadb
+          image: chromadb/chroma:1.5.7
+          ports:
+            - containerPort: 8000
+              name: chroma-api
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: ANONYMIZED_TELEMETRY
+              value: "FALSE"
+            - name: CHROMA_SERVER_PORT
+              value: "8000"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: chroma-data
+              mountPath: /chroma/chroma
+      volumes:
+        - name: chroma-data
+          persistentVolumeClaim:
+            claimName: chroma-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb
+  namespace: medw
+  labels:
+    app: medw-chromadb
+    app.kubernetes.io/part-of: medw
+spec:
+  selector:
+    app: medw-chromadb
+  ports:
+    - name: chroma-api
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
