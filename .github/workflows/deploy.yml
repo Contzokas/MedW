@@ -367,4 +367,4 @@ jobs:
         run: |
           curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
             -H "Authorization: Bearer $TOKEN" \
-            | jq '[.[] | select(.name | startswith("medw-")) | {name, phase, clusterName}]'
+            | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'
