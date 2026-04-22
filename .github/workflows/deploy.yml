@@ -220,7 +220,7 @@ jobs:
           RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
           runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
-          runai login
+          runai login --client-id="$RUNAI_CLIENT_ID" --client-secret="$RUNAI_CLIENT_SECRET"
 
       - name: Set Run:ai project
         run: runai project set ${{ env.RUNAI_PROJECT }}
