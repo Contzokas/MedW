@@ -93,7 +93,7 @@ jobs:
             type=raw,value=${{ needs.setup.outputs.tag }}
             type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -130,7 +130,7 @@ jobs:
             type=raw,value=${{ needs.setup.outputs.tag }}
             type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
 
-      - uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -174,7 +174,7 @@ jobs:
         run: echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
 
       - name: Connect to VPN
-        uses: kota65535/github-openvpn-connect-action@v3
+        uses: kota65535/github-openvpn-connect-action@v3.1.0
         with:
           config_file: /tmp/vpn.ovpn
           username: ${{ secrets.VPN_USERNAME }}
@@ -252,7 +252,7 @@ jobs:
                   {name: "CHROMA_SERVER_PORT", value: "8000"}
                 ],
                 ports: [{container: 8000, serviceType: "ClusterIP"}],
-                data: {
+                storage: {
                   pvc: [{
                     path: "/chroma/chroma",
                     claimName: $pvc,
@@ -380,7 +380,7 @@ jobs:
                 command: "/bin/bash",
                 args: ["/entrypoint.sh"],
                 ports: [{container: 11434, serviceType: "ClusterIP"}],
-                data: {
+                storage: {
                   pvc: [{
                     path: "/root/.ollama",
                     claimName: $pvc,
