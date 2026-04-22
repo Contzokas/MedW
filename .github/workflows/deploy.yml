@@ -252,7 +252,6 @@ jobs:
           echo ""
           echo "--- trying project set ---"
           runai project set ${{ env.RUNAI_PROJECT }} 2>&1 || true
-        run: runai project set ${{ env.RUNAI_PROJECT }}
 
       # ── Show plan ─────────────────────────────────────────────────────────
       - name: Show deployment plan
