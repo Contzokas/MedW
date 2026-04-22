@@ -231,45 +231,6 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── Provision PVCs (idempotent — 409 = already exists) ──────────────
-      - name: Create PVCs
-        run: |
-          create_pvc() {
-            local pvc_name="$1"
-            local size="$2"
-            local PAYLOAD
-            PAYLOAD=$(jq -n \
-              --arg     name      "$pvc_name" \
-              --argjson projectId "$PROJECT_ID" \
-              --arg     clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg     size      "$size" \
-              '{
-                name: $name,
-                projectId: $projectId,
-                clusterId: $clusterId,
-                spec: { size: $size }
-              }')
-            echo "Creating PVC: $pvc_name ($size)"
-            RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/data-sources/pvcs" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $TOKEN" \
-              -d "$PAYLOAD") || true
-            STATUS=$(echo "$RESP" | tail -1)
-            BODY=$(echo "$RESP" | head -n -1)
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
-              echo "  ✓ $pvc_name created"
-            elif [ "$STATUS" = "409" ]; then
-              echo "  ✓ $pvc_name already exists — skipping"
-            else
-              echo "  ✗ $pvc_name failed (HTTP $STATUS): $BODY"
-              exit 1
-            fi
-          }
-
-          create_pvc "chroma-pvc${SUFFIX}" "10G"
-          create_pvc "ollama-pvc${SUFFIX}"  "50G"
-
       # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
@@ -295,7 +256,8 @@ jobs:
                   pvc: [{
                     path: "/chroma/chroma",
                     claimName: $pvc,
-                    existingPvc: true
+                    existingPvc: false,
+                    size: "10G"
                   }]
                 }
               }
@@ -422,7 +384,8 @@ jobs:
                   pvc: [{
                     path: "/root/.ollama",
                     claimName: $pvc,
-                    existingPvc: true
+                    existingPvc: false,
+                    size: "50G"
                   }]
                 }
               }
