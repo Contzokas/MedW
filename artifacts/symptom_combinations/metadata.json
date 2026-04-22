@@ -1,0 +1,207 @@
+{
+  "actual_num_records": 50,
+  "buffer_size": 1000,
+  "column_statistics": [
+    {
+      "column_name": "patient_age",
+      "column_type": "sampler",
+      "distribution": {
+        "max": 83,
+        "mean": 44.18,
+        "median": 47.5,
+        "min": 2,
+        "stddev": 16.02
+      },
+      "distribution_type": "numerical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 31,
+      "pyarrow_dtype": "int64",
+      "sampler_type": "gaussian",
+      "simple_dtype": "int"
+    },
+    {
+      "column_name": "patient_sex",
+      "column_type": "sampler",
+      "distribution": {
+        "histogram": {
+          "categories": [
+            "Female",
+            "Male"
+          ],
+          "counts": [
+            26,
+            24
+          ]
+        },
+        "least_common_value": "Male",
+        "most_common_value": "Female"
+      },
+      "distribution_type": "categorical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 2,
+      "pyarrow_dtype": "string",
+      "sampler_type": "category",
+      "simple_dtype": "string"
+    },
+    {
+      "column_name": "body_region",
+      "column_type": "sampler",
+      "distribution": {
+        "histogram": {
+          "categories": [
+            "Abdomen",
+            "Chest",
+            "Head",
+            "Lower Limbs",
+            "General",
+            "Back",
+            "Upper Limbs"
+          ],
+          "counts": [
+            11,
+            10,
+            7,
+            7,
+            7,
+            5,
+            3
+          ]
+        },
+        "least_common_value": "Upper Limbs",
+        "most_common_value": "Abdomen"
+      },
+      "distribution_type": "categorical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 7,
+      "pyarrow_dtype": "string",
+      "sampler_type": "category",
+      "simple_dtype": "string"
+    },
+    {
+      "column_name": "severity",
+      "column_type": "sampler",
+      "distribution": {
+        "histogram": {
+          "categories": [
+            "Moderate",
+            "Mild",
+            "Severe",
+            "Emergency"
+          ],
+          "counts": [
+            19,
+            19,
+            10,
+            2
+          ]
+        },
+        "least_common_value": "Emergency",
+        "most_common_value": "Moderate"
+      },
+      "distribution_type": "categorical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 4,
+      "pyarrow_dtype": "string",
+      "sampler_type": "category",
+      "simple_dtype": "string"
+    },
+    {
+      "column_name": "pain_level",
+      "column_type": "sampler",
+      "distribution": {
+        "max": 10,
+        "mean": 4.82,
+        "median": 4.0,
+        "min": 1,
+        "stddev": 2.76
+      },
+      "distribution_type": "numerical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 10,
+      "pyarrow_dtype": "int64",
+      "sampler_type": "uniform",
+      "simple_dtype": "int"
+    },
+    {
+      "column_name": "duration_category",
+      "column_type": "sampler",
+      "distribution": {
+        "histogram": {
+          "categories": [
+            "Subacute (3-14 days)",
+            "Chronic (more than 14 days)",
+            "Acute (less than 3 days)"
+          ],
+          "counts": [
+            18,
+            17,
+            15
+          ]
+        },
+        "least_common_value": "Acute (less than 3 days)",
+        "most_common_value": "Subacute (3-14 days)"
+      },
+      "distribution_type": "categorical",
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 3,
+      "pyarrow_dtype": "string",
+      "sampler_type": "category",
+      "simple_dtype": "string"
+    },
+    {
+      "column_name": "symptom_profile",
+      "column_type": "llm-structured",
+      "input_tokens_mean": 329.34,
+      "input_tokens_median": 329.0,
+      "input_tokens_stddev": 1.12,
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 50,
+      "output_tokens_mean": 66.02,
+      "output_tokens_median": 66.0,
+      "output_tokens_stddev": 12.01,
+      "pyarrow_dtype": "struct<additional_symptoms: list<element: string>, primary_symptom: string, recommended_urgency: string>",
+      "simple_dtype": "dict"
+    },
+    {
+      "column_name": "description",
+      "column_type": "llm-text",
+      "input_tokens_mean": 154.68,
+      "input_tokens_median": 155.0,
+      "input_tokens_stddev": 11.41,
+      "num_null": 0,
+      "num_records": 50,
+      "num_unique": 50,
+      "output_tokens_mean": 102.28,
+      "output_tokens_median": 101.0,
+      "output_tokens_stddev": 17.81,
+      "pyarrow_dtype": "string",
+      "simple_dtype": "string"
+    }
+  ],
+  "dataset_name": "symptom_combinations",
+  "file_paths": {
+    "parquet-files": [
+      "parquet-files/batch_00000.parquet"
+    ]
+  },
+  "num_completed_batches": 1,
+  "schema": {
+    "body_region": "string",
+    "description": "string",
+    "duration_category": "string",
+    "pain_level": "int64",
+    "patient_age": "int64",
+    "patient_sex": "string",
+    "severity": "string",
+    "symptom_profile": "struct<additional_symptoms: list<element: string>, primary_symptom: string, recommended_urgency: string>"
+  },
+  "target_num_records": 50,
+  "total_num_batches": 1
+}

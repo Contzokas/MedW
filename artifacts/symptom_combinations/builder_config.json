@@ -1,0 +1,407 @@
+{
+  "data_designer": {
+    "columns": [
+      {
+        "name": "patient_age",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "gaussian",
+        "params": {
+          "mean": 42.0,
+          "stddev": 15.0,
+          "decimal_places": null,
+          "sampler_type": "gaussian"
+        },
+        "conditional_params": {},
+        "convert_to": "int"
+      },
+      {
+        "name": "patient_sex",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "category",
+        "params": {
+          "values": [
+            "Male",
+            "Female"
+          ],
+          "weights": null,
+          "sampler_type": "category"
+        },
+        "conditional_params": {},
+        "convert_to": null
+      },
+      {
+        "name": "body_region",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "category",
+        "params": {
+          "values": [
+            "Head",
+            "Chest",
+            "Abdomen",
+            "Upper Limbs",
+            "Lower Limbs",
+            "Back",
+            "Skin",
+            "General"
+          ],
+          "weights": [
+            0.13793103448275862,
+            0.14942528735632185,
+            0.16091954022988506,
+            0.09195402298850576,
+            0.1149425287356322,
+            0.14942528735632185,
+            0.08045977011494253,
+            0.1149425287356322
+          ],
+          "sampler_type": "category"
+        },
+        "conditional_params": {},
+        "convert_to": null
+      },
+      {
+        "name": "severity",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "category",
+        "params": {
+          "values": [
+            "Mild",
+            "Moderate",
+            "Severe",
+            "Emergency"
+          ],
+          "weights": [
+            0.3333333333333333,
+            0.4,
+            0.2,
+            0.06666666666666667
+          ],
+          "sampler_type": "category"
+        },
+        "conditional_params": {},
+        "convert_to": null
+      },
+      {
+        "name": "pain_level",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "uniform",
+        "params": {
+          "low": 1.0,
+          "high": 10.0,
+          "decimal_places": null,
+          "sampler_type": "uniform"
+        },
+        "conditional_params": {},
+        "convert_to": "int"
+      },
+      {
+        "name": "duration_category",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "sampler",
+        "skip": null,
+        "propagate_skip": true,
+        "sampler_type": "category",
+        "params": {
+          "values": [
+            "Acute (less than 3 days)",
+            "Subacute (3-14 days)",
+            "Chronic (more than 14 days)"
+          ],
+          "weights": [
+            0.3333333333333333,
+            0.4166666666666667,
+            0.25
+          ],
+          "sampler_type": "category"
+        },
+        "conditional_params": {},
+        "convert_to": null
+      },
+      {
+        "name": "symptom_profile",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "llm-structured",
+        "skip": null,
+        "propagate_skip": true,
+        "prompt": "Generate a realistic medical symptom profile for a patient.\n\nBody region: {{ body_region }}\nSeverity: {{ severity }}\nPain level: {{ pain_level }}/10\nDuration: {{ duration_category }}\nPatient age: {{ patient_age }}\nPatient sex: {{ patient_sex }}\n\nProvide a specific primary symptom and 2-4 additional symptoms that are clinically plausible for this body region and severity level.",
+        "model_alias": "nvidia-text",
+        "system_prompt": "You are a medical triage data generator. Generate realistic, clinically plausible symptom combinations. Each combination should be diverse and cover a wide range of conditions for the given body region. Do not always pick the most common condition — vary across rare and common presentations.",
+        "multi_modal_context": null,
+        "tool_alias": null,
+        "with_trace": "none",
+        "extract_reasoning_content": false,
+        "output_format": {
+          "properties": {
+            "primary_symptom": {
+              "description": "The main symptom the patient is experiencing, specific to the body region",
+              "title": "Primary Symptom",
+              "type": "string"
+            },
+            "additional_symptoms": {
+              "description": "2-4 related symptoms that commonly accompany the primary symptom",
+              "items": {
+                "type": "string"
+              },
+              "title": "Additional Symptoms",
+              "type": "array"
+            },
+            "recommended_urgency": {
+              "description": "One of: Low, Medium, High, Critical",
+              "title": "Recommended Urgency",
+              "type": "string"
+            }
+          },
+          "required": [
+            "primary_symptom",
+            "additional_symptoms",
+            "recommended_urgency"
+          ],
+          "title": "SymptomProfile",
+          "type": "object"
+        }
+      },
+      {
+        "name": "description",
+        "drop": false,
+        "allow_resize": false,
+        "column_type": "llm-text",
+        "skip": null,
+        "propagate_skip": true,
+        "prompt": "Write a first-person patient description (2-3 sentences) describing their symptoms as they would report them to a nurse or doctor.\n\nPatient: {{ patient_sex }}, age {{ patient_age }}\nBody region: {{ body_region }}\nPrimary symptom: {{ symptom_profile.primary_symptom }}\nAdditional symptoms: {{ symptom_profile.additional_symptoms }}\nSeverity: {{ severity }}\nPain level: {{ pain_level }}/10\nDuration: {{ duration_category }}\n\nWrite naturally as a patient would speak. Include how the symptoms affect daily life.",
+        "model_alias": "nvidia-text",
+        "system_prompt": "You generate realistic patient symptom descriptions. Write in a natural, conversational tone as a patient describing their condition. Vary sentence structure and detail level.",
+        "multi_modal_context": null,
+        "tool_alias": null,
+        "with_trace": "none",
+        "extract_reasoning_content": false
+      }
+    ],
+    "model_configs": [
+      {
+        "alias": "nvidia-text",
+        "model": "nvidia/nemotron-3-nano-30b-a3b",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 1.0,
+          "top_p": 1.0,
+          "max_tokens": null
+        },
+        "provider": "nvidia",
+        "skip_health_check": false
+      },
+      {
+        "alias": "nvidia-reasoning",
+        "model": "openai/gpt-oss-20b",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 0.35,
+          "top_p": 0.95,
+          "max_tokens": null
+        },
+        "provider": "nvidia",
+        "skip_health_check": false
+      },
+      {
+        "alias": "nvidia-vision",
+        "model": "nvidia/nemotron-nano-12b-v2-vl",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 0.85,
+          "top_p": 0.95,
+          "max_tokens": null
+        },
+        "provider": "nvidia",
+        "skip_health_check": false
+      },
+      {
+        "alias": "nvidia-embedding",
+        "model": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "inference_parameters": {
+          "generation_type": "embedding",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": {
+            "input_type": "query"
+          },
+          "encoding_format": "float",
+          "dimensions": null
+        },
+        "provider": "nvidia",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openai-text",
+        "model": "gpt-4.1",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 0.85,
+          "top_p": 0.95,
+          "max_tokens": null
+        },
+        "provider": "openai",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openai-reasoning",
+        "model": "gpt-5",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": {
+            "reasoning_effort": "medium"
+          },
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null
+        },
+        "provider": "openai",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openai-vision",
+        "model": "gpt-5",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": {
+            "reasoning_effort": "medium"
+          },
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null
+        },
+        "provider": "openai",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openai-embedding",
+        "model": "text-embedding-3-large",
+        "inference_parameters": {
+          "generation_type": "embedding",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "encoding_format": "float",
+          "dimensions": null
+        },
+        "provider": "openai",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openrouter-text",
+        "model": "nvidia/nemotron-3-nano-30b-a3b",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 1.0,
+          "top_p": 1.0,
+          "max_tokens": null
+        },
+        "provider": "openrouter",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openrouter-reasoning",
+        "model": "openai/gpt-oss-20b",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 0.35,
+          "top_p": 0.95,
+          "max_tokens": null
+        },
+        "provider": "openrouter",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openrouter-vision",
+        "model": "nvidia/nemotron-nano-12b-v2-vl",
+        "inference_parameters": {
+          "generation_type": "chat-completion",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "temperature": 0.85,
+          "top_p": 0.95,
+          "max_tokens": null
+        },
+        "provider": "openrouter",
+        "skip_health_check": false
+      },
+      {
+        "alias": "openrouter-embedding",
+        "model": "openai/text-embedding-3-large",
+        "inference_parameters": {
+          "generation_type": "embedding",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "encoding_format": "float",
+          "dimensions": null
+        },
+        "provider": "openrouter",
+        "skip_health_check": false
+      },
+      {
+        "alias": "data",
+        "model": "glm5-1",
+        "inference_parameters": {
+          "generation_type": "embedding",
+          "max_parallel_requests": 4,
+          "timeout": null,
+          "extra_body": null,
+          "encoding_format": "float",
+          "dimensions": 32
+        },
+        "provider": "nvidia",
+        "skip_health_check": false
+      }
+    ],
+    "tool_configs": [],
+    "seed_config": null,
+    "constraints": null,
+    "profilers": null,
+    "processors": null
+  },
+  "library_version": "0.5.7"
+}
