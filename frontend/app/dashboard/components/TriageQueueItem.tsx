@@ -13,17 +13,17 @@ const MTS_LABELS: Record<number, string> = {
 }
 
 const MTS_COLORS: Record<number, string> = {
-  1: "bg-red-600 text-white",
-  2: "bg-red-600 text-white",
-  3: "bg-orange-500 text-white",
-  4: "bg-green-600 text-white",
-  5: "bg-green-600 text-white",
+  1: "bg-destructive text-destructive-foreground",
+  2: "bg-destructive text-destructive-foreground",
+  3: "bg-warning text-warning-foreground",
+  4: "bg-success text-success-foreground",
+  5: "bg-success text-success-foreground",
 }
 
 export default function TriageQueueItem({ entry }: TriageQueueItemProps) {
   const badgeClass = MTS_COLORS[entry.mts_level] ?? "bg-gray-500 text-white"
   const label = MTS_LABELS[entry.mts_level] ?? `Επίπεδο ${entry.mts_level}`
-  const rowClass = entry.mts_level <= 2 ? "bg-red-50" : "bg-white"
+  const rowClass = entry.mts_level <= 2 ? "bg-destructive/10" : "bg-card"
   const patientId = entry.patient_id.slice(0, 8)
 
   const parsedDate = new Date(entry.timestamp)
@@ -33,10 +33,10 @@ export default function TriageQueueItem({ entry }: TriageQueueItemProps) {
 
   return (
     <tr className={rowClass}>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
         {formattedTime}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
         {patientId}...
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
@@ -47,7 +47,7 @@ export default function TriageQueueItem({ entry }: TriageQueueItemProps) {
           {label}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
         {entry.specialty}
       </td>
     </tr>

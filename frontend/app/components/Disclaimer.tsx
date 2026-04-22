@@ -3,12 +3,12 @@ export default function Disclaimer() {
     <div
       role="note"
       aria-label="Σημαντική ιατρική ανακοίνωση"
-      className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-base"
+      className="mb-6 rounded-lg border border-warning bg-warning/10 p-4 text-base"
     >
-      <p className="font-semibold text-amber-900">
+      <p className="font-semibold text-warning">
         ⚠️ Σημαντική Ανακοίνωση
       </p>
-      <p className="mt-1 text-amber-800">
+      <p className="mt-1 text-foreground">
         Το MEDΩ είναι σύστημα τεχνητής νοημοσύνης για αρχική αξιολόγηση συμπτωμάτων
         και <strong>δεν αποτελεί κλινική διάγνωση</strong>. Τα αποτελέσματα είναι
         ενδεικτικά και δεν υποκαθιστούν τη γνώμη ιατρού. Σε περίπτωση επείγοντος,
