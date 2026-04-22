@@ -359,6 +359,8 @@ jobs:
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
+            --arg cmd "/bin/sh" \
+            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull mistral:7b && wait'" \
             '{
               name: $name,
               projectId: $projectId,
@@ -376,8 +378,8 @@ jobs:
                   {name: "OLLAMA_NUM_PARALLEL", value: "4"},
                   {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
                 ],
-                command: "/bin/sh",
-                args: "-c 'ollama serve & sleep 10 && ollama pull mistral:7b && wait'",
+                command: $cmd,
+                args: $cmdargs,
                 ports: [{container: 11434, serviceType: "ClusterIP"}],
                 storage: {
                   pvc: [{
