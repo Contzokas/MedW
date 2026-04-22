@@ -168,6 +168,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install OpenVPN
+        run: sudo apt-get update -qq && sudo apt-get install -y openvpn
+
       - name: Write VPN config
         run: echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
 
