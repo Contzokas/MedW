@@ -230,6 +230,45 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+      # ── Provision PVCs (idempotent — 409 = already exists) ──────────────
+      - name: Create PVCs
+        run: |
+          create_pvc() {
+            local pvc_name="$1"
+            local size="$2"
+            local PAYLOAD
+            PAYLOAD=$(jq -n \
+              --arg     name      "$pvc_name" \
+              --argjson projectId "$PROJECT_ID" \
+              --arg     clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+              --arg     size      "$size" \
+              '{
+                name: $name,
+                projectId: $projectId,
+                clusterId: $clusterId,
+                spec: { size: $size }
+              }')
+            echo "Creating PVC: $pvc_name ($size)"
+            RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/data-sources/pvcs" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $TOKEN" \
+              -d "$PAYLOAD") || true
+            STATUS=$(echo "$RESP" | tail -1)
+            BODY=$(echo "$RESP" | head -n -1)
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+              echo "  ✓ $pvc_name created"
+            elif [ "$STATUS" = "409" ]; then
+              echo "  ✓ $pvc_name already exists — skipping"
+            else
+              echo "  ✗ $pvc_name failed (HTTP $STATUS): $BODY"
+              exit 1
+            fi
+          }
+
+          create_pvc "chroma-pvc${SUFFIX}" "10G"
+          create_pvc "ollama-pvc${SUFFIX}"  "50G"
+
       # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
@@ -255,22 +294,25 @@ jobs:
                   pvc: [{
                     path: "/chroma/chroma",
                     claimName: $pvc,
-                    size: "10G"
+                    existingPvc: true
                   }]
                 }
               }
             }')
-          RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$CHROMA_JSON") || true
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
+          echo "ChromaDB response (HTTP $STATUS): $BODY"
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
             echo "ChromaDB submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "ChromaDB already exists — skipping"
           else
-            echo "ChromaDB failed (HTTP $STATUS): $BODY"
+            echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
       - name: Deploy Backend
@@ -298,11 +340,21 @@ jobs:
                 ports: [{container: 8000, serviceType: "ClusterIP"}]
               }
             }')
-          curl -fsSL -X POST \
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$BACKEND_JSON" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
+            -d "$BACKEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Backend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "Backend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Backend already exists — skipping"
+          else
+            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
+          fi
 
       - name: Deploy Frontend
         run: |
@@ -321,11 +373,21 @@ jobs:
                 ports: [{container: 3000, serviceType: "NodePort"}]
               }
             }')
-          curl -fsSL -X POST \
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$FRONTEND_JSON" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
+            -d "$FRONTEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Frontend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "Frontend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Frontend already exists — skipping"
+          else
+            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
+          fi
 
       - name: Deploy Ollama (B200 GPU)
         run: |
@@ -359,22 +421,25 @@ jobs:
                   pvc: [{
                     path: "/root/.ollama",
                     claimName: $pvc,
-                    size: "50G"
+                    existingPvc: true
                   }]
                 }
               }
             }')
-          RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$OLLAMA_JSON") || true
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
+          echo "Ollama response (HTTP $STATUS): $BODY"
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
             echo "Ollama submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Ollama already exists — skipping"
           else
-            echo "Ollama failed (HTTP $STATUS): $BODY"
+            echo "Ollama failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
       # ── Status ────────────────────────────────────────────────────────────
