@@ -194,7 +194,7 @@ jobs:
             -H "Accept: */*" \
             -H "Content-Type: application/json" \
             -d "{\"grantType\":\"client_credentials\",\"clientId\":\"$RUNAI_CLIENT_ID\",\"clientSecret\":\"$RUNAI_CLIENT_SECRET\"}" \
-            | jq -r ‘.accessToken’)
+            | jq -r '.accessToken')
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Failed to obtain access token"; exit 1
@@ -206,7 +206,7 @@ jobs:
           PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
             -H "Authorization: Bearer $TOKEN")
           echo "DEBUG projects response: $PROJECT_RESP"
-          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r ‘.[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id’)
+          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
             echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
           fi
@@ -242,7 +242,7 @@ jobs:
               --arg projectId "$PROJECT_ID" \
               --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
               --arg pvc "chroma-pvc${SUFFIX}" \
-              ‘{
+              '{
                 name: $name,
                 projectId: $projectId,
                 clusterId: $clusterId,
@@ -264,7 +264,7 @@ jobs:
                     }]
                   }
                 }
-              }’)" && echo "ChromaDB submitted" || echo "ChromaDB submit failed (may already exist)"
+              }')" && echo "ChromaDB submitted" || echo "ChromaDB submit failed (may already exist)"
 
       - name: Deploy Backend
         run: |
@@ -278,7 +278,7 @@ jobs:
               --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
               --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
               --arg suffix "$SUFFIX" \
-              ‘{
+              '{
                 name: $name,
                 projectId: $projectId,
                 clusterId: $clusterId,
@@ -294,7 +294,7 @@ jobs:
                   ],
                   ports: [{container: 8000, serviceType: "ClusterIP"}]
                 }
-              }’)" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
+              }')" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
 
       - name: Deploy Frontend
         run: |
@@ -307,7 +307,7 @@ jobs:
               --arg projectId "$PROJECT_ID" \
               --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
               --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
-              ‘{
+              '{
                 name: $name,
                 projectId: $projectId,
                 clusterId: $clusterId,
@@ -316,7 +316,7 @@ jobs:
                   compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
                   ports: [{container: 3000, serviceType: "NodePort"}]
                 }
-              }’)" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
+              }')" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
 
       - name: Deploy Ollama (B200 GPU)
         run: |
@@ -329,7 +329,7 @@ jobs:
               --arg projectId "$PROJECT_ID" \
               --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
               --arg pvc "ollama-pvc${SUFFIX}" \
-              ‘{
+              '{
                 name: $name,
                 projectId: $projectId,
                 clusterId: $clusterId,
@@ -359,7 +359,7 @@ jobs:
                     }]
                   }
                 }
-              }’)" && echo "Ollama submitted" || echo "Ollama submit failed (may already exist)"
+              }')" && echo "Ollama submitted" || echo "Ollama submit failed (may already exist)"
 
       # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
@@ -367,4 +367,4 @@ jobs:
         run: |
           curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
             -H "Authorization: Bearer $TOKEN" \
-            | jq ‘[.[] | select(.name | startswith("medw-")) | {name, phase, clusterName}]’
+            | jq '[.[] | select(.name | startswith("medw-")) | {name, phase, clusterName}]'
