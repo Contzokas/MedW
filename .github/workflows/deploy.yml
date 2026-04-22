@@ -233,38 +233,39 @@ jobs:
       # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
+          CHROMA_JSON=$(jq -n \
+            --arg name "medw-chromadb${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg pvc "chroma-pvc${SUFFIX}" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: "chromadb/chroma:1.5.7",
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
+                environmentVariables: [
+                  {name: "IS_PERSISTENT", value: "TRUE"},
+                  {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
+                  {name: "CHROMA_SERVER_PORT", value: "8000"}
+                ],
+                ports: [{container: 8000, serviceType: "ClusterIP"}],
+                data: {
+                  pvc: [{
+                    path: "/chroma/chroma",
+                    claimName: $pvc,
+                    existingPvc: false,
+                    size: "10G"
+                  }]
+                }
+              }
+            }')
           RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$(jq -n \
-              --arg name "medw-chromadb${SUFFIX}" \
-              --arg projectId "$PROJECT_ID" \
-              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg pvc "chroma-pvc${SUFFIX}" \
-              '{
-                name: $name,
-                projectId: $projectId,
-                clusterId: $clusterId,
-                spec: {
-                  image: "chromadb/chroma:1.5.7",
-                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
-                  environmentVariables: [
-                    {name: "IS_PERSISTENT", value: "TRUE"},
-                    {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
-                    {name: "CHROMA_SERVER_PORT", value: "8000"}
-                  ],
-                  ports: [{container: 8000, serviceType: "ClusterIP"}],
-                  data: {
-                    pvc: [{
-                      path: "/chroma/chroma",
-                      claimName: $pvc,
-                      existingPvc: false,
-                      size: "10G"
-                    }]
-                  }
-                }
-              }")") || true
+            -d "$CHROMA_JSON") || true
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
@@ -275,98 +276,101 @@ jobs:
 
       - name: Deploy Backend
         run: |
+          BACKEND_JSON=$(jq -n \
+            --arg name "medw-backend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
+            --arg suffix "$SUFFIX" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
+                environmentVariables: [
+                  {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
+                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_TIMEOUT", value: "30"},
+                  {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
+                  {name: "CHROMA_PORT", value: "8000"}
+                ],
+                ports: [{container: 8000, serviceType: "ClusterIP"}]
+              }
+            }')
           curl -fsSL -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$(jq -n \
-              --arg name "medw-backend${SUFFIX}" \
-              --arg projectId "$PROJECT_ID" \
-              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
-              --arg suffix "$SUFFIX" \
-              '{
-                name: $name,
-                projectId: $projectId,
-                clusterId: $clusterId,
-                spec: {
-                  image: $image,
-                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
-                  environmentVariables: [
-                    {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
-                    {name: "OLLAMA_MODEL", value: "mistral:7b"},
-                    {name: "OLLAMA_TIMEOUT", value: "30"},
-                    {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
-                    {name: "CHROMA_PORT", value: "8000"}
-                  ],
-                  ports: [{container: 8000, serviceType: "ClusterIP"}]
-                }
-              }')" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
+            -d "$BACKEND_JSON" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
 
       - name: Deploy Frontend
         run: |
+          FRONTEND_JSON=$(jq -n \
+            --arg name "medw-frontend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
+                ports: [{container: 3000, serviceType: "NodePort"}]
+              }
+            }')
           curl -fsSL -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$(jq -n \
-              --arg name "medw-frontend${SUFFIX}" \
-              --arg projectId "$PROJECT_ID" \
-              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
-              '{
-                name: $name,
-                projectId: $projectId,
-                clusterId: $clusterId,
-                spec: {
-                  image: $image,
-                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
-                  ports: [{container: 3000, serviceType: "NodePort"}]
-                }
-              }')" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
+            -d "$FRONTEND_JSON" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
 
       - name: Deploy Ollama (B200 GPU)
         run: |
+          OLLAMA_JSON=$(jq -n \
+            --arg name "medw-ollama${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg pvc "ollama-pvc${SUFFIX}" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: "ollama/ollama:latest",
+                compute: {
+                  cpuCoreRequest: 8, cpuCoreLimit: 8,
+                  cpuMemoryRequest: "32G", cpuMemoryLimit: "32G",
+                  gpuDevicesRequest: 1
+                },
+                nodeType: "NVIDIA-B200",
+                environmentVariables: [
+                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
+                  {name: "OLLAMA_NUM_PARALLEL", value: "4"},
+                  {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
+                ],
+                command: "/bin/bash",
+                args: "/entrypoint.sh",
+                ports: [{container: 11434, serviceType: "ClusterIP"}],
+                data: {
+                  pvc: [{
+                    path: "/root/.ollama",
+                    claimName: $pvc,
+                    existingPvc: false,
+                    size: "50G"
+                  }]
+                }
+              }
+            }')
           RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$(jq -n \
-              --arg name "medw-ollama${SUFFIX}" \
-              --arg projectId "$PROJECT_ID" \
-              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg pvc "ollama-pvc${SUFFIX}" \
-              '{
-                name: $name,
-                projectId: $projectId,
-                clusterId: $clusterId,
-                spec: {
-                  image: "ollama/ollama:latest",
-                  compute: {
-                    cpuCoreRequest: 8, cpuCoreLimit: 8,
-                    cpuMemoryRequest: "32G", cpuMemoryLimit: "32G",
-                    gpuDevicesRequest: 1
-                  },
-                  nodeType: "NVIDIA-B200",
-                  environmentVariables: [
-                    {name: "OLLAMA_MODEL", value: "mistral:7b"},
-                    {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
-                    {name: "OLLAMA_NUM_PARALLEL", value: "4"},
-                    {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
-                  ],
-                  command: "/bin/bash",
-                  args: "/entrypoint.sh",
-                  ports: [{container: 11434, serviceType: "ClusterIP"}],
-                  data: {
-                    pvc: [{
-                      path: "/root/.ollama",
-                      claimName: $pvc,
-                      existingPvc: false,
-                      size: "50G"
-                    }]
-                  }
-                }
-              }")") || true
+            -d "$OLLAMA_JSON") || true
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
