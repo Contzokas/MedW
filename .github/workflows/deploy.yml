@@ -168,13 +168,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── VPN ───────────────────────────────────────────────────────────────
       - name: Install OpenVPN
         run: sudo apt-get update -qq && sudo apt-get install -y openvpn resolvconf
 
       - name: Write VPN config
-        run: |
-          echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
-          # No dhcp-option DNS in this VPN config — hostname resolved via /etc/hosts below
+        run: echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
 
       - name: Connect to VPN
         uses: kota65535/github-openvpn-connect-action@v3
@@ -183,14 +182,14 @@ jobs:
           username: ${{ secrets.VPN_USERNAME }}
           password: ${{ secrets.VPN_PASSWORD }}
 
-      # runai.kiefersa.gr is a private IP (10.184.94.250) only reachable via VPN.
-      # The VPN config doesn't push DNS, so we bypass DNS entirely via /etc/hosts.
+      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only — no DNS push in ovpn)
       - name: Add Run:ai host entry
         run: echo "10.184.94.250 runai.kiefersa.gr" | sudo tee -a /etc/hosts
 
+      # ── Run:ai CLI ────────────────────────────────────────────────────────
       - name: Install Run:ai CLI
         run: |
-          # Step 1: get a bearer token via client credentials
+          # Get bearer token via client credentials
           TOKEN=$(curl -fsSL -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
@@ -200,23 +199,20 @@ jobs:
             | jq -r '.access_token')
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-            echo "Failed to obtain access token"
-            exit 1
+            echo "Failed to obtain access token"; exit 1
           fi
-          echo "Token obtained successfully"
+          echo "Token obtained"
 
-          # Step 2: download CLI using the token
-          curl -fsSL \
-            -H "Authorization: Bearer $TOKEN" \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli/linux" -o runai
+          # Run the official installer script (URL discovered from Run:ai UI)
+          bash -c "$(curl -fsSL \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli-exposer/installer/linux" \
+            -H "Authorization: Bearer $TOKEN")"
 
-          chmod +x runai
-          sudo mv runai /usr/local/bin/runai
           runai version
 
+      # ── Authenticate ──────────────────────────────────────────────────────
       - name: Authenticate to Run:ai (CLI v2)
         run: |
-          # v2: set control plane URL first, then login via env vars
           runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
           RUNAI_CLIENT_ID="${{ secrets.RUNAI_CLIENT_ID }}" \
           RUNAI_CLIENT_SECRET="${{ secrets.RUNAI_CLIENT_SECRET }}" \
@@ -225,13 +221,14 @@ jobs:
       - name: Set Run:ai project
         run: runai project set ${{ env.RUNAI_PROJECT }}
 
+      # ── Show plan ─────────────────────────────────────────────────────────
       - name: Show deployment plan
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  Environment : ${{ needs.setup.outputs.env }}"
           echo "  Branch      : ${{ github.ref_name }}"
           echo "  Image tag   : ${{ env.TAG }}"
-          echo "  Suffix      : ${{ env.SUFFIX || '(none — production)' }}"
+          echo "  Suffix      : ${{ env.SUFFIX }}"
           echo "  Workloads   :"
           echo "    medw-chromadb${{ env.SUFFIX }}"
           echo "    medw-backend${{ env.SUFFIX }}"
@@ -239,6 +236,7 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+      # ── Submit workloads ──────────────────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
           runai submit medw-chromadb${{ env.SUFFIX }} \
