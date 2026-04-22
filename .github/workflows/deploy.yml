@@ -235,7 +235,7 @@ jobs:
         run: |
           CHROMA_JSON=$(jq -n \
             --arg name "medw-chromadb${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
+            --argjson projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "chroma-pvc${SUFFIX}" \
             '{
@@ -255,7 +255,6 @@ jobs:
                   pvc: [{
                     path: "/chroma/chroma",
                     claimName: $pvc,
-                    existingPvc: false,
                     size: "10G"
                   }]
                 }
@@ -278,7 +277,7 @@ jobs:
         run: |
           BACKEND_JSON=$(jq -n \
             --arg name "medw-backend${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
+            --argjson projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
             --arg suffix "$SUFFIX" \
@@ -309,7 +308,7 @@ jobs:
         run: |
           FRONTEND_JSON=$(jq -n \
             --arg name "medw-frontend${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
+            --argjson projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
             '{
@@ -332,7 +331,7 @@ jobs:
         run: |
           OLLAMA_JSON=$(jq -n \
             --arg name "medw-ollama${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
+            --argjson projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
             '{
@@ -346,7 +345,7 @@ jobs:
                   cpuMemoryRequest: "32G", cpuMemoryLimit: "32G",
                   gpuDevicesRequest: 1
                 },
-                nodeType: "NVIDIA-B200",
+                nodePools: ["NVIDIA-B200"],
                 environmentVariables: [
                   {name: "OLLAMA_MODEL", value: "mistral:7b"},
                   {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
@@ -354,13 +353,12 @@ jobs:
                   {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
                 ],
                 command: "/bin/bash",
-                args: "/entrypoint.sh",
+                args: ["/entrypoint.sh"],
                 ports: [{container: 11434, serviceType: "ClusterIP"}],
                 data: {
                   pvc: [{
                     path: "/root/.ollama",
                     claimName: $pvc,
-                    existingPvc: false,
                     size: "50G"
                   }]
                 }
