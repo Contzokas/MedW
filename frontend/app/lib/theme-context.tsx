@@ -38,11 +38,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mounted) {
       try {
-        if (theme === "light" || theme === "dark") {
-          document.documentElement.setAttribute("data-theme", theme)
+        if (theme === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark")
+          document.documentElement.classList.add("dark")
         } else {
-          // Remove data-theme attribute for system preference mode
-          document.documentElement.removeAttribute("data-theme")
+          // Explicitly set light to override system dark preference via media query
+          document.documentElement.setAttribute("data-theme", "light")
+          document.documentElement.classList.remove("dark")
         }
         localStorage.setItem("theme", theme)
       } catch (error) {

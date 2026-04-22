@@ -55,6 +55,24 @@
   }
 }
 
+/* Explicitly override system dark preference when user selects light mode */
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --info: #0891b2;
+}
+
 [data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
