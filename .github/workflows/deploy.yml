@@ -236,7 +236,7 @@ jobs:
         run: |
           CHROMA_JSON=$(jq -n \
             --arg name "medw-chromadb${SUFFIX}" \
-            --argjson projectId "$PROJECT_ID" \
+            --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "chroma-pvc${SUFFIX}" \
             '{
@@ -282,7 +282,7 @@ jobs:
         run: |
           BACKEND_JSON=$(jq -n \
             --arg name "medw-backend${SUFFIX}" \
-            --argjson projectId "$PROJECT_ID" \
+            --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
             --arg suffix "$SUFFIX" \
@@ -323,7 +323,7 @@ jobs:
         run: |
           FRONTEND_JSON=$(jq -n \
             --arg name "medw-frontend${SUFFIX}" \
-            --argjson projectId "$PROJECT_ID" \
+            --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
             '{
@@ -356,7 +356,7 @@ jobs:
         run: |
           OLLAMA_JSON=$(jq -n \
             --arg name "medw-ollama${SUFFIX}" \
-            --argjson projectId "$PROJECT_ID" \
+            --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
             '{
