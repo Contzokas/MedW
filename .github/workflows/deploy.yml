@@ -333,7 +333,7 @@ jobs:
               spec: {
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
-                ports: [{container: 3000, serviceType: "NodePort"}]
+                ports: [{container: 3000, serviceType: "LoadBalancer"}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
