@@ -168,10 +168,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Write VPN config
+        run: echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
+
       - name: Connect to VPN
         uses: kota65535/github-openvpn-connect-action@v3
         with:
-          config_file: ${{ secrets.VPN_CONFIG }}
+          config_file: /tmp/vpn.ovpn
           username: ${{ secrets.VPN_USERNAME }}
           password: ${{ secrets.VPN_PASSWORD }}
 
