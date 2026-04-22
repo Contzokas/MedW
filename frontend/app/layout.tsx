@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MEDΩ - Σύστημα Τριάζ",
-  description: "Σύστημα τεχνητής νοημοσύνης για αξιολόγηση συμπτωμάτων",
+  title: "MEDΩ - Triage System",
+  description: "AI-powered symptom assessment and guidance system",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="el"
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

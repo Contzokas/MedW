@@ -18,15 +18,6 @@ MTS_LABELS = {
     5: "Non-urgent",
 }
 
-# TODO: Greek medical terminology validation required in Sprint 1.
-# Run classify() against ≥20 Greek symptom test cases covering MTS levels 1–5.
-# If MTS classification accuracy falls below 80%:
-#   Fallback strategy: translate `symptoms` to English before LLM inference,
-#   then instruct the model to return `reasoning` in Greek.
-#   Implement as: symptoms_en = translate_to_english(symptoms); classify(symptoms_en, context)
-#   Translation can use a secondary Ollama call or a lightweight library (e.g., googletrans).
-#   Document accuracy results and chosen approach in the Story 2.2 dev agent record.
-
 _SYSTEM_PROMPT = (
     "You are a medical triage assistant using the Manchester Triage System (MTS). "
     "Analyse the patient's symptoms using the provided clinical context. "
@@ -35,12 +26,12 @@ _SYSTEM_PROMPT = (
 
 _HUMAN_TEMPLATE = (
     "Clinical context:\n{context}\n\n"
-    "Patient symptoms (Greek):\n{symptoms}\n\n"
+    "Patient symptoms:\n{symptoms}\n\n"
     "Return JSON with exactly these fields:\n"
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-    '"specialty": "<Greek specialty name>", "reasoning": "<explanation in Greek>"}}\n\n'
+    '"specialty": "<English specialty name>", "reasoning": "<explanation in English>"}}\n\n'
     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
-    "specialty must be a Greek medical specialty name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική)."
+    "specialty must be an English medical specialty name (e.g. Cardiology, Neurology, General Practice)."
 )
 
 

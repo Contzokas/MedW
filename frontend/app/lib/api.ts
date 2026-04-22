@@ -13,7 +13,7 @@ export async function submitTriage(
   })
 
   if (!res.ok) {
-    throw new Error(`Αποτυχία αξιολόγησης (κωδικός ${res.status})`)
+    throw new Error(`Assessment failed (code ${res.status})`)
   }
 
   return res.json() as Promise<TriageResponse>

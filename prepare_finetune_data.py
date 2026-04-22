@@ -22,14 +22,14 @@ MTS_LABELS = {1: "Immediate", 2: "Very Urgent", 3: "Urgent", 4: "Less Urgent", 5
 URGENCY_TO_MTS = {"Critical": 1, "High": 2, "Medium": 3, "Low": 4}
 
 BODY_REGION_SPECIALTY = {
-    "Head": "Νευρολογία",
-    "Chest": "Καρδιολογία",
-    "Abdomen": "Γαστρεντερολογία",
-    "Upper Limbs": "Ορθοπεδική",
-    "Lower Limbs": "Ορθοπεδική",
-    "Back": "Ορθοπεδική",
-    "Skin": "Δερματολογία",
-    "General": "Γενική Ιατρική",
+    "Head": "Neurology",
+    "Chest": "Cardiology",
+    "Abdomen": "Gastroenterology",
+    "Upper Limbs": "Orthopedics",
+    "Lower Limbs": "Orthopedics",
+    "Back": "Orthopedics",
+    "Skin": "Dermatology",
+    "General": "General Practice",
 }
 
 
@@ -55,7 +55,7 @@ def load_records():
 def build_assistant_response(rec):
     mts_level = URGENCY_TO_MTS[rec["recommended_urgency"]]
     mts_label = MTS_LABELS[mts_level]
-    specialty = BODY_REGION_SPECIALTY.get(rec["body_region"], "Γενική Ιατρική")
+    specialty = BODY_REGION_SPECIALTY.get(rec["body_region"], "General Practice")
 
     reasoning_parts = [
         f"Based on the described symptoms of {rec['primary_symptom'].lower()}",
@@ -81,9 +81,9 @@ def build_human_message(rec):
         f"Patient symptoms:\n{symptoms_text}\n\n"
         "Return JSON with exactly these fields:\n"
         '{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-        '"specialty": "<Greek specialty name>", "reasoning": "<explanation>"}}\n\n'
+        '"specialty": "<English specialty name>", "reasoning": "<explanation>"}}\n\n'
         "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
-        "specialty must be a Greek medical specialty name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική)."
+        "specialty must be an English medical specialty name (e.g. Cardiology, Neurology, General Practice)."
     )
 
 
@@ -121,9 +121,9 @@ def main():
                     f"Patient symptoms (EMERGENCY):\n{rec['description']}\n\n"
                     "Return JSON with exactly these fields:\n"
                     '{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-                    '"specialty": "<Greek specialty name>", "reasoning": "<explanation>"}}\n\n'
+                    '"specialty": "<English specialty name>", "reasoning": "<explanation>"}}\n\n'
                     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
-                    "specialty must be a Greek medical specialty name."
+                    "specialty must be an English medical specialty name."
                 )
                 lines.append({
                     "messages": [

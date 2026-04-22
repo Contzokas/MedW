@@ -24,13 +24,13 @@ export default function TriageResult({ result }: TriageResultProps) {
       <div className="flex items-center gap-4">
         <span
           className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-xl font-bold ${mtsBadgeClass}`}
-          aria-label={`Επίπεδο τριάζ ${result.mts_level}`}
+          aria-label={`Triage level ${result.mts_level}`}
         >
           {result.mts_level}
         </span>
         <div>
           <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
-            Επίπεδο Επείγοντος (MTS)
+            Urgency Level (MTS)
           </p>
           <p className="text-2xl font-bold text-foreground">{result.mts_label}</p>
         </div>
@@ -38,7 +38,7 @@ export default function TriageResult({ result }: TriageResultProps) {
 
       <div>
         <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
-          Συνιστώμενη Ειδικότητα
+          Recommended Specialty
         </p>
         <p className="mt-1 text-lg font-semibold text-foreground">{result.specialty}</p>
       </div>
@@ -47,7 +47,7 @@ export default function TriageResult({ result }: TriageResultProps) {
 
       <div>
         <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">
-          Αιτιολόγηση
+          Reasoning
         </p>
         <p className="mt-1 text-base text-foreground leading-relaxed">{result.reasoning}</p>
       </div>

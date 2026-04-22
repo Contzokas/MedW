@@ -12,16 +12,16 @@ export default function TriageQueue() {
         <thead className="bg-muted">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Ώρα (Τοπική)
+              Time (Local)
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              ID Ασθενούς
+              Patient ID
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Επίπεδο MTS
+              MTS Level
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Ειδικότητα
+              Specialty
             </th>
           </tr>
         </thead>
@@ -29,7 +29,7 @@ export default function TriageQueue() {
           {entries.length === 0 ? (
             <tr>
               <td colSpan={4} className="px-6 py-4 text-center text-sm text-muted-foreground">
-                Η ουρά είναι άδεια. Δεν υπάρχουν νέα περιστατικά.
+                Queue is empty. No new incidents.
               </td>
             </tr>
           ) : (

@@ -12,8 +12,8 @@ from app.services.rag_service import RAGUnavailableError, retrieve_context
 
 logger = logging.getLogger(__name__)
 
-_GP_SPECIALTY = "Γενική Ιατρική"
-_GP_NAME = "Γενικός Ιατρός"
+_GP_SPECIALTY = "General Practice"
+_GP_NAME = "General Practitioner"
 _SAFE_REDIRECT = (
     f"https://finddoctors.gov.gr/search"
     f"?specialty={quote(_GP_SPECIALTY)}&doctor={quote(_GP_NAME)}"
@@ -21,15 +21,15 @@ _SAFE_REDIRECT = (
 
 _SAFE_DEFAULT = TriageResponse(
     mts_level=3,
-    mts_label="Επείγον",
+    mts_label="Urgent",
     specialty=_GP_SPECIALTY,
     doctor=Doctor(
         name=_GP_NAME,
         specialty=_GP_SPECIALTY,
         availability=True,
-        fallback_note="Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό.",
+        fallback_note="Processing failed — please consult a doctor.",
     ),
-    reasoning="Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό.",
+    reasoning="Processing failed — please consult a doctor.",
     redirect_url=_SAFE_REDIRECT,
     rag_used=False,
 )
