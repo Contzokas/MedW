@@ -168,10 +168,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Connect to VPN
+        uses: kota65535/github-openvpn-connect-action@v3
+        with:
+          config_file: ${{ secrets.VPN_CONFIG }}
+          username: ${{ secrets.VPN_USERNAME }}
+          password: ${{ secrets.VPN_PASSWORD }}
+
       - name: Install Run:ai CLI
         run: |
-          curl -L https://github.com/run-ai/runai-cli/releases/latest/download/runai-cli-linux-amd64.tar.gz \
-            | tar xz
+          # Download CLI directly from the Run:ai platform (official method)
+          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli/linux" -o runai
+          chmod +x runai
           sudo mv runai /usr/local/bin/runai
           runai version
 
