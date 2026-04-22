@@ -239,27 +239,26 @@ jobs:
             local SIZE="$2"
             local BODY
             BODY=$(jq -n \
-              --arg name    "$PVC_NAME" \
-              --argjson pid  "$PROJECT_ID" \
-              --arg cid     "${{ env.RUNAI_CLUSTER_ID }}" \
-              --arg size    "$SIZE" \
+              --arg name "$PVC_NAME" \
+              --argjson pid "$PROJECT_ID" \
+              --arg size "$SIZE" \
               '{
-                meta: { name: $name, projectId: $pid, clusterId: $cid },
+                meta: { name: $name, scope: "project", projectId: $pid },
                 spec: {
-                  claimName:   $name,
+                  path: "/data",
+                  claimName: $name,
                   existingPvc: false,
-                  size:        $size,
-                  accessModes: { readWriteOnce: true }
+                  claimInfo: { size: $size }
                 }
               }')
             RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/asset/pvc" \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/asset/datasource/pvc" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $TOKEN" \
               -d "$BODY") || true
             STATUS=$(echo "$RESP" | tail -1)
-            BTEXT=$(echo  "$RESP" | head -n -1)
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            BTEXT=$(echo "$RESP" | head -n -1)
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
               echo "PVC $PVC_NAME created"
             elif [ "$STATUS" = "409" ]; then
               echo "PVC $PVC_NAME already exists — skipping"
