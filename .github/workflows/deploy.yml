@@ -251,6 +251,7 @@ jobs:
                   claimInfo: { size: $size }
                 }
               }')
+            echo "  Payload: $BODY"
             RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
               "${{ env.RUNAI_CLUSTER_URL }}/api/v1/asset/datasource/pvc" \
               -H "Content-Type: application/json" \
@@ -258,12 +259,13 @@ jobs:
               -d "$BODY") || true
             STATUS=$(echo "$RESP" | tail -1)
             BTEXT=$(echo "$RESP" | head -n -1)
+            echo "  PVC $PVC_NAME → HTTP $STATUS: $BTEXT"
             if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-              echo "PVC $PVC_NAME created"
+              echo "  ✓ PVC $PVC_NAME created"
             elif [ "$STATUS" = "409" ]; then
-              echo "PVC $PVC_NAME already exists — skipping"
+              echo "  ✓ PVC $PVC_NAME already exists — skipping"
             else
-              echo "PVC $PVC_NAME failed (HTTP $STATUS): $BTEXT" && exit 1
+              echo "  ✗ PVC $PVC_NAME failed (HTTP $STATUS): $BTEXT" && exit 1
             fi
           }
 
@@ -308,7 +310,7 @@ jobs:
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "ChromaDB response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
             echo "ChromaDB submitted"
           elif [ "$STATUS" = "409" ]; then
             echo "ChromaDB already exists — skipping"
@@ -349,7 +351,7 @@ jobs:
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "Backend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
             echo "Backend submitted"
           elif [ "$STATUS" = "409" ]; then
             echo "Backend already exists — skipping"
@@ -382,7 +384,7 @@ jobs:
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "Frontend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
             echo "Frontend submitted"
           elif [ "$STATUS" = "409" ]; then
             echo "Frontend already exists — skipping"
@@ -435,7 +437,7 @@ jobs:
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
           echo "Ollama response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
             echo "Ollama submitted"
           elif [ "$STATUS" = "409" ]; then
             echo "Ollama already exists — skipping"
