@@ -233,7 +233,7 @@ jobs:
       # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
-          curl -fsSL -X POST \
+          RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
@@ -264,7 +264,14 @@ jobs:
                     }]
                   }
                 }
-              }')" && echo "ChromaDB submitted" || echo "ChromaDB submit failed (may already exist)"
+              }")") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "ChromaDB submitted"
+          else
+            echo "ChromaDB failed (HTTP $STATUS): $BODY"
+          fi
 
       - name: Deploy Backend
         run: |
@@ -320,7 +327,7 @@ jobs:
 
       - name: Deploy Ollama (B200 GPU)
         run: |
-          curl -fsSL -X POST \
+          RESP=$(curl -fsSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
@@ -359,7 +366,14 @@ jobs:
                     }]
                   }
                 }
-              }')" && echo "Ollama submitted" || echo "Ollama submit failed (may already exist)"
+              }")") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ]; then
+            echo "Ollama submitted"
+          else
+            echo "Ollama failed (HTTP $STATUS): $BODY"
+          fi
 
       # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
