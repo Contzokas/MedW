@@ -45,6 +45,53 @@ These are used within the SKILL.md body — never in frontmatter:
 | `config-variables`       | Beyond core vars                  | `planning_artifacts`, `output_folder` |
 | `output-artifacts`       | What it creates (output-location) | "PRD document", "agent skill"         |
 
+## Customization Surface (`customize.toml`, opt-in)
+
+Emitted only when the skill author opts in during Phase 3.5 (Configurability Discovery). The file sits next to SKILL.md and is loaded via `_bmad/scripts/resolve_customization.py` at activation.
+
+### Always-present fields (when opted in)
+
+| Field                      | Type          | Purpose                                                                    |
+| -------------------------- | ------------- | -------------------------------------------------------------------------- |
+| `activation_steps_prepend` | array[string] | Steps run before standard activation. Overrides append.                    |
+| `activation_steps_append`  | array[string] | Steps run after greet, before the workflow's first stage. Overrides append. |
+| `persistent_facts`         | array[string] | Facts (literal or `file:` prefixed paths/globs) loaded on activation. Overrides append. |
+
+### Workflow-specific scalars (lifted during Phase 3.5)
+
+Named by purpose and suffix. Override wins (scalar merge rule).
+
+| Naming pattern      | Use for                                              | Example                                             |
+| ------------------- | ---------------------------------------------------- | --------------------------------------------------- |
+| `<purpose>_template` | File path for templates the workflow loads          | `brief_template = "resources/brief-template.md"`    |
+| `<purpose>_output_path` | Writable destination paths                       | `output_path = "{project-root}/docs/briefs"`        |
+| `on_<event>`        | Prompt or command executed at a hook point           | `on_complete = ""`                                  |
+
+**Path resolution within scalar values:**
+
+- Bare paths (e.g. `resources/brief-template.md`) resolve from the skill root.
+- `{project-root}/...` resolves from the project working directory — use for org-owned overrides.
+- Never mix `{project-root}` with config variables that already contain it (no double-prefix).
+
+### How SKILL.md references the resolved values
+
+After the resolver step runs, read customized values as `{workflow.<name>}`:
+
+```markdown
+Load the brief template from `{workflow.brief_template}`.
+```
+
+At runtime, that resolves to whatever the merged `[workflow].brief_template` scalar is — the default, a team override, or a personal override.
+
+### Override files
+
+Teams and users override without editing `customize.toml` in the skill, and instead modify the following:
+
+- Team: `{project-root}/_bmad/custom/{skill-name}.toml`
+- Personal: `{project-root}/_bmad/custom/{skill-name}.user.toml`
+
+Both use the same `[workflow]` block shape. Merge order: base (skill's `customize.toml`) → team → user.
+
 ## Overview Section Format
 
 The Overview is the first section after the title — it primes the AI for everything that follows.

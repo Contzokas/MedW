@@ -138,6 +138,10 @@ Order by impact — "how many findings does fixing this resolve?" The fix that c
 ### Sanctum Architecture
 {Only include this section if sanctum-architecture-analysis.md exists in the report directory}
 
+### Customization Surface
+
+{Assessment of metadata validity, customization posture, opportunities, and abuse patterns. For stateless agents, focus on lifting hardcoded paths and flagging toggle farms. For memory/autonomous agents, flag any override surface that duplicates sanctum concepts (identity, principles, menu) and confirm the sanctum remains the primary customization vehicle.}
+
 ## Recommendations
 
 1. {Highest impact}

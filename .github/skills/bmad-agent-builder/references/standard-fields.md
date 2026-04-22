@@ -48,6 +48,79 @@ These are content blocks the builder fills during Phase 5 Build. They are NOT te
 | `communication-style-seed`  | PERSONA-template.md     | Initial personality expression seed                          |
 | `vibe-prompt`               | PERSONA-template.md     | Prompt for vibe discovery during First Breath                |
 
+## Customization Surface (`customize.toml`)
+
+Every agent ships a `customize.toml` alongside SKILL.md. The file has two parts: a metadata block that is always emitted, and an override surface that is emitted only when the author opted in during build.
+
+### Metadata block (always present)
+
+Consumed by the installer to populate `module.yaml:agents[]` and the central config's `[agents.<code>]` section. Required for every agent regardless of archetype.
+
+| Field         | Type   | Required | Notes                                                                 |
+| ------------- | ------ | -------- | --------------------------------------------------------------------- |
+| `code`        | string | yes      | Stable identifier. Matches skill directory basename (no module prefix). |
+| `name`        | string | optional | Display name. Empty string is valid for First-Breath-named agents.    |
+| `title`       | string | yes      | Role title. Always fillable at build time.                            |
+| `icon`        | string | yes      | Single emoji.                                                         |
+| `description` | string | yes      | One-sentence summary of what the agent does.                          |
+| `agent_type`  | string | yes      | One of `stateless`, `memory`, `autonomous`.                           |
+
+**First-Breath-named agents:** leave `name = ""` at build time. The owner fills it post-activation in `{project-root}/_bmad/custom/config.toml`:
+
+```toml
+[agents.<code>]
+name = "..."
+```
+
+UIs tolerate empty `name` and fall back to `title`.
+
+### Override surface (emitted only when opted in)
+
+Loaded via `_bmad/scripts/resolve_customization.py` at activation. Skip entirely for agents that did not opt in to customization.
+
+| Field                      | Type          | Purpose                                                        |
+| -------------------------- | ------------- | -------------------------------------------------------------- |
+| `activation_steps_prepend` | array[string] | Steps run before standard activation. Overrides append.        |
+| `activation_steps_append`  | array[string] | Steps run after greet, before user input. Overrides append.    |
+| `persistent_facts`         | array[string] | Facts (literal or `file:` prefixed). Overrides append.         |
+
+### Agent-specific scalars (lifted during Configurability Discovery)
+
+Named by purpose and suffix. Override wins (scalar merge rule).
+
+| Naming pattern          | Use for                                       | Example                                          |
+| ----------------------- | --------------------------------------------- | ------------------------------------------------ |
+| `<purpose>_template`    | File paths for templates the agent loads      | `style_guide_template = "resources/style.md"`    |
+| `<purpose>_output_path` | Writable destinations                         | `report_output_path = "{project-root}/reports"`  |
+| `on_<event>`            | Prompt or command executed at a hook point    | `on_session_close = ""`                          |
+
+**Path resolution within scalar values:**
+
+- Bare paths (e.g. `resources/style.md`) resolve from the skill root.
+- `{project-root}/...` resolves from the project working directory — use for org-owned overrides.
+- Config variables are used directly (they already contain `{project-root}`) — no double-prefix.
+
+### How SKILL.md references the resolved values
+
+After the resolver step runs, read customized values as `{agent.<name>}`:
+
+```markdown
+Load the style guide from `{agent.style_guide_template}`.
+```
+
+### Override files
+
+Teams and users override without editing `customize.toml`:
+
+- Team: `{project-root}/_bmad/custom/{skill-name}.toml`
+- Personal: `{project-root}/_bmad/custom/{skill-name}.user.toml`
+
+Both use the same `[agent]` block shape. Merge order: base (skill's `customize.toml`) → team → user.
+
+### Memory / autonomous agents — prefer sanctum over this surface
+
+For memory and autonomous agents, the sanctum (PERSONA.md, CREED.md, BOND.md, CAPABILITIES.md) is the primary behavior-customization surface. It's calibrated at First Breath and evolves over time through owner edits and teaching. The `[agent]` override surface is usually empty for these archetypes — opt in only when there is a specific need (e.g. org-mandated pre-sanctum-load compliance step) that the sanctum cannot express.
+
 ## Overview Section Format
 
 The Overview is the first section after the title — it primes the AI for everything that follows.

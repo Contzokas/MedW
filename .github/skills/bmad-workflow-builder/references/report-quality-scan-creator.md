@@ -121,6 +121,10 @@ A narrative markdown report. Structure:
 
 {Assessment + token savings estimates}
 
+### Customization Surface
+
+{Assessment of customization posture (opted in or not), opportunities to expose, and abuse patterns to trim. Flag metadata drift, toggle farms, and archetype-inappropriate surfaces.}
+
 ## Recommendations
 
 1. {Highest impact — resolves N observations}

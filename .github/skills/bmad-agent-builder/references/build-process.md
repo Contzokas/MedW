@@ -86,6 +86,53 @@ Key structural context:
 - **Memory architecture:** Agent memory at `{project-root}/_bmad/memory/{skillName}/`
 - **Access boundaries:** Read/write/deny zones stored in memory
 
+### Customization Metadata (gather for all agents — feeds `customize.toml` and `module.yaml`)
+
+Every agent ships a `customize.toml` with an `[agent]` metadata block. The installer reads it to build the agent roster in `module.yaml:agents[]` and the central config's `[agents.<code>]` section. Gather:
+
+- **`code`** — stable identifier, matches the skill directory basename without module prefix (e.g. `creative-muse`, `analyst`).
+- **`name`** — display name (e.g. `Mary`, `Aria`). **For memory/autonomous agents whose name is learned during First Breath: leave empty.** The owner fills it post-activation via `[agents.<code>] name = "..."` in `_bmad/custom/config.toml`.
+- **`title`** — role title (e.g. `Business Analyst`, `Creative Muse`). Always fillable at build time, even when `name` is deferred.
+- **`icon`** — single emoji used in menus and greetings.
+- **`description`** — one-sentence summary of what the agent does.
+- **`agent_type`** — `stateless`, `memory`, or `autonomous` (already determined in Phase 1).
+
+### Customization Opt-In (override surface)
+
+Ask: _"Do you want this agent to expose override hooks (persistent facts, pre/post-activation steps) so teams can customize it without forking?"_
+
+- **No** → `customize.toml` ships with metadata only. SKILL.md does not call the resolver. Simplest shape.
+- **Yes** → `customize.toml` additionally carries `activation_steps_prepend`, `activation_steps_append`, `persistent_facts`, and any agent-specific scalars lifted in the next sub-step. SKILL.md gets the resolver step.
+
+**Default recommendation by archetype:**
+
+- **Stateless agents** — offer the opt-in; reasonable candidates for overrides (compliance preloads, swappable reference docs).
+- **Memory / autonomous agents** — default to **no**. Note: their sanctum (PERSONA/CREED/BOND/CAPABILITIES) is already the primary behavior-customization surface, edited by the owner and evolved via First Breath. A TOML override surface competes with that. Offer opt-in only if the user has a clear use case (e.g. pre-sanctum-load compliance step).
+
+In headless mode, default to **no** unless `--customizable` is passed. Record the answer as `{customizable}`.
+
+### Configurability Discovery (only if `{customizable}` is yes)
+
+Identify swappable points. Walk through the agent's planned structure and surface candidates:
+
+- **Reference documents** the agent loads (e.g. a style guide, a domain glossary) — each becomes a named scalar.
+- **Output destination paths** if the agent writes artifacts.
+- **`on_<event>` hooks** — prompts/commands executed at hook points.
+- **Pre/post-activation step arrays** — `activation_steps_prepend` / `activation_steps_append` are always present in the override surface; call these out so the user sees they're available.
+
+For each candidate, confirm with the user:
+
+- Should this be exposed as an `[agent]` scalar?
+- What name? Follow the conventions in `./standard-fields.md`:
+  - `<purpose>_template` for template file paths
+  - `<purpose>_output_path` for writable destinations
+  - `on_<event>` for hook scalars
+- What's the default value?
+
+User-added configurables are welcome — domain-specific knobs are fair game as long as they fit scalar or array merge rules.
+
+**Output:** a list of `{name, default, purpose}` tuples that Phase 5 will emit into `customize.toml` and reference from SKILL.md as `{agent.<name>}`.
+
 **If headless mode enabled, also gather:**
 
 - Default wake behavior (`--headless` | `-H` with no specific task)
@@ -162,6 +209,32 @@ Load `./references/sample-capability-prompt.md` as a quality reference for capab
 - `./references/quality-dimensions.md` — build quality checklist
 
 Build the agent using templates from `./assets/` and rules from `./references/template-substitution-rules.md`. Output to `{bmad_builder_output_folder}`.
+
+### Emit `customize.toml` (always, every archetype)
+
+Copy `./assets/customize-template.toml` into the built agent's root. Fill the `[agent]` metadata block from Phase 3:
+
+- `code`, `title`, `icon`, `description`, `agent_type` — always populated.
+- `name` — populated for stateless agents and memory/autonomous agents whose name was fixed at build time; emit as an empty string for First-Breath-named agents.
+
+**If `{customizable}` is yes:**
+
+- Retain the override surface block (keep `{if-customizable}` content).
+- Append any scalars lifted in Configurability Discovery (Phase 3), following the naming conventions (`*_template`, `*_output_path`, `on_<event>`).
+- In SKILL.md, reference those scalars as `{agent.<name>}` rather than hardcoded values. Add the resolver activation step near the top of "On Activation":
+
+  ```markdown
+  ### Step 1: Resolve the Agent Block
+
+  Run: `python3 {project-root}/_bmad/scripts/resolve_customization.py --skill {skill-root} --key agent`
+
+  If the script fails, resolve the `agent` block yourself by reading these three files in base → team → user order and applying structural merge rules: `{skill-root}/customize.toml`, `{project-root}/_bmad/custom/{skill-name}.toml`, `{project-root}/_bmad/custom/{skill-name}.user.toml`. Scalars override, tables deep-merge, arrays of tables keyed by `code`/`id` replace matching entries and append new ones, all other arrays append.
+  ```
+
+- For stateless agents, execute `{agent.activation_steps_prepend}` before the rest of activation and `{agent.activation_steps_append}` after greet. Treat `{agent.persistent_facts}` as foundational context loaded on activation (`file:` prefix = path/glob; bare entries = literal facts).
+- For memory/autonomous agents (if opted in): the override surface runs before the sanctum load. In practice this is rarely populated — sanctum remains the primary surface.
+
+**If `{customizable}` is no:** emit customize.toml with metadata only (the `{if-customizable}` block is stripped). SKILL.md has no resolver step and uses hardcoded paths throughout.
 
 **Capability prompts are outcome-driven:** Each `./references/{capability}.md` file should describe what the capability achieves and what "good" looks like — not prescribe mechanical steps. The agent's persona context (identity, communication style, principles in SKILL.md) informs how each capability is executed. Don't repeat that context in every capability prompt.
 
