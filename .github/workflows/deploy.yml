@@ -231,6 +231,14 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+      # ── DEBUG: inspect existing workload to learn correct API field names ─
+      - name: Probe API schema (inspect existing backend workload)
+        run: |
+          echo "=== Listing all medw- workloads ==="
+          curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings?projectId=$PROJECT_ID" \
+            -H "Authorization: Bearer $TOKEN" \
+            | jq '[.entries[]? | select(.name | startswith("medw-")) | {name, spec}]'
+
       # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
