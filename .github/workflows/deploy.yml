@@ -206,7 +206,7 @@ jobs:
           PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
             -H "Authorization: Bearer $TOKEN")
           echo "DEBUG projects response: $PROJECT_RESP"
-          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
+          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.projects[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
             echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
           fi
