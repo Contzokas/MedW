@@ -418,7 +418,7 @@ jobs:
                   {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
                 ],
                 command: "/bin/bash",
-                args: ["/entrypoint.sh"],
+                args: "/entrypoint.sh",
                 ports: [{container: 11434, serviceType: "ClusterIP"}],
                 storage: {
                   pvc: [{
