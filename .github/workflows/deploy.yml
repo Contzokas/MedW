@@ -257,7 +257,7 @@ jobs:
                     path: "/chroma/chroma",
                     claimName: $pvc,
                     existingPvc: false,
-                    size: "10G"
+                    claimInfo: { size: "10Gi" }
                   }]
                 }
               }
@@ -384,7 +384,7 @@ jobs:
                     path: "/root/.ollama",
                     claimName: $pvc,
                     existingPvc: false,
-                    size: "50G"
+                    claimInfo: { size: "50Gi" }
                   }]
                 }
               }
