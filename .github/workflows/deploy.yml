@@ -13,6 +13,7 @@ env:
   ORG: contzokas
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
+  RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 3: Deploy via Run:ai CLI
+  # Job 3: Deploy via Run:ai REST API (no CLI needed)
   #
   # Workload names are suffixed by branch:
   #   feature/deploy-to-runai → medw-ollama-test, medw-backend-test, ...
@@ -149,13 +150,9 @@ jobs:
   #   main                    → medw-ollama,       medw-backend,       ...
   #
   # Required secrets (Settings → Secrets → Actions):
-  #   RUNAI_CLIENT_ID     — from https://runai.kiefersa.gr → Settings → Application → New Application
-  #   RUNAI_CLIENT_SECRET — same place (copy the secret immediately, shown only once)
-  #
-  # Why application credentials over API token?
-  #   ✓ Don’t expire (tokens are short-lived JWTs)
-  #   ✓ Designed for non-interactive/CI use
-  #   ✓ Can be scoped to specific permissions
+  #   RUNAI_CLIENT_ID     — from Run:ai → Settings → Application
+  #   RUNAI_CLIENT_SECRET — same place
+  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD — VPN credentials
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
@@ -182,76 +179,39 @@ jobs:
           username: ${{ secrets.VPN_USERNAME }}
           password: ${{ secrets.VPN_PASSWORD }}
 
-      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only — no DNS push in ovpn)
+      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only)
       - name: Add Run:ai host entry
         run: echo "10.184.94.250 runai.kiefersa.gr" | sudo tee -a /etc/hosts
 
-      # ── Run:ai CLI ────────────────────────────────────────────────────────
-      - name: Install Run:ai CLI
-        run: |
-          # Get bearer token via client credentials
-          TOKEN=$(curl -fsSL -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=client_credentials" \
-            -d "client_id=${{ secrets.RUNAI_CLIENT_ID }}" \
-            -d "client_secret=${{ secrets.RUNAI_CLIENT_SECRET }}" \
-            | jq -r '.access_token')
-
-          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-            echo "Failed to obtain access token"; exit 1
-          fi
-          echo "Token obtained"
-
-          # Run the official installer script (URL discovered from Run:ai UI)
-          # Respond 'n' to all interactive prompts (PATH, completion, auto-update)
-          printf 'n\nn\nn\n' | bash -c "$(curl -fsSL \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli-exposer/installer/linux" \
-            -H "Authorization: Bearer $TOKEN")" || true
-
-          # Installer puts binary at ~/.runai/bin/runai — symlink to system PATH
-          sudo ln -sf /home/runner/.runai/bin/runai /usr/local/bin/runai
-          runai version
-
-      # ── Authenticate ──────────────────────────────────────────────────────
-      - name: Authenticate to Run:ai
+      # ── Auth (REST API, no CLI) ──────────────────────────────────────────
+      - name: Authenticate and resolve project
         env:
           RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
           RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
-          runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
-
-          # Get bearer token via Run:ai API endpoint (not Keycloak)
           TOKEN=$(curl -fsSL -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/token" \
             -H "Accept: */*" \
             -H "Content-Type: application/json" \
             -d "{\"grantType\":\"client_credentials\",\"clientId\":\"$RUNAI_CLIENT_ID\",\"clientSecret\":\"$RUNAI_CLIENT_SECRET\"}" \
-            | jq -r '.accessToken')
+            | jq -r ‘.accessToken’)
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Failed to obtain access token"; exit 1
           fi
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
           echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
 
-          # Write token to authentication.json
-          AUTH_FILE="$HOME/.runai/authentication.json"
-          jq -n --arg token "$TOKEN" \
-            '{access_token: $token, token_type: "Bearer"}' > "$AUTH_FILE"
-          echo "Auth file written"
-          echo "--- auth file contents ---"
-          cat "$AUTH_FILE"
-
-      - name: Set Run:ai cluster and project
-        run: |
-          echo "--- current config ---"
-          cat ~/.runai/config.json
-          echo ""
-          echo "--- trying cluster set ---"
-          runai cluster set runai-kiefer 2>&1 || true
-          echo ""
-          echo "--- trying project set ---"
-          runai project set ${{ env.RUNAI_PROJECT }} 2>&1 || true
+          # Resolve project UUID by name
+          PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
+            -H "Authorization: Bearer $TOKEN")
+          echo "DEBUG projects response: $PROJECT_RESP"
+          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r ‘.[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id’)
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
+            echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
+          fi
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
+          echo "Project: ${{ env.RUNAI_PROJECT }} → $PROJECT_ID"
 
       # ── Show plan ─────────────────────────────────────────────────────────
       - name: Show deployment plan
@@ -261,6 +221,8 @@ jobs:
           echo "  Branch      : ${{ github.ref_name }}"
           echo "  Image tag   : ${{ env.TAG }}"
           echo "  Suffix      : ${{ env.SUFFIX }}"
+          echo "  Cluster     : ${{ env.RUNAI_CLUSTER_ID }}"
+          echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
           echo "    medw-chromadb${{ env.SUFFIX }}"
           echo "    medw-backend${{ env.SUFFIX }}"
@@ -268,64 +230,141 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── Submit workloads ──────────────────────────────────────────────────
+      # ── Submit workloads via REST API ────────────────────────────────────
       - name: Deploy ChromaDB
         run: |
-          runai submit medw-chromadb${{ env.SUFFIX }} \
-            --image chromadb/chroma:1.5.7 \
-            --cpu 1 --memory 2G \
-            --project ${{ env.RUNAI_PROJECT }} \
-            -e IS_PERSISTENT=TRUE \
-            -e ANONYMIZED_TELEMETRY=FALSE \
-            -e CHROMA_SERVER_PORT=8000 \
-            --service-type ClusterIP \
-            --port 8000 \
-            --persistent-volume-claim chroma-pvc${{ env.SUFFIX }}:/chroma/chroma \
-            || true
+          curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$(jq -n \
+              --arg name "medw-chromadb${SUFFIX}" \
+              --arg projectId "$PROJECT_ID" \
+              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+              --arg pvc "chroma-pvc${SUFFIX}" \
+              ‘{
+                name: $name,
+                projectId: $projectId,
+                clusterId: $clusterId,
+                spec: {
+                  image: "chromadb/chroma:1.5.7",
+                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
+                  environmentVariables: [
+                    {name: "IS_PERSISTENT", value: "TRUE"},
+                    {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
+                    {name: "CHROMA_SERVER_PORT", value: "8000"}
+                  ],
+                  ports: [{container: 8000, serviceType: "ClusterIP"}],
+                  data: {
+                    pvc: [{
+                      path: "/chroma/chroma",
+                      claimName: $pvc,
+                      existingPvc: false,
+                      size: "10G"
+                    }]
+                  }
+                }
+              }’)" && echo "ChromaDB submitted" || echo "ChromaDB submit failed (may already exist)"
 
       - name: Deploy Backend
         run: |
-          runai submit medw-backend${{ env.SUFFIX }} \
-            --image ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.TAG }} \
-            --cpu 1 --memory 1G \
-            --project ${{ env.RUNAI_PROJECT }} \
-            -e OLLAMA_HOST=http://medw-ollama${{ env.SUFFIX }}:11434 \
-            -e OLLAMA_MODEL=mistral:7b \
-            -e OLLAMA_TIMEOUT=30 \
-            -e CHROMA_HOST=medw-chromadb${{ env.SUFFIX }} \
-            -e CHROMA_PORT=8000 \
-            --service-type ClusterIP \
-            --port 8000 \
-            || true
+          curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$(jq -n \
+              --arg name "medw-backend${SUFFIX}" \
+              --arg projectId "$PROJECT_ID" \
+              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+              --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
+              --arg suffix "$SUFFIX" \
+              ‘{
+                name: $name,
+                projectId: $projectId,
+                clusterId: $clusterId,
+                spec: {
+                  image: $image,
+                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
+                  environmentVariables: [
+                    {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
+                    {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                    {name: "OLLAMA_TIMEOUT", value: "30"},
+                    {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
+                    {name: "CHROMA_PORT", value: "8000"}
+                  ],
+                  ports: [{container: 8000, serviceType: "ClusterIP"}]
+                }
+              }’)" && echo "Backend submitted" || echo "Backend submit failed (may already exist)"
 
       - name: Deploy Frontend
         run: |
-          runai submit medw-frontend${{ env.SUFFIX }} \
-            --image ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.TAG }} \
-            --cpu 1 --memory 512M \
-            --project ${{ env.RUNAI_PROJECT }} \
-            --service-type NodePort \
-            --port 3000 \
-            || true
+          curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$(jq -n \
+              --arg name "medw-frontend${SUFFIX}" \
+              --arg projectId "$PROJECT_ID" \
+              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+              --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
+              ‘{
+                name: $name,
+                projectId: $projectId,
+                clusterId: $clusterId,
+                spec: {
+                  image: $image,
+                  compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
+                  ports: [{container: 3000, serviceType: "NodePort"}]
+                }
+              }’)" && echo "Frontend submitted" || echo "Frontend submit failed (may already exist)"
 
       - name: Deploy Ollama (B200 GPU)
         run: |
-          runai submit medw-ollama${{ env.SUFFIX }} \
-            --image ollama/ollama:latest \
-            --gpu 1 \
-            --node-type NVIDIA-B200 \
-            --cpu 8 --memory 32G \
-            --project ${{ env.RUNAI_PROJECT }} \
-            -e OLLAMA_MODEL=mistral:7b \
-            -e OLLAMA_FLASH_ATTENTION=1 \
-            -e OLLAMA_NUM_PARALLEL=4 \
-            -e OLLAMA_MAX_LOADED_MODELS=1 \
-            --service-type ClusterIP \
-            --port 11434 \
-            --persistent-volume-claim ollama-pvc${{ env.SUFFIX }}:/root/.ollama \
-            --command -- /bin/bash /entrypoint.sh \
-            || true
+          curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$(jq -n \
+              --arg name "medw-ollama${SUFFIX}" \
+              --arg projectId "$PROJECT_ID" \
+              --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+              --arg pvc "ollama-pvc${SUFFIX}" \
+              ‘{
+                name: $name,
+                projectId: $projectId,
+                clusterId: $clusterId,
+                spec: {
+                  image: "ollama/ollama:latest",
+                  compute: {
+                    cpuCoreRequest: 8, cpuCoreLimit: 8,
+                    cpuMemoryRequest: "32G", cpuMemoryLimit: "32G",
+                    gpuDevicesRequest: 1
+                  },
+                  nodeType: "NVIDIA-B200",
+                  environmentVariables: [
+                    {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                    {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
+                    {name: "OLLAMA_NUM_PARALLEL", value: "4"},
+                    {name: "OLLAMA_MAX_LOADED_MODELS", value: "1"}
+                  ],
+                  command: "/bin/bash",
+                  args: "/entrypoint.sh",
+                  ports: [{container: 11434, serviceType: "ClusterIP"}],
+                  data: {
+                    pvc: [{
+                      path: "/root/.ollama",
+                      claimName: $pvc,
+                      existingPvc: false,
+                      size: "50G"
+                    }]
+                  }
+                }
+              }’)" && echo "Ollama submitted" || echo "Ollama submit failed (may already exist)"
 
+      # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
         if: always()
-        run: runai workload list
+        run: |
+          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
+            -H "Authorization: Bearer $TOKEN" \
+            | jq ‘[.[] | select(.name | startswith("medw-")) | {name, phase, clusterName}]’
