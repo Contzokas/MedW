@@ -14,6 +14,7 @@ env:
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
   RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # suppress Node.js 20 deprecation on all actions
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
