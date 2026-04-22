@@ -230,7 +230,7 @@ jobs:
           fi
 
           runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
-          runai login api-token --token "$TOKEN"
+          runai login api-token "$TOKEN"
 
       - name: Set Run:ai project
         run: runai project set ${{ env.RUNAI_PROJECT }}
