@@ -221,53 +221,37 @@ jobs:
         run: |
           runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
 
-          # Get a bearer token via client credentials
+          # Get bearer token via Run:ai API endpoint (not Keycloak)
           TOKEN=$(curl -fsSL -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=client_credentials" \
-            -d "client_id=$RUNAI_CLIENT_ID" \
-            -d "client_secret=$RUNAI_CLIENT_SECRET" \
-            | jq -r '.access_token')
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/token" \
+            -H "Accept: */*" \
+            -H "Content-Type: application/json" \
+            -d "{\"grantType\":\"client_credentials\",\"clientId\":\"$RUNAI_CLIENT_ID\",\"clientSecret\":\"$RUNAI_CLIENT_SECRET\"}" \
+            | jq -r '.accessToken')
 
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Failed to obtain access token"; exit 1
           fi
           echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
 
-          # Write token directly to authentication.json (skip runai login)
+          # Write token to authentication.json
           AUTH_FILE="$HOME/.runai/authentication.json"
           jq -n --arg token "$TOKEN" \
             '{access_token: $token, token_type: "Bearer"}' > "$AUTH_FILE"
-          echo "Auth file written to $AUTH_FILE"
+          echo "Auth file written"
+          echo "--- auth file contents ---"
+          cat "$AUTH_FILE"
 
-      - name: Discover and set Run:ai cluster
-        env:
-          RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
-          RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
+      - name: Set Run:ai cluster and project
         run: |
-          # List available clusters via API
-          TOKEN=$(curl -fsSL -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=client_credentials" \
-            -d "client_id=$RUNAI_CLIENT_ID" \
-            -d "client_secret=$RUNAI_CLIENT_SECRET" \
-            | jq -r '.access_token')
-
-          echo "=== Trying runai cluster list ==="
-          runai cluster list 2>&1 || true
+          echo "--- current config ---"
+          cat ~/.runai/config.json
           echo ""
-
-          echo "=== Trying runai cluster list -o json ==="
-          runai cluster list -o json 2>&1 || true
+          echo "--- trying cluster set ---"
+          runai cluster set runai-kiefer 2>&1 || true
           echo ""
-
-          echo "=== Trying clusters API ==="
-          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/clusters" \
-            -H "Authorization: Bearer $TOKEN" | jq . 2>&1 || echo "API call failed"
-
-      - name: Set Run:ai project
+          echo "--- trying project set ---"
+          runai project set ${{ env.RUNAI_PROJECT }} 2>&1 || true
         run: runai project set ${{ env.RUNAI_PROJECT }}
 
       # ── Show plan ─────────────────────────────────────────────────────────
