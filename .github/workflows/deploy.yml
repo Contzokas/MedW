@@ -190,8 +190,26 @@ jobs:
 
       - name: Install Run:ai CLI
         run: |
-          # Download CLI directly from the Run:ai platform (official method)
-          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli/linux" -o runai
+          # Step 1: get a bearer token via client credentials
+          TOKEN=$(curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials" \
+            -d "client_id=${{ secrets.RUNAI_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.RUNAI_CLIENT_SECRET }}" \
+            | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to obtain access token"
+            exit 1
+          fi
+          echo "Token obtained successfully"
+
+          # Step 2: download CLI using the token
+          curl -fsSL \
+            -H "Authorization: Bearer $TOKEN" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli/linux" -o runai
+
           chmod +x runai
           sudo mv runai /usr/local/bin/runai
           runai version
