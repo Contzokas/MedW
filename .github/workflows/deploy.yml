@@ -215,22 +215,12 @@ jobs:
 
       # ── Authenticate ──────────────────────────────────────────────────────
       - name: Authenticate to Run:ai (CLI v2)
+        env:
+          RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
+          RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
-          # Get bearer token via client credentials (non-interactive, no browser)
-          TOKEN=$(curl -fsSL -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/auth/realms/runai/protocol/openid-connect/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=client_credentials" \
-            -d "client_id=${{ secrets.RUNAI_CLIENT_ID }}" \
-            -d "client_secret=${{ secrets.RUNAI_CLIENT_SECRET }}" \
-            | jq -r '.access_token')
-
-          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-            echo "Failed to obtain token"; exit 1
-          fi
-
           runai config set --cp-url="${{ env.RUNAI_CLUSTER_URL }}"
-          runai login api-token "$TOKEN"
+          runai login
 
       - name: Set Run:ai project
         run: runai project set ${{ env.RUNAI_PROJECT }}
