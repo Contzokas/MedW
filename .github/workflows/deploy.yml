@@ -204,10 +204,13 @@ jobs:
           echo "Token obtained"
 
           # Run the official installer script (URL discovered from Run:ai UI)
-          bash -c "$(curl -fsSL \
+          # Respond 'n' to all interactive prompts (PATH, completion, auto-update)
+          printf 'n\nn\nn\n' | bash -c "$(curl -fsSL \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/cli-exposer/installer/linux" \
-            -H "Authorization: Bearer $TOKEN")"
+            -H "Authorization: Bearer $TOKEN")" || true
 
+          # Installer puts binary at ~/.runai/bin/runai — symlink to system PATH
+          sudo ln -sf /home/runner/.runai/bin/runai /usr/local/bin/runai
           runai version
 
       # ── Authenticate ──────────────────────────────────────────────────────
