@@ -1,0 +1,416 @@
+name: Build & Deploy to Run:ai
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - feature/deploy-to-runai
+  workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
+
+env:
+  REGISTRY: ghcr.io
+  ORG: contzokas
+  RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
+  RUNAI_PROJECT: medo
+  RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # suppress Node.js 20 deprecation on all actions
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 0: Resolve branch → image tag + workload suffix
+  #   main                    → tag=latest  suffix=""
+  #   dev                     → tag=dev     suffix="-dev"
+  #   feature/deploy-to-runai → tag=test    suffix="-test"
+  #   any other branch        → tag=test    suffix="-test"
+  # ─────────────────────────────────────────────────────────────────────────
+  setup:
+    name: Resolve deployment environment
+    runs-on: ubuntu-latest
+    outputs:
+      tag:    ${{ steps.resolve.outputs.tag }}
+      suffix: ${{ steps.resolve.outputs.suffix }}
+      env:    ${{ steps.resolve.outputs.env }}
+    steps:
+      - name: Resolve tag and suffix from branch
+        id: resolve
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          echo "Branch: $BRANCH"
+
+          if [ "$BRANCH" = "main" ]; then
+            TAG="latest"
+            SUFFIX=""
+            ENV="production"
+          elif [ "$BRANCH" = "dev" ]; then
+            TAG="dev"
+            SUFFIX="-dev"
+            ENV="development"
+          else
+            TAG="test"
+            SUFFIX="-test"
+            ENV="test"
+          fi
+
+          echo "tag=$TAG"       >> $GITHUB_OUTPUT
+          echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
+          echo "env=$ENV"       >> $GITHUB_OUTPUT
+
+          echo "──────────────────────────────────"
+          echo "  Branch : $BRANCH"
+          echo "  Tag    : $TAG"
+          echo "  Suffix : ${SUFFIX:-(none)}"
+          echo "  Env    : $ENV"
+          echo "──────────────────────────────────"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 1 & 2: Build images (parallel)
+  # ─────────────────────────────────────────────────────────────────────────
+  build-backend:
+    name: Build backend → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.tag }}
+            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-frontend:
+    name: Build frontend → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.tag }}
+            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://backend:8000' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Job 3: Deploy via Run:ai REST API (no CLI needed)
+  #
+  # Workload names are suffixed by branch:
+  #   feature/deploy-to-runai → medw-ollama-test, medw-backend-test, ...
+  #   dev                     → medw-ollama-dev,  medw-backend-dev,  ...
+  #   main                    → medw-ollama,       medw-backend,       ...
+  #
+  # Required secrets (Settings → Secrets → Actions):
+  #   RUNAI_CLIENT_ID     — from Run:ai → Settings → Application
+  #   RUNAI_CLIENT_SECRET — same place
+  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD — VPN credentials
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
+    runs-on: ubuntu-latest
+    needs: [setup, build-backend, build-frontend]
+    environment: ${{ needs.setup.outputs.env }}
+    env:
+      TAG:    ${{ needs.setup.outputs.tag }}
+      SUFFIX: ${{ needs.setup.outputs.suffix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── VPN ───────────────────────────────────────────────────────────────
+      - name: Install OpenVPN
+        run: sudo apt-get update -qq && sudo apt-get install -y openvpn resolvconf
+
+      - name: Write VPN config
+        run: echo "${{ secrets.VPN_CONFIG }}" > /tmp/vpn.ovpn
+
+      - name: Connect to VPN
+        uses: kota65535/github-openvpn-connect-action@v3.1.0
+        with:
+          config_file: /tmp/vpn.ovpn
+          username: ${{ secrets.VPN_USERNAME }}
+          password: ${{ secrets.VPN_PASSWORD }}
+
+      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only)
+      - name: Add Run:ai host entry
+        run: echo "10.184.94.250 runai.kiefersa.gr" | sudo tee -a /etc/hosts
+
+      # ── Auth (REST API, no CLI) ──────────────────────────────────────────
+      - name: Authenticate and resolve project
+        env:
+          RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
+          RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
+        run: |
+          TOKEN=$(curl -fsSL -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/token" \
+            -H "Accept: */*" \
+            -H "Content-Type: application/json" \
+            -d "{\"grantType\":\"client_credentials\",\"clientId\":\"$RUNAI_CLIENT_ID\",\"clientSecret\":\"$RUNAI_CLIENT_SECRET\"}" \
+            | jq -r '.accessToken')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Failed to obtain access token"; exit 1
+          fi
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
+
+          # Resolve project UUID by name
+          PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
+            -H "Authorization: Bearer $TOKEN")
+          echo "DEBUG projects response: $PROJECT_RESP"
+          PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.projects[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
+            echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
+          fi
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
+          echo "Project: ${{ env.RUNAI_PROJECT }} → $PROJECT_ID"
+
+      # ── Show plan ─────────────────────────────────────────────────────────
+      - name: Show deployment plan
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Environment : ${{ needs.setup.outputs.env }}"
+          echo "  Branch      : ${{ github.ref_name }}"
+          echo "  Image tag   : ${{ env.TAG }}"
+          echo "  Suffix      : ${{ env.SUFFIX }}"
+          echo "  Cluster     : ${{ env.RUNAI_CLUSTER_ID }}"
+          echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
+          echo "  Workloads   :"
+          echo "    medw-chromadb${{ env.SUFFIX }}"
+          echo "    medw-backend${{ env.SUFFIX }}"
+          echo "    medw-frontend${{ env.SUFFIX }}"
+          echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # ── Submit workloads via REST API ────────────────────────────────────
+      - name: Deploy ChromaDB
+        run: |
+          CHROMA_JSON=$(jq -n \
+            --arg name "medw-chromadb${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg pvc "chroma-pvc${SUFFIX}" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: "chromadb/chroma:1.5.7",
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
+                environmentVariables: [
+                  {name: "IS_PERSISTENT", value: "TRUE"},
+                  {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
+                  {name: "CHROMA_SERVER_PORT", value: "8000"}
+                ],
+                ports: [{container: 8000, serviceType: "ClusterIP"}],
+                storage: {
+                  pvc: [{
+                    path: "/chroma/chroma",
+                    claimName: $pvc,
+                    existingPvc: false,
+                    claimInfo: { size: "10Gi" }
+                  }]
+                }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$CHROMA_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "ChromaDB response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "ChromaDB submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "ChromaDB already exists — skipping"
+          else
+            echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      - name: Deploy Backend
+        run: |
+          BACKEND_JSON=$(jq -n \
+            --arg name "medw-backend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
+            --arg suffix "$SUFFIX" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
+                environmentVariables: [
+                  {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
+                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_TIMEOUT", value: "30"},
+                  {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
+                  {name: "CHROMA_PORT", value: "8000"}
+                ],
+                ports: [{container: 8000, serviceType: "ClusterIP"}]
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$BACKEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Backend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "Backend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Backend already exists — skipping"
+          else
+            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      - name: Deploy Frontend
+        run: |
+          FRONTEND_JSON=$(jq -n \
+            --arg name "medw-frontend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
+                ports: [{container: 3000, serviceType: "NodePort"}]
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$FRONTEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Frontend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "Frontend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Frontend already exists — skipping"
+          else
+            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      - name: Deploy Ollama (B200 GPU)
+        run: |
+          OLLAMA_JSON=$(jq -n \
+            --arg name "medw-ollama${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg pvc "ollama-pvc${SUFFIX}" \
+            --arg cmd "/bin/sh" \
+            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull mistral:7b && wait'" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: "ollama/ollama:latest",
+                compute: {
+                  cpuCoreRequest: 24, cpuCoreLimit: 24,
+                  cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
+                  gpuDevicesRequest: 3
+                },
+                environmentVariables: [
+                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
+                  {name: "OLLAMA_NUM_PARALLEL", value: "12"},
+                  {name: "OLLAMA_MAX_LOADED_MODELS", value: "3"}
+                ],
+                command: $cmd,
+                args: $cmdargs,
+                ports: [{container: 11434, serviceType: "ClusterIP"}],
+                storage: {
+                  pvc: [{
+                    path: "/root/.ollama",
+                    claimName: $pvc,
+                    existingPvc: false,
+                    claimInfo: { size: "50Gi" }
+                  }]
+                }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$OLLAMA_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Ollama response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "Ollama submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Ollama already exists — skipping"
+          else
+            echo "Ollama failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      # ── Status ────────────────────────────────────────────────────────────
+      - name: Show workload status
+        if: always()
+        run: |
+          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
+            -H "Authorization: Bearer $TOKEN" \
+            | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'
