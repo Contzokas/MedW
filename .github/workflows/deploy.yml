@@ -280,12 +280,23 @@ jobs:
 
       - name: Deploy Backend
         run: |
+          # Run:ai does not expose workload services via cluster-internal DNS,
+          # so we point the backend at the node IP + auto-assigned NodePort.
+          # These must be updated if ChromaDB / Ollama are deleted and recreated
+          # (NodePorts are reassigned on recreation). Find them in the Run:ai UI
+          # → Workloads → Connections column.
+          CHROMA_URL="${{ vars.CHROMA_URL || 'http://10.184.94.23:30538' }}"
+          OLLAMA_URL="${{ vars.OLLAMA_URL || 'http://10.184.94.23:32029' }}"
+          CHROMA_HOST_VAL=$(echo "$CHROMA_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
+          CHROMA_PORT_VAL=$(echo "$CHROMA_URL" | sed -E 's|.*:([0-9]+)$|\1|')
           BACKEND_JSON=$(jq -n \
             --arg name "medw-backend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
-            --arg suffix "$SUFFIX" \
+            --arg ollamaUrl "$OLLAMA_URL" \
+            --arg chromaHost "$CHROMA_HOST_VAL" \
+            --arg chromaPort "$CHROMA_PORT_VAL" \
             '{
               name: $name,
               projectId: $projectId,
@@ -294,11 +305,11 @@ jobs:
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
-                  {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
+                  {name: "OLLAMA_HOST", value: $ollamaUrl},
                   {name: "OLLAMA_MODEL", value: "mistral:7b"},
                   {name: "OLLAMA_TIMEOUT", value: "30"},
-                  {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
-                  {name: "CHROMA_PORT", value: "8000"}
+                  {name: "CHROMA_HOST", value: $chromaHost},
+                  {name: "CHROMA_PORT", value: $chromaPort}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}]
               }
