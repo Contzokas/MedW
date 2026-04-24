@@ -1,7 +1,7 @@
 import os
 
 OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "http://ollama:11434")
-OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "mistral:7b")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "medgemma:27b")
 try:
     OLLAMA_TIMEOUT: int = max(1, int(os.environ.get("OLLAMA_TIMEOUT", "30")))
 except ValueError:

@@ -290,7 +290,7 @@ jobs:
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
             --arg cmd "/bin/sh" \
-            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull mistral:7b && wait'" \
+            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull medgemma:27b && wait'" \
             '{
               name: $name,
               projectId: $projectId,
@@ -303,7 +303,7 @@ jobs:
                   gpuDevicesRequest: 3
                 },
                 environmentVariables: [
-                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_MODEL", value: "medgemma:27b"},
                   {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
                   {name: "OLLAMA_NUM_PARALLEL", value: "12"},
                   {name: "OLLAMA_MAX_LOADED_MODELS", value: "3"}
@@ -316,7 +316,7 @@ jobs:
                     path: "/root/.ollama",
                     claimName: $pvc,
                     existingPvc: false,
-                    claimInfo: { size: "50Gi" }
+                    claimInfo: { size: "100Gi" }
                   }]
                 }
               }
@@ -421,8 +421,8 @@ jobs:
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
                   {name: "OLLAMA_HOST", value: $ollamaUrl},
-                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
-                  {name: "OLLAMA_TIMEOUT", value: "30"},
+                  {name: "OLLAMA_MODEL", value: "medgemma:27b"},
+                  {name: "OLLAMA_TIMEOUT", value: "120"},
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],

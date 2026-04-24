@@ -120,7 +120,7 @@ runai submit medw-backend `
     --cpu 1 --memory 1G `
     --project $Project `
     -e OLLAMA_HOST=http://medw-ollama:11434 `
-    -e OLLAMA_MODEL=mistral:7b `
+    -e OLLAMA_MODEL=medgemma:27b `
     -e OLLAMA_TIMEOUT=30 `
     -e CHROMA_HOST=medw-chromadb `
     -e CHROMA_PORT=8000 `
@@ -144,7 +144,7 @@ runai submit medw-ollama `
     --node-type NVIDIA-B200 `
     --cpu 8 --memory 32G `
     --project $Project `
-    -e OLLAMA_MODEL=mistral:7b `
+    -e OLLAMA_MODEL=medgemma:27b `
     -e OLLAMA_FLASH_ATTENTION=1 `
     -e OLLAMA_NUM_PARALLEL=4 `
     -e OLLAMA_MAX_LOADED_MODELS=1 `
