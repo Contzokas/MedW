@@ -1,15 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    const backend = process.env.BACKEND_URL?.replace(/\/$/, "") || "http://localhost:8000";
-    return [
-      {
-        source: "/backend/:path*",
-        destination: `${backend}/:path*`,
-      },
-    ];
-  },
+  // Rewrites removed — backend proxying is handled by the
+  // /api/proxy/[...path] API route which reads BACKEND_URL at runtime.
 };
 
 export default nextConfig;

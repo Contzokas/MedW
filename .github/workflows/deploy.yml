@@ -232,6 +232,44 @@ jobs:
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+      # ── Delete stale app workloads so the new image + env vars take effect ─
+      # Data services (ChromaDB, Ollama) are kept to preserve PVC state.
+      # Backend + Frontend are always recreated.
+      - name: Delete existing backend & frontend workloads
+        run: |
+          delete_workload() {
+            local name="$1"
+            echo "Deleting workload: $name"
+            # Find workload ID by name
+            RESP=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+              -H "Authorization: Bearer $TOKEN")
+            WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .id // empty")
+            if [ -z "$WL_ID" ] || [ "$WL_ID" = "null" ]; then
+              echo "  $name not found — nothing to delete"
+              return 0
+            fi
+            DEL_RESP=$(curl -sSL -w "\n%{http_code}" -X DELETE \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces/$WL_ID" \
+              -H "Authorization: Bearer $TOKEN") || true
+            DEL_STATUS=$(echo "$DEL_RESP" | tail -1)
+            echo "  $name deleted (HTTP $DEL_STATUS)"
+            # Wait for workload to fully terminate
+            for i in $(seq 1 30); do
+              CHECK=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .phase // empty")
+              if [ -z "$CHECK" ]; then
+                echo "  $name fully removed"
+                return 0
+              fi
+              echo "  [$i] $name phase: $CHECK — waiting..."
+              sleep 5
+            done
+            echo "  WARNING: $name not fully removed after 150s — proceeding anyway"
+          }
+
+          delete_workload "medw-backend${SUFFIX}"
+          delete_workload "medw-frontend${SUFFIX}"
+
       # ── Submit workloads via REST API ────────────────────────────────────
       # Deploy in dependency order: data services → backend → frontend.
       # After each tier, resolve the auto-assigned NodePort URLs from the
