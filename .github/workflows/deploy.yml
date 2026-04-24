@@ -300,7 +300,7 @@ jobs:
                   {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
                   {name: "CHROMA_PORT", value: "8000"}
                 ],
-                ports: [{container: 8000, serviceType: "ClusterIP"}]
+                ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
