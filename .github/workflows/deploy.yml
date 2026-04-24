@@ -347,6 +347,10 @@ jobs:
         run: |
           # Progress logs go to stderr so stdout only contains the resolved URL
           # (or nothing on failure) — safe to capture via command substitution.
+          # The Run:ai API returns connection info at:
+          #   .urls[0]                                    → "10.184.94.23:31977"
+          #   .environments[0].connections[0].url         → "10.184.94.23:31977"
+          # Values are IP:port without scheme — we prepend http:// here.
           resolve_url() {
             local workload_name="$1"
             local scheme="${2:-http}"
@@ -361,28 +365,17 @@ jobs:
                 sleep 5
                 continue
               fi
-              local phase=$(echo "$workload" | jq -r '.phase // .status.phase // "Unknown"')
+              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
               echo "  [$i] $workload_name phase: $phase" >&2
               if [ "$phase" = "Running" ]; then
-                echo "  Full workload JSON:" >&2
-                echo "$workload" | jq '.' >&2
-                local port=$(echo "$workload" | jq -r '
-                  [
-                    (.connections[0].nodePort? // empty),
-                    (.connections[0].externalPort? // empty),
-                    (.connections[0].port? // empty),
-                    (.connections[0].serviceInfo.nodePort? // empty),
-                    (.spec.ports[0].external? // empty),
-                    (.spec.ports[0].nodePort? // empty),
-                    ((.connections[0].url? // .connections[0].externalUrl? // "") | capture("(?<p>[0-9]+)$")?.p // empty)
-                  ] | map(select(. != null and . != "")) | .[0] // empty
-                ')
-                if [ -n "$port" ] && [ "$port" != "null" ]; then
-                  echo "  Resolved $workload_name -> ${scheme}://${NODE_IP}:${port}" >&2
-                  echo "${scheme}://${NODE_IP}:${port}"
+                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
+                  echo "  Resolved $workload_name -> ${scheme}://${ip_port}" >&2
+                  echo "${scheme}://${ip_port}"
                   return 0
                 fi
-                echo "  ERROR: Running but could not extract port from workload JSON" >&2
+                echo "  ERROR: Running but no URL in workload JSON" >&2
+                echo "$workload" | jq '.' >&2
                 return 1
               fi
               sleep 5
