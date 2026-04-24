@@ -251,7 +251,7 @@ jobs:
                   {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
                   {name: "CHROMA_SERVER_PORT", value: "8000"}
                 ],
-                ports: [{container: 8000, serviceType: "ClusterIP"}],
+                ports: [{container: 8000, serviceType: "NodePort"}],
                 storage: {
                   pvc: [{
                     path: "/chroma/chroma",
@@ -294,10 +294,10 @@ jobs:
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
-                  {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ".runai-medo.svc.cluster.local:11434")},
+                  {name: "OLLAMA_HOST", value: ("http://medw-ollama" + $suffix + ":11434")},
                   {name: "OLLAMA_MODEL", value: "mistral:7b"},
                   {name: "OLLAMA_TIMEOUT", value: "30"},
-                  {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix + ".runai-medo.svc.cluster.local")},
+                  {name: "CHROMA_HOST", value: ("medw-chromadb" + $suffix)},
                   {name: "CHROMA_PORT", value: "8000"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}]
@@ -380,7 +380,7 @@ jobs:
                 ],
                 command: $cmd,
                 args: $cmdargs,
-                ports: [{container: 11434, serviceType: "ClusterIP"}],
+                ports: [{container: 11434, serviceType: "NodePort"}],
                 storage: {
                   pvc: [{
                     path: "/root/.ollama",
