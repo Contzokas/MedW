@@ -72,7 +72,6 @@ if (-not $SkipBuild) {
 
     Write-Host "[1/4] Building frontend image..." -ForegroundColor Yellow
     docker build `
-        --build-arg NEXT_PUBLIC_API_URL="http://backend:8000" `
         -t "$Registry/medw-frontend:$Tag" `
         ./frontend
     if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }

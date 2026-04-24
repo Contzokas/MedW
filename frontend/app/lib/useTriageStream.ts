@@ -24,11 +24,23 @@ function toQueueEntry(raw: string): QueueEntry | null {
   }
 }
 
+/**
+ * Resolves the base URL for backend API calls (same logic as api.ts).
+ * When NEXT_PUBLIC_BACKEND_URL is set (e.g. http://localhost:8000),
+ * the browser connects directly to the port-forwarded backend.
+ */
+function getBackendBase(): string {
+  const envUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+  if (envUrl) return envUrl.replace(/\/$/, "")
+  return "/backend"
+}
+
 export function useTriageStream(): QueueEntry[] {
   const [entries, setEntries] = useState<QueueEntry[]>([])
 
   useEffect(() => {
-    const es = new EventSource(`/backend/api/v1/triage/queue`)
+    const base = getBackendBase()
+    const es = new EventSource(`${base}/api/v1/triage/queue`)
 
     es.addEventListener("triage_update", (event: MessageEvent) => {
       const entry = toQueueEntry(event.data)

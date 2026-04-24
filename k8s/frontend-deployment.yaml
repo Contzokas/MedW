@@ -26,10 +26,11 @@ spec:
             - containerPort: 3000
               name: http
           env:
-            # NEXT_PUBLIC_API_URL is baked at build time (see CI workflow).
-            # At runtime this env var is informational only, but we set it
-            # consistently in case the app reads it server-side.
-            - name: NEXT_PUBLIC_API_URL
+            # BACKEND_URL is read at runtime by Next.js rewrites (server-side proxy).
+            # In-cluster: points to the backend k8s service.
+            # For port-forward scenarios, users can set NEXT_PUBLIC_BACKEND_URL
+            # on the client side to bypass the proxy.
+            - name: BACKEND_URL
               value: "http://backend:8000"
           resources:
             requests:
