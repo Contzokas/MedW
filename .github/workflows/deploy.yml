@@ -446,11 +446,10 @@ jobs:
           fi
 
       - name: Resolve Backend URL
-        env:
-          NODE_IP: "10.184.94.23"
         run: |
           resolve_url() {
             local workload_name="$1"
+            local scheme="${2:-http}"
             local max_attempts=120
             echo "━━━ Resolving URL for $workload_name ━━━" >&2
             for i in $(seq 1 $max_attempts); do
@@ -461,29 +460,22 @@ jobs:
                 sleep 5
                 continue
               fi
-              local phase=$(echo "$workload" | jq -r '.phase // .status.phase // "Unknown"')
+              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
               echo "  [$i] $workload_name phase: $phase" >&2
               if [ "$phase" = "Running" ]; then
-                echo "$workload" | jq '.' >&2
-                local port=$(echo "$workload" | jq -r '
-                  [
-                    (.connections[0].nodePort? // empty),
-                    (.connections[0].externalPort? // empty),
-                    (.connections[0].port? // empty),
-                    (.connections[0].serviceInfo.nodePort? // empty),
-                    (.spec.ports[0].external? // empty),
-                    (.spec.ports[0].nodePort? // empty),
-                    ((.connections[0].url? // .connections[0].externalUrl? // "") | capture("(?<p>[0-9]+)$")?.p // empty)
-                  ] | map(select(. != null and . != "")) | .[0] // empty
-                ')
-                if [ -n "$port" ] && [ "$port" != "null" ]; then
-                  echo "http://${NODE_IP}:${port}"
+                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
+                  echo "  Resolved $workload_name -> ${scheme}://${ip_port}" >&2
+                  echo "${scheme}://${ip_port}"
                   return 0
                 fi
+                echo "  ERROR: Running but no URL in workload JSON" >&2
+                echo "$workload" | jq '.' >&2
                 return 1
               fi
               sleep 5
             done
+            echo "  ERROR: $workload_name did not reach Running within timeout" >&2
             return 1
           }
 
