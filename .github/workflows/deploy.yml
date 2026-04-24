@@ -267,7 +267,7 @@ jobs:
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/inferences" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$CHROMA_JSON") || true
@@ -322,7 +322,7 @@ jobs:
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/inferences" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$OLLAMA_JSON") || true
@@ -430,7 +430,7 @@ jobs:
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/inferences" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$BACKEND_JSON") || true
@@ -510,7 +510,7 @@ jobs:
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/inferences" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
             -d "$FRONTEND_JSON") || true
