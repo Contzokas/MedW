@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
 import { QueueEntry } from "@/app/lib/types"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-
 function isQueueEntry(value: unknown): value is QueueEntry {
   if (typeof value !== "object" || value === null) {
     return false
@@ -30,7 +28,7 @@ export function useTriageStream(): QueueEntry[] {
   const [entries, setEntries] = useState<QueueEntry[]>([])
 
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/api/v1/triage/queue`)
+    const es = new EventSource(`/backend/api/v1/triage/queue`)
 
     es.addEventListener("triage_update", (event: MessageEvent) => {
       const entry = toQueueEntry(event.data)

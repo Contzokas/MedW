@@ -107,7 +107,6 @@ jobs:
     name: Build frontend → :${{ needs.setup.outputs.tag }}
     runs-on: ubuntu-latest
     needs: setup
-    environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
       packages: write
@@ -131,6 +130,9 @@ jobs:
             type=raw,value=${{ needs.setup.outputs.tag }}
             type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
 
+      # The backend URL is now resolved at runtime via the BACKEND_URL env var
+      # and proxied through Next.js rewrites (see frontend/next.config.ts).
+      # No build-time NEXT_PUBLIC_API_URL is needed.
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -138,8 +140,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://backend:8000' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -233,6 +233,9 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Submit workloads via REST API ────────────────────────────────────
+      # Deploy in dependency order: data services → backend → frontend.
+      # After each tier, resolve the auto-assigned NodePort URLs from the
+      # Run:ai API and pass them to downstream workloads as env vars.
       - name: Deploy ChromaDB
         run: |
           CHROMA_JSON=$(jq -n \
@@ -277,91 +280,6 @@ jobs:
             echo "ChromaDB already exists — skipping"
           else
             echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
-          fi
-
-      - name: Deploy Backend
-        run: |
-          # Run:ai does not expose workload services via cluster-internal DNS,
-          # so we point the backend at the node IP + auto-assigned NodePort.
-          # These must be updated if ChromaDB / Ollama are deleted and recreated
-          # (NodePorts are reassigned on recreation). Find them in the Run:ai UI
-          # → Workloads → Connections column.
-          CHROMA_URL="${{ vars.CHROMA_URL || 'http://10.184.94.23:30538' }}"
-          OLLAMA_URL="${{ vars.OLLAMA_URL || 'http://10.184.94.23:32029' }}"
-          CHROMA_HOST_VAL=$(echo "$CHROMA_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
-          CHROMA_PORT_VAL=$(echo "$CHROMA_URL" | sed -E 's|.*:([0-9]+)$|\1|')
-          BACKEND_JSON=$(jq -n \
-            --arg name "medw-backend${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
-            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
-            --arg ollamaUrl "$OLLAMA_URL" \
-            --arg chromaHost "$CHROMA_HOST_VAL" \
-            --arg chromaPort "$CHROMA_PORT_VAL" \
-            '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
-              spec: {
-                image: $image,
-                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
-                environmentVariables: [
-                  {name: "OLLAMA_HOST", value: $ollamaUrl},
-                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
-                  {name: "OLLAMA_TIMEOUT", value: "30"},
-                  {name: "CHROMA_HOST", value: $chromaHost},
-                  {name: "CHROMA_PORT", value: $chromaPort}
-                ],
-                ports: [{container: 8000, serviceType: "NodePort"}]
-              }
-            }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$BACKEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Backend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Backend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Backend already exists — skipping"
-          else
-            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
-          fi
-
-      - name: Deploy Frontend
-        run: |
-          FRONTEND_JSON=$(jq -n \
-            --arg name "medw-frontend${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
-            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
-            '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
-              spec: {
-                image: $image,
-                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
-                ports: [{container: 3000, serviceType: "NodePort"}]
-              }
-            }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$FRONTEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Frontend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Frontend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Frontend already exists — skipping"
-          else
-            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
       - name: Deploy Ollama (B200 GPU)
@@ -417,6 +335,209 @@ jobs:
             echo "Ollama already exists — skipping"
           else
             echo "Ollama failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      # ── Resolve data-service URLs from Run:ai API ─────────────────────────
+      # Polls /api/v1/workloads until each workload's phase is Running, then
+      # extracts the NodePort from the API response and constructs a URL.
+      # The node IP is static (NODE_IP env), only the port is dynamic.
+      - name: Resolve ChromaDB and Ollama URLs
+        env:
+          NODE_IP: "10.184.94.23"
+        run: |
+          # Progress logs go to stderr so stdout only contains the resolved URL
+          # (or nothing on failure) — safe to capture via command substitution.
+          resolve_url() {
+            local workload_name="$1"
+            local scheme="${2:-http}"
+            local max_attempts=120  # 10 minutes @ 5s interval
+            echo "━━━ Resolving URL for $workload_name ━━━" >&2
+            for i in $(seq 1 $max_attempts); do
+              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN")
+              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
+              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
+                echo "  [$i] Workload $workload_name not found yet" >&2
+                sleep 5
+                continue
+              fi
+              local phase=$(echo "$workload" | jq -r '.phase // .status.phase // "Unknown"')
+              echo "  [$i] $workload_name phase: $phase" >&2
+              if [ "$phase" = "Running" ]; then
+                echo "  Full workload JSON:" >&2
+                echo "$workload" | jq '.' >&2
+                local port=$(echo "$workload" | jq -r '
+                  [
+                    (.connections[0].nodePort? // empty),
+                    (.connections[0].externalPort? // empty),
+                    (.connections[0].port? // empty),
+                    (.connections[0].serviceInfo.nodePort? // empty),
+                    (.spec.ports[0].external? // empty),
+                    (.spec.ports[0].nodePort? // empty),
+                    ((.connections[0].url? // .connections[0].externalUrl? // "") | capture("(?<p>[0-9]+)$")?.p // empty)
+                  ] | map(select(. != null and . != "")) | .[0] // empty
+                ')
+                if [ -n "$port" ] && [ "$port" != "null" ]; then
+                  echo "  Resolved $workload_name -> ${scheme}://${NODE_IP}:${port}" >&2
+                  echo "${scheme}://${NODE_IP}:${port}"
+                  return 0
+                fi
+                echo "  ERROR: Running but could not extract port from workload JSON" >&2
+                return 1
+              fi
+              sleep 5
+            done
+            echo "  ERROR: $workload_name did not reach Running within timeout" >&2
+            return 1
+          }
+
+          CHROMA_URL=$(resolve_url "medw-chromadb${SUFFIX}" "http") || CHROMA_URL=""
+          OLLAMA_URL=$(resolve_url "medw-ollama${SUFFIX}" "http") || OLLAMA_URL=""
+
+          # GitHub var fallbacks if API extraction fails
+          [ -z "$CHROMA_URL" ] && CHROMA_URL="${{ vars.CHROMA_URL }}"
+          [ -z "$OLLAMA_URL" ] && OLLAMA_URL="${{ vars.OLLAMA_URL }}"
+
+          if [ -z "$CHROMA_URL" ] || [ -z "$OLLAMA_URL" ]; then
+            echo "Failed to resolve service URLs. Set CHROMA_URL / OLLAMA_URL GitHub vars as fallback."
+            exit 1
+          fi
+          echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
+          echo "OLLAMA_URL=$OLLAMA_URL" >> "$GITHUB_ENV"
+          echo "Resolved CHROMA_URL=$CHROMA_URL"
+          echo "Resolved OLLAMA_URL=$OLLAMA_URL"
+
+      - name: Deploy Backend
+        run: |
+          CHROMA_HOST_VAL=$(echo "$CHROMA_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
+          CHROMA_PORT_VAL=$(echo "$CHROMA_URL" | sed -E 's|.*:([0-9]+)$|\1|')
+          BACKEND_JSON=$(jq -n \
+            --arg name "medw-backend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
+            --arg ollamaUrl "$OLLAMA_URL" \
+            --arg chromaHost "$CHROMA_HOST_VAL" \
+            --arg chromaPort "$CHROMA_PORT_VAL" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
+                environmentVariables: [
+                  {name: "OLLAMA_HOST", value: $ollamaUrl},
+                  {name: "OLLAMA_MODEL", value: "mistral:7b"},
+                  {name: "OLLAMA_TIMEOUT", value: "30"},
+                  {name: "CHROMA_HOST", value: $chromaHost},
+                  {name: "CHROMA_PORT", value: $chromaPort}
+                ],
+                ports: [{container: 8000, serviceType: "NodePort"}]
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$BACKEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Backend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "Backend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Backend already exists — skipping (delete it to apply new env vars)"
+          else
+            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
+          fi
+
+      - name: Resolve Backend URL
+        env:
+          NODE_IP: "10.184.94.23"
+        run: |
+          resolve_url() {
+            local workload_name="$1"
+            local max_attempts=120
+            echo "━━━ Resolving URL for $workload_name ━━━" >&2
+            for i in $(seq 1 $max_attempts); do
+              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN")
+              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
+              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
+                sleep 5
+                continue
+              fi
+              local phase=$(echo "$workload" | jq -r '.phase // .status.phase // "Unknown"')
+              echo "  [$i] $workload_name phase: $phase" >&2
+              if [ "$phase" = "Running" ]; then
+                echo "$workload" | jq '.' >&2
+                local port=$(echo "$workload" | jq -r '
+                  [
+                    (.connections[0].nodePort? // empty),
+                    (.connections[0].externalPort? // empty),
+                    (.connections[0].port? // empty),
+                    (.connections[0].serviceInfo.nodePort? // empty),
+                    (.spec.ports[0].external? // empty),
+                    (.spec.ports[0].nodePort? // empty),
+                    ((.connections[0].url? // .connections[0].externalUrl? // "") | capture("(?<p>[0-9]+)$")?.p // empty)
+                  ] | map(select(. != null and . != "")) | .[0] // empty
+                ')
+                if [ -n "$port" ] && [ "$port" != "null" ]; then
+                  echo "http://${NODE_IP}:${port}"
+                  return 0
+                fi
+                return 1
+              fi
+              sleep 5
+            done
+            return 1
+          }
+
+          BACKEND_URL=$(resolve_url "medw-backend${SUFFIX}") || BACKEND_URL=""
+          [ -z "$BACKEND_URL" ] && BACKEND_URL="${{ vars.BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "Failed to resolve backend URL. Set BACKEND_URL GitHub var as fallback."
+            exit 1
+          fi
+          echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
+          echo "Resolved BACKEND_URL=$BACKEND_URL"
+
+      - name: Deploy Frontend
+        run: |
+          FRONTEND_JSON=$(jq -n \
+            --arg name "medw-frontend${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
+            --arg backendUrl "$BACKEND_URL" \
+            '{
+              name: $name,
+              projectId: $projectId,
+              clusterId: $clusterId,
+              spec: {
+                image: $image,
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
+                environmentVariables: [
+                  {name: "BACKEND_URL", value: $backendUrl}
+                ],
+                ports: [{container: 3000, serviceType: "NodePort"}]
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/trainings" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d "$FRONTEND_JSON") || true
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | head -n -1)
+          echo "Frontend response (HTTP $STATUS): $BODY"
+          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
+            echo "Frontend submitted"
+          elif [ "$STATUS" = "409" ]; then
+            echo "Frontend already exists — skipping (delete it to apply new BACKEND_URL)"
+          else
+            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
       # ── Status ────────────────────────────────────────────────────────────
