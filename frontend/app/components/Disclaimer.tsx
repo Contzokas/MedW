@@ -8,17 +8,16 @@ export default function Disclaimer() {
   return (
     <div
       role="note"
-      aria-label="Important medical notice"
-      className="mb-6 rounded-lg border border-warning bg-warning/10 p-4 text-base"
+      aria-label={t.disclaimer.ariaLabel}
+      className="rounded-lg border border-warning bg-warning/10 p-4 text-sm"
     >
-      <p className="font-semibold text-warning">
-        ⚠️ Important Notice
-      </p>
+      <p className="font-semibold text-warning">{t.disclaimer.title}</p>
       <p className="mt-1 text-foreground">
-        MEDΩ is an AI system for initial symptom assessment and{" "}
-        <strong>does not constitute a clinical diagnosis</strong>. Results are
-        indicative and do not replace professional medical advice. In case of
-        emergency, call <strong>112</strong>.
+        {t.disclaimer.body}
+        <strong>{t.disclaimer.bodyStrong}</strong>
+        {t.disclaimer.body2}
+        <strong>{t.disclaimer.bodyStrong2}</strong>
+        {t.disclaimer.body3}
       </p>
     </div>
   )

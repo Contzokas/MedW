@@ -13,19 +13,12 @@ export default function Home() {
   const { t } = useLang()
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-muted py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-3xl">
-        <div className="mb-10 text-center">
-          <button
-            onClick={() => setResult(null)}
-            className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
-            title="Back to home"
-          >
-            MED<span className="text-primary">Ω</span>
-          </button>
-          <p className="mt-6 text-xl font-medium text-foreground">
-            Intelligent symptom assessment and guidance system
-          </p>
+    <>
+      {/* ── Hero ── */}
+      <section className="snap-section hero-section relative min-h-screen flex flex-col items-center px-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="hero-orb-1 absolute w-[680px] h-[680px] rounded-full -top-48 -left-24" />
+          <div className="hero-orb-2 absolute w-[560px] h-[560px] rounded-full -bottom-36 -right-24" />
         </div>
 
         <div className="relative flex-1 w-full flex flex-col items-center justify-center py-16">
@@ -72,31 +65,23 @@ export default function Home() {
               </div>
             )}
 
-            <div className="mt-10 rounded-2xl border-2 border-destructive/20 bg-destructive/10 p-6 text-center shadow-sm">
-              <p className="text-lg font-medium text-destructive">
-                In case of a life-threatening emergency, call
-              </p>
-              <p className="mt-2 text-4xl font-black tracking-widest text-destructive">
-                112
-              </p>
-            </div>
-
-            {/* Scroll indicator */}
-            <a
-              href="#about"
-              className="relative self-center flex flex-col items-center gap-1.5 pb-20 pt-4 text-muted-foreground/40 hover:text-primary transition-colors"
-              aria-label={t.hero.scrollLabel}
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.25em]">{t.hero.scroll}</span>
-              <svg className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </a>
           </div>
         </div>
 
-        <TeamSection />
-      </div>
-    </main>
+        {/* Scroll indicator */}
+        <a
+          href="#about"
+          className="relative self-center flex flex-col items-center gap-1.5 pb-20 pt-4 text-muted-foreground/40 hover:text-primary transition-colors"
+          aria-label={t.hero.scrollLabel}
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-[0.25em]">{t.hero.scroll}</span>
+          <svg className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </a>
+      </section>
+
+      <TeamSection />
+    </>
   )
 }
