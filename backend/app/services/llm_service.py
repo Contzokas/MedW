@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -109,6 +109,7 @@ def _build_chain():
         model=OLLAMA_MODEL,
         temperature=0,
         request_timeout=OLLAMA_TIMEOUT,
+        num_ctx=131072,
     )
     prompt = ChatPromptTemplate.from_messages(
         [("system", _SYSTEM_PROMPT), ("human", _HUMAN_TEMPLATE)]
