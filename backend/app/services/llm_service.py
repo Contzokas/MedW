@@ -208,7 +208,7 @@ async def warmup_model() -> None:
         "messages": [{"role": "user", "content": "ping"}],
         "stream": False,
         "options": {"num_predict": 1},
-        "keep_alive": "-1",
+        "keep_alive": -1,
     }
 
     timeout = httpx.Timeout(timeout=float(OLLAMA_TIMEOUT))
@@ -232,12 +232,20 @@ async def warmup_model() -> None:
             _warmup_state["in_progress"] = False
             return
         except Exception as exc:  # noqa: BLE001
+            # Log response body for HTTPStatusError so we can see Ollama's error message
+            body = ""
+            if hasattr(exc, "response"):
+                try:
+                    body = exc.response.text[:400]
+                except Exception:  # noqa: BLE001
+                    pass
             _warmup_state["last_error"] = f"{type(exc).__name__}: {exc}"
             logger.warning(
-                "Ollama warmup attempt %s/%s failed: %s",
+                "Ollama warmup attempt %s/%s failed: %s%s",
                 attempt,
                 OLLAMA_WARMUP_RETRIES,
                 type(exc).__name__,
+                f" — {body}" if body else "",
             )
             if attempt < OLLAMA_WARMUP_RETRIES:
                 await asyncio.sleep(OLLAMA_WARMUP_RETRY_DELAY_SECONDS)
