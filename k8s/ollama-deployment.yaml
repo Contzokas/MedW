@@ -69,18 +69,19 @@ spec:
               name: ollama-api
           env:
             - name: OLLAMA_MODEL
-              value: "mistral:7b"
-              # ↑ B200 can handle much larger models. Options:
-              #   mistral:7b   — fast, default (~4 GB VRAM)
+              value: "medgemma:27b"
+              # ↑ Must match the OLLAMA_MODEL GitHub Actions variable injected into the backend pod.
+              # B200 (192 GB HBM3e) alternatives if needed:
+              #   mistral:7b   — fast, lightweight (~4 GB VRAM)
               #   llama3:8b    — good quality (~5 GB VRAM)
-              #   llama3:70b   — high quality (~40 GB VRAM, still fits in B200's 192 GB)
-              #   mixtral:8x7b — MoE, excellent for multilingual (Greek) (~26 GB VRAM)
+              #   llama3:70b   — high quality (~40 GB VRAM)
+              #   mixtral:8x7b — MoE, excellent for multilingual/Greek (~26 GB VRAM)
 
             # B200 Blackwell FP8 acceleration — Ollama uses this automatically
             - name: OLLAMA_FLASH_ATTENTION
               value: "1"
             - name: OLLAMA_NUM_PARALLEL
-              value: "4"   # serve up to 4 concurrent triage requests on B200
+              value: "1"   # serve 1 concurrent request (matches OLLAMA_NUM_PARALLEL var)
             - name: OLLAMA_MAX_LOADED_MODELS
               value: "1"
 

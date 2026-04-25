@@ -20,7 +20,7 @@ spec:
         - name: backend
           # Replace with your actual GHCR image after CI builds it:
           # ghcr.io/medw/medw-backend:latest
-          image: ghcr.io/medw/medw-backend:latest
+          image: ghcr.io/contzokas/medw-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -29,9 +29,9 @@ spec:
             - name: OLLAMA_HOST
               value: "http://ollama:11434"
             - name: OLLAMA_MODEL
-              value: "mistral:7b"
+              value: "medgemma:27b"
             - name: OLLAMA_TIMEOUT
-              value: "30"
+              value: "120"
             - name: CHROMA_HOST
               value: "chromadb"
             - name: CHROMA_PORT
@@ -63,7 +63,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend
-  namespace: medw
+  namespace: runai-medo
   labels:
     app: medw-backend
     app.kubernetes.io/part-of: medw
