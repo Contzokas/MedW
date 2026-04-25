@@ -38,6 +38,18 @@ function getDirectBackendCandidates(): string[] {
   return [...new Set(candidates)]
 }
 
+async function fetchServerBackendUrl(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/config", { cache: "no-store" })
+    if (!res.ok) return null
+    const data = (await res.json()) as { backendUrl: string | null }
+    const url = data.backendUrl
+    return url && isAbsoluteHttpUrl(url) ? stripTrailingSlash(url) : null
+  } catch {
+    return null
+  }
+}
+
 async function isBackendReachable(baseUrl: string): Promise<boolean> {
   if (!isAbsoluteHttpUrl(baseUrl)) {
     return false
@@ -64,6 +76,13 @@ let apiBasePromise: Promise<string> | null = null
 
 async function resolveApiBaseUncached(): Promise<string> {
   const candidates = getDirectBackendCandidates()
+
+  // Add the server-configured backend URL (BACKEND_URL env var) as a candidate.
+  // The browser on VPN can reach the NodePort directly; this avoids the proxy.
+  const serverUrl = await fetchServerBackendUrl()
+  if (serverUrl && !candidates.includes(serverUrl)) {
+    candidates.push(serverUrl)
+  }
 
   for (const candidate of candidates) {
     if (await isBackendReachable(candidate)) {
