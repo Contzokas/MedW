@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 
-/**
- * Catch-all API route that proxies requests to the backend.
- *
- * BACKEND_URL is read on every request (true runtime config),
- * unlike next.config.ts rewrites which are baked at build time.
- *
- * Example:
- *   GET /api/proxy/api/v1/health  →  GET http://backend:8000/api/v1/health
- *   POST /api/proxy/api/v1/triage →  POST http://backend:8000/api/v1/triage
- */
 function getBackendUrl(): string {
   const url = process.env.BACKEND_URL?.replace(/\/$/, "")
   if (!url) {
@@ -72,14 +62,17 @@ async function proxyRequest(
 
   const path = params.path.join("/")
   const target = `${backendUrl}/${path}`
-
-  // Forward query string
   const search = request.nextUrl.search
   const url = search ? `${target}${search}` : target
 
-  // Build headers (strip host so backend gets its own)
   const headers = new Headers(request.headers)
   headers.delete("host")
+
+  // 5-second timeout: pods cannot reach NodePort services via the node IP
+  // (hairpin NAT). On timeout, redirect the browser to the backend directly —
+  // the browser (on VPN) can reach NodePorts even when the pod cannot.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
     const backendRes = await fetch(url, {
@@ -88,11 +81,12 @@ async function proxyRequest(
       body: request.body,
       // @ts-expect-error duplex is needed for streaming body
       duplex: "half",
+      signal: controller.signal,
     })
 
-    // Stream the response back to the client
+    clearTimeout(timeout)
+
     const responseHeaders = new Headers(backendRes.headers)
-    // Remove hop-by-hop headers
     responseHeaders.delete("transfer-encoding")
 
     return new Response(backendRes.body, {
@@ -101,14 +95,9 @@ async function proxyRequest(
       headers: responseHeaders,
     })
   } catch (err) {
+    clearTimeout(timeout)
     console.error(`Proxy error → ${url}:`, err)
-    return NextResponse.json(
-      {
-        error: "Backend unreachable",
-        target: url,
-        detail: (err as Error).message,
-      },
-      { status: 502 }
-    )
+    // Redirect browser to the backend directly — works when VPN has NodePort access
+    return NextResponse.redirect(url, { status: 307 })
   }
 }

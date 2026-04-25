@@ -1,7 +1,8 @@
 const API_PROXY_BASE = "/api/proxy"
 const LOCAL_PORT_FORWARD_BACKEND = "http://localhost:8000"
 const HEALTH_ENDPOINT = "/api/v1/health"
-const HEALTHCHECK_TIMEOUT_MS = 700
+const HEALTHCHECK_TIMEOUT_MS = 3000
+const CACHE_TTL_MS = 2 * 60 * 1000
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "")
@@ -73,6 +74,7 @@ async function isBackendReachable(baseUrl: string): Promise<boolean> {
 }
 
 let apiBasePromise: Promise<string> | null = null
+let apiBaseCachedAt = 0
 
 async function resolveApiBaseUncached(): Promise<string> {
   const candidates = getDirectBackendCandidates()
@@ -94,10 +96,11 @@ async function resolveApiBaseUncached(): Promise<string> {
 }
 
 export async function resolveApiBase(): Promise<string> {
-  if (!apiBasePromise) {
+  const now = Date.now()
+  if (!apiBasePromise || now - apiBaseCachedAt > CACHE_TTL_MS) {
     apiBasePromise = resolveApiBaseUncached()
+    apiBaseCachedAt = now
   }
-
   return apiBasePromise
 }
 
