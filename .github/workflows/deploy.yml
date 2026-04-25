@@ -234,6 +234,10 @@ jobs:
       OLLAMA_NUM_PARALLEL: ${{ vars.OLLAMA_NUM_PARALLEL || '1' }}
       OLLAMA_MAX_LOADED_MODELS: ${{ vars.OLLAMA_MAX_LOADED_MODELS || '1' }}
       OLLAMA_FLASH_ATTENTION: ${{ vars.OLLAMA_FLASH_ATTENTION || '0' }}
+      OLLAMA_WARMUP_ENABLED: ${{ vars.OLLAMA_WARMUP_ENABLED || 'true' }}
+      OLLAMA_WARMUP_KEEP_ALIVE: ${{ vars.OLLAMA_WARMUP_KEEP_ALIVE || '30m' }}
+      OLLAMA_WARMUP_RETRIES: ${{ vars.OLLAMA_WARMUP_RETRIES || '24' }}
+      OLLAMA_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.OLLAMA_WARMUP_RETRY_DELAY_SECONDS || '5' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -307,6 +311,7 @@ jobs:
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${{ env.IMMUTABLE_TAG }}"
           echo "  Ollama cfg  : model=${{ env.OLLAMA_MODEL }} timeout=${{ env.OLLAMA_TIMEOUT }} parallel=${{ env.OLLAMA_NUM_PARALLEL }} max_loaded=${{ env.OLLAMA_MAX_LOADED_MODELS }} flash=${{ env.OLLAMA_FLASH_ATTENTION }}"
+          echo "  Warmup cfg  : enabled=${{ env.OLLAMA_WARMUP_ENABLED }} keep_alive=${{ env.OLLAMA_WARMUP_KEEP_ALIVE }} retries=${{ env.OLLAMA_WARMUP_RETRIES }} retry_delay=${{ env.OLLAMA_WARMUP_RETRY_DELAY_SECONDS }}s"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale app workloads so the new image + env vars take effect ─
@@ -533,6 +538,10 @@ jobs:
             --arg ollamaUrl "$OLLAMA_URL" \
             --arg ollamaModel "${OLLAMA_MODEL}" \
             --arg ollamaTimeout "${OLLAMA_TIMEOUT}" \
+            --arg ollamaWarmupEnabled "${OLLAMA_WARMUP_ENABLED}" \
+            --arg ollamaWarmupKeepAlive "${OLLAMA_WARMUP_KEEP_ALIVE}" \
+            --arg ollamaWarmupRetries "${OLLAMA_WARMUP_RETRIES}" \
+            --arg ollamaWarmupRetryDelaySeconds "${OLLAMA_WARMUP_RETRY_DELAY_SECONDS}" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
             '{
@@ -546,6 +555,10 @@ jobs:
                   {name: "OLLAMA_HOST", value: $ollamaUrl},
                   {name: "OLLAMA_MODEL", value: $ollamaModel},
                   {name: "OLLAMA_TIMEOUT", value: $ollamaTimeout},
+                  {name: "OLLAMA_WARMUP_ENABLED", value: $ollamaWarmupEnabled},
+                  {name: "OLLAMA_WARMUP_KEEP_ALIVE", value: $ollamaWarmupKeepAlive},
+                  {name: "OLLAMA_WARMUP_RETRIES", value: $ollamaWarmupRetries},
+                  {name: "OLLAMA_WARMUP_RETRY_DELAY_SECONDS", value: $ollamaWarmupRetryDelaySeconds},
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],

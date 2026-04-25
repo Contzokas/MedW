@@ -64,6 +64,34 @@ async def test_health_still_returns_ok(client):
 
 
 @pytest.mark.asyncio
+async def test_warmup_health_status_shape(client):
+    response = await client.get("/api/v1/health/warmup")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert "warmup" in data
+    warmup = data["warmup"]
+
+    expected_keys = {
+        "enabled",
+        "ready",
+        "model",
+        "timeout_seconds",
+        "keep_alive",
+        "max_retries",
+        "retry_delay_seconds",
+        "in_progress",
+        "attempts",
+        "started_at",
+        "last_attempt_at",
+        "last_success_at",
+        "last_error",
+    }
+    assert expected_keys.issubset(set(warmup.keys()))
+
+
+@pytest.mark.asyncio
 async def test_triage_queue_sse_headers(client):
     """SSE endpoint responds with correct content-type and headers."""
     async def _finite_generator():

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.routers import doctors, health
 from app.services import doctor_service
+from app.services.llm_service import warmup_model
 from app.services.rag_service import seed_corpus_if_empty
 
 load_dotenv()  # Load .env if present (development only)
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
     except doctor_service.DoctorDataLoadError as exc:
         logger.exception("Doctor dataset load failed during startup")
         raise RuntimeError("Startup aborted: doctor dataset failed to load") from exc
+    await warmup_model()
     yield
 
 
