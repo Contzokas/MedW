@@ -65,29 +65,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* TODO: remove before demo */}
-            {result === null && (
-              <button
-                type="button"
-                onClick={() => setResult({
-                  mts_level: 3,
-                  mts_label: "Επείγον",
-                  specialty: "Καρδιολογία",
-                  doctor: {
-                    name: "Δρ. Γεώργιος Παπαδόπουλος",
-                    specialty: "Καρδιολόγος",
-                    availability: true,
-                    fallback_note: null,
-                  },
-                  reasoning: "Ο ασθενής παρουσιάζει συμπτώματα που υποδηλώνουν πιθανή καρδιακή εμπλοκή. Συνιστάται άμεση αξιολόγηση από καρδιολόγο.",
-                  redirect_url: "https://www.finddoctors.gov.gr",
-                  rag_used: true,
-                })}
-                className="mt-3 w-full rounded-md border border-dashed border-yellow-500/50 bg-yellow-500/10 px-4 py-2 text-xs font-mono text-yellow-600 hover:bg-yellow-500/20 transition-colors"
-              >
-                ⚠ MOCK — skip backend
-              </button>
-            )}
           </div>
         </div>
 
