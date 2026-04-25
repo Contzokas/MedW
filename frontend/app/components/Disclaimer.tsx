@@ -8,7 +8,7 @@ export default function Disclaimer() {
   return (
     <div
       role="note"
-      aria-label="Important medical notice"
+      aria-label={t.disclaimer.ariaLabel}
       className="rounded-lg border border-warning bg-warning/10 p-4 text-sm"
     >
       <p className="font-semibold text-warning">{t.disclaimer.title}</p>

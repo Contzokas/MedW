@@ -6,6 +6,8 @@ export const translations = {
     hero: {
       subtitle: "Intelligent symptom assessment and guidance · AI Triage",
       scroll: "scroll",
+      logoTitle: "Return to home",
+      scrollLabel: "Scroll to about section",
     },
     form: {
       label: "Symptoms",
@@ -25,6 +27,7 @@ export const translations = {
       link: "Find the doctor at finddoctors.gov.gr",
     },
     disclaimer: {
+      ariaLabel: "Important medical notice",
       title: "⚠️ Important Notice",
       body: "MEDΩ is an AI system for initial symptom assessment and ",
       bodyStrong: "does not constitute a clinical diagnosis",
@@ -42,6 +45,8 @@ export const translations = {
     hero: {
       subtitle: "Σύστημα αξιολόγησης συμπτωμάτων · AI Triage",
       scroll: "scroll",
+      logoTitle: "Επιστροφή στην αρχή",
+      scrollLabel: "Κύλιση στην ενότητα Σχετικά",
     },
     form: {
       label: "Συμπτώματα",
@@ -61,6 +66,7 @@ export const translations = {
       link: "Βρείτε τον γιατρό στο finddoctors.gov.gr",
     },
     disclaimer: {
+      ariaLabel: "Σημαντική ιατρική ειδοποίηση",
       title: "⚠️ Σημαντική Ενημέρωση",
       body: "Το MEDΩ είναι σύστημα τεχνητής νοημοσύνης για αρχική αξιολόγηση συμπτωμάτων και ",
       bodyStrong: "δεν αποτελεί κλινική διάγνωση",

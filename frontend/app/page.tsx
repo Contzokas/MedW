@@ -28,7 +28,7 @@ export default function Home() {
               <button
                 onClick={() => setResult(null)}
                 className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-lg"
-                title="Return to home"
+                title={t.hero.logoTitle}
               >
                 <h1 className="text-6xl sm:text-7xl font-black tracking-tight text-foreground">
                   MED<span className="logo-omega text-primary transition-colors group-hover:text-primary-hover">Ω</span>
@@ -72,7 +72,7 @@ export default function Home() {
         <a
           href="#about"
           className="relative self-center flex flex-col items-center gap-1.5 pb-20 pt-4 text-muted-foreground/40 hover:text-primary transition-colors"
-          aria-label="Scroll to about section"
+          aria-label={t.hero.scrollLabel}
         >
           <span className="text-[10px] font-semibold uppercase tracking-[0.25em]">{t.hero.scroll}</span>
           <svg className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
