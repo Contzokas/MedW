@@ -8,7 +8,7 @@ export default function Disclaimer() {
   return (
     <div
       aria-label={t.disclaimer.ariaLabel}
-      className="border-t border-warning/30 bg-warning/10 backdrop-blur-md px-4 py-2.5 text-sm flex flex-col sm:flex-row sm:items-center sm:gap-2"
+      className="border-t border-warning/30 bg-warning/10 backdrop-blur-md px-4 py-2.5 text-sm flex flex-col sm:flex-row sm:items-center sm:gap-2 justify-center text-center sm:text-left"
     >
       <p className="font-bold uppercase tracking-[0.12em] text-warning/90 shrink-0">{t.disclaimer.title}</p>
       <p className="text-foreground/80">
