@@ -228,6 +228,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [setup, build-backend, build-frontend, mirror-chromadb, mirror-ollama]
     environment: ${{ needs.setup.outputs.env }}
+    permissions:
+      contents: read
+      actions: write
     env:
       TAG:           ${{ needs.setup.outputs.tag }}
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
@@ -606,6 +609,24 @@ jobs:
           fi
           echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
           echo "Resolved BACKEND_URL=$BACKEND_URL"
+
+          # Persist the resolved URL back to the GitHub environment variable so
+          # future deploys always have a correct fallback (and /api/config is never stale).
+          ENV_NAME="${{ needs.setup.outputs.env }}"
+          REPO="${{ github.repository }}"
+          GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/BACKEND_URL"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "$GH_API" -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}")
+          if [ "$HTTP" = "404" ]; then
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
+              -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}"
+          fi
+          echo "GitHub variable BACKEND_URL updated to $BACKEND_URL (HTTP $HTTP)"
 
       - name: Deploy Frontend
         run: |
