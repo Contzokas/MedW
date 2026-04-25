@@ -229,6 +229,11 @@ jobs:
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
       SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
+      OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'medgemma:27b' }}
+      OLLAMA_TIMEOUT: ${{ vars.OLLAMA_TIMEOUT || '120' }}
+      OLLAMA_NUM_PARALLEL: ${{ vars.OLLAMA_NUM_PARALLEL || '1' }}
+      OLLAMA_MAX_LOADED_MODELS: ${{ vars.OLLAMA_MAX_LOADED_MODELS || '1' }}
+      OLLAMA_FLASH_ATTENTION: ${{ vars.OLLAMA_FLASH_ATTENTION || '0' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -301,6 +306,7 @@ jobs:
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.IMMUTABLE_TAG }}"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${{ env.IMMUTABLE_TAG }}"
+          echo "  Ollama cfg  : model=${{ env.OLLAMA_MODEL }} timeout=${{ env.OLLAMA_TIMEOUT }} parallel=${{ env.OLLAMA_NUM_PARALLEL }} max_loaded=${{ env.OLLAMA_MAX_LOADED_MODELS }} flash=${{ env.OLLAMA_FLASH_ATTENTION }}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale app workloads so the new image + env vars take effect ─
@@ -401,7 +407,11 @@ jobs:
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${IMMUTABLE_TAG}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
             --arg cmd "/bin/sh" \
-            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull medgemma:27b && wait'" \
+            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull ${OLLAMA_MODEL} && wait'" \
+            --arg ollamaModel "${OLLAMA_MODEL}" \
+            --arg ollamaFlashAttention "${OLLAMA_FLASH_ATTENTION}" \
+            --arg ollamaNumParallel "${OLLAMA_NUM_PARALLEL}" \
+            --arg ollamaMaxLoadedModels "${OLLAMA_MAX_LOADED_MODELS}" \
             '{
               name: $name,
               projectId: $projectId,
@@ -414,10 +424,10 @@ jobs:
                   gpuDevicesRequest: 3
                 },
                 environmentVariables: [
-                  {name: "OLLAMA_MODEL", value: "medgemma:27b"},
-                  {name: "OLLAMA_FLASH_ATTENTION", value: "1"},
-                  {name: "OLLAMA_NUM_PARALLEL", value: "12"},
-                  {name: "OLLAMA_MAX_LOADED_MODELS", value: "3"}
+                  {name: "OLLAMA_MODEL", value: $ollamaModel},
+                  {name: "OLLAMA_FLASH_ATTENTION", value: $ollamaFlashAttention},
+                  {name: "OLLAMA_NUM_PARALLEL", value: $ollamaNumParallel},
+                  {name: "OLLAMA_MAX_LOADED_MODELS", value: $ollamaMaxLoadedModels}
                 ],
                 command: $cmd,
                 args: $cmdargs,
@@ -521,6 +531,8 @@ jobs:
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${IMMUTABLE_TAG}" \
             --arg ollamaUrl "$OLLAMA_URL" \
+            --arg ollamaModel "${OLLAMA_MODEL}" \
+            --arg ollamaTimeout "${OLLAMA_TIMEOUT}" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
             '{
@@ -532,8 +544,8 @@ jobs:
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
                   {name: "OLLAMA_HOST", value: $ollamaUrl},
-                  {name: "OLLAMA_MODEL", value: "medgemma:27b"},
-                  {name: "OLLAMA_TIMEOUT", value: "120"},
+                  {name: "OLLAMA_MODEL", value: $ollamaModel},
+                  {name: "OLLAMA_TIMEOUT", value: $ollamaTimeout},
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],
