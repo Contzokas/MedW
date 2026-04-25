@@ -53,6 +53,24 @@ The builder selects the appropriate SKILL.md template based on agent type:
 - **Stateless agent:** Use `./assets/SKILL-template.md` (full identity, no Three Laws/Sacred Truth)
 - **Memory/autonomous agent:** Use `./assets/SKILL-template-bootloader.md` (lean bootloader with Three Laws, Sacred Truth, 3-path activation)
 
+## Customize.toml Emission
+
+Every agent ships `customize.toml` alongside SKILL.md. The template is `./assets/customize-template.toml`. Fill the `[agent]` metadata block from Phase 3's metadata gathering:
+
+- `{agent-code}` → stable identifier (skill dir basename without module prefix)
+- `{agent-name-or-empty}` → display name, or empty string for First-Breath-named agents
+- `{agent-title}` → role title
+- `{agent-icon}` → single emoji
+- `{agent-description}` → one-sentence description
+- `{agent-type}` → `stateless` | `memory` | `autonomous`
+
+### Customization Opt-In Conditional
+
+- `{if-customizable}` ... `{/if-customizable}` → Keep the content inside when the author opted in to the override surface; add the resolver step to SKILL.md; reference lifted scalars as `{agent.<name>}` in SKILL.md body.
+- When not opted in → Remove the entire block including markers; `customize.toml` ships with metadata only; SKILL.md has no resolver step and uses hardcoded paths.
+
+Lifted configurable scalars are referenced in SKILL.md as `{agent.<name>}` (e.g. `{agent.style_guide_template}`). These are resolved at runtime by the resolver, not at build time — emit them verbatim.
+
 ## Beyond the Template
 
 The builder determines the rest of the agent structure — capabilities, activation flow, sanctum templates, init script, First Breath, capability routing, external skills, scripts — based on the agent's requirements. The template intentionally does not prescribe these.

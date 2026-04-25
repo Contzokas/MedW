@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MEDΩ - AI Triage System",
-  description: "Intelligent AI system for symptom assessment and triage",
+  title: "MEDΩ - Triage System",
+  description: "AI-powered symptom assessment and guidance system",
 };
 
 export default function RootLayout({

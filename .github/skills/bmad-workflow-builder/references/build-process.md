@@ -100,11 +100,46 @@ Work through conversationally, adapted per skill type. Glean from what the user 
 **Module capability metadata (if part of a module):**
 Confirm with user: phase-name, after (dependencies), before (downstream), is-required, description (short — what it produces, not how).
 
+**Customization opt-in (ask once, default no):**
+
+Ask: _"Should this workflow support end-user customization (activation hooks, swappable templates, output paths)? If no, it ships fixed — users who need changes fork it."_
+
+- **No** → skip Phase 3.5 entirely. No `customize.toml` will be emitted. SKILL.md stays fixed-path.
+- **Yes** → proceed to Phase 3.5 below after finishing Phase 3.
+
+In headless mode, default to **no** unless `--customizable` is passed. Record the answer as `{customizable}` for later phases.
+
 **Path conventions (CRITICAL):**
 
 - Skill-internal: `references/`, `scripts/` (relative to skill root)
 - Project-scope paths: `{project-root}/...` (any path relative to project root)
 - Config variables used directly — they already contain `{project-root}`
+
+## Phase 3.5: Configurability Discovery (only if `{customizable}` is yes)
+
+Identify what should be swappable without forking. Walk through the workflow's planned structure and surface candidates:
+
+**Auto-detect candidates to propose:**
+
+- **Template files** the workflow loads — each becomes a named scalar (strongest case). A workflow that drafts output from `resources/brief-template.md` should expose `brief_template` so an org can point it at their own template.
+- **Output destination paths** if the workflow writes artifacts.
+- **`on_complete` hooks** — prompt or command executed at the terminal stage.
+- **Pre/post-flight step arrays** — `activation_steps_prepend` / `activation_steps_append` are always present in the override surface; call these out so the user sees they're available.
+
+**For each candidate, confirm with the user:**
+
+- Should this be exposed as a `[workflow]` scalar?
+- What name? Follow the conventions in `./standard-fields.md`:
+  - `<purpose>_template` for template file paths
+  - `<purpose>_output_path` for writable destinations
+  - `on_<event>` for hook scalars
+- What's the default value?
+
+**User-added configurables:** explicitly ask if the user wants to expose anything the auto-detect missed. Domain-specific knobs (style guides, severity thresholds, section lists) are fair game — as long as they're scalars or arrays that fit the merge rules.
+
+**Headless behavior:** auto-promote every template reference and output path the workflow declares. Name them from the filename stem (`brief-template.md` → `brief_template`). The user can prune later.
+
+**Output:** a list of `{name, default, purpose}` tuples that Phase 5 will emit into `customize.toml` and reference from SKILL.md as `{workflow.<name>}`.
 
 ## Phase 4: Draft & Refine
 
@@ -134,6 +169,24 @@ Watch especially for:
 - **If Complex Workflow:** `./complex-workflow-patterns.md` — compaction survival, config integration, progressive disclosure
 
 Load the template from `assets/SKILL-template.md` and `./template-substitution-rules.md`. Build the skill with progressive disclosure (SKILL.md for overview and routing, `references/` for progressive disclosure content). Output to `{bmad_builder_output_folder}`.
+
+**If `{customizable}` is yes:**
+
+- Emit `customize.toml` alongside SKILL.md using `assets/customize-template.toml` as the base. Fill `[workflow]` with the scalars identified in Phase 3.5.
+- In SKILL.md, replace hardcoded references to customizable values with `{workflow.<name>}` indirection. A hardcoded `resources/brief-template.md` becomes `{workflow.brief_template}` if that scalar was lifted.
+- Add the resolver activation step to SKILL.md before config load:
+
+  ```markdown
+  ### Step 1: Resolve the Workflow Block
+
+  Run: `python3 {project-root}/_bmad/scripts/resolve_customization.py --skill {skill-root} --key workflow`
+
+  If the script fails, resolve the `workflow` block yourself by reading these three files in base → team → user order and applying structural merge rules: `{skill-root}/customize.toml`, `{project-root}/_bmad/custom/{skill-name}.toml`, `{project-root}/_bmad/custom/{skill-name}.user.toml`. Scalars override, tables deep-merge, arrays of tables keyed by `code`/`id` replace matching entries and append new ones, all other arrays append.
+  ```
+
+- Execute `{workflow.activation_steps_prepend}` before the workflow's first stage and `{workflow.activation_steps_append}` after greet but before Stage 1. Treat `{workflow.persistent_facts}` as foundational context loaded on activation (`file:` prefix = path/glob; bare entries = literal facts).
+
+**If `{customizable}` is no:** no `customize.toml`, no resolver step. SKILL.md uses hardcoded paths throughout.
 
 **Skill Source Tree** (only create subfolders that are needed):
 

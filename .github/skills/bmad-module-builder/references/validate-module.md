@@ -46,6 +46,15 @@ This is where LLM judgment matters. For 4 or fewer skills, read all SKILL.md fil
 
 **Menu codes** — Are they intuitive? Do they relate to the display name in a way users can remember?
 
+**Agent roster (if module.yaml has an `agents:` block)** — Verify each entry has:
+
+- `code` matching a skill directory basename in the module folder
+- `title`, `icon`, `description` non-empty
+- `name` either populated or explicitly empty string (empty is valid for First-Breath-named agents whose name is filled post-activation via `_bmad/custom/config.toml`)
+- A corresponding `customize.toml` in the agent's skill directory with an `[agent]` block whose fields agree with the roster entry
+
+Flag drift: if the roster says `icon: 🎨` but the agent's own `customize.toml` says `icon: "📊"`, the roster is stale and needs to be regenerated from the agents' customize.toml files.
+
 ### 4. Present Results
 
 Combine script findings and quality assessment into a clear report:

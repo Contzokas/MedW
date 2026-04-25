@@ -61,6 +61,7 @@ Each scanner writes a free-form analysis document (not JSON):
 | L4  | `quality-scan-skill-cohesion.md`            | Stage flow, purpose alignment, complexity appropriateness                 | No        | `skill-cohesion-analysis.md`            |
 | L5  | `quality-scan-enhancement-opportunities.md` | Edge cases, UX gaps, user journeys, headless potential                    | No        | `enhancement-opportunities-analysis.md` |
 | L6  | `quality-scan-script-opportunities.md`      | Deterministic operations that should be scripts                           | No        | `script-opportunities-analysis.md`      |
+| L7  | `quality-scan-customization-surface.md`     | Opportunities to expose customization; abuse of the customization surface | No        | `customization-surface-analysis.md`     |
 
 ## Execution
 
@@ -84,7 +85,7 @@ After scripts complete, spawn all applicable LLM scanners as parallel subagents.
 
 **For scanners WITH pre-pass (L1, L2, L3):** provide the pre-pass JSON file path so the scanner reads compact metrics first, then reads raw files only as needed for judgment calls.
 
-**For scanners WITHOUT pre-pass (L4, L5, L6):** provide just the skill path and output directory.
+**For scanners WITHOUT pre-pass (L4, L5, L6, L7):** provide just the skill path and output directory.
 
 Each subagent receives:
 

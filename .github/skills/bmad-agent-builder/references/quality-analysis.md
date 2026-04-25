@@ -56,8 +56,11 @@ Each scanner writes a free-form analysis document:
 | L5  | `quality-scan-enhancement-opportunities.md` | Edge cases, experience gaps, user journeys, headless potential            | No        | `enhancement-opportunities-analysis.md` |
 | L6  | `quality-scan-script-opportunities.md`      | Deterministic operations that should be scripts                           | No        | `script-opportunities-analysis.md`      |
 | L7  | `quality-scan-sanctum-architecture.md`      | Sanctum architecture (memory agents only)                                 | Yes       | `sanctum-architecture-analysis.md`      |
+| L8  | `quality-scan-customization-surface.md`     | Customization opportunities and abuse; metadata validity                  | No        | `customization-surface-analysis.md`     |
 
 **L7 only runs for memory agents.** The prepass (P4) detects whether the agent is a memory agent. If the prepass reports `is_memory_agent: false`, skip L7 entirely.
+
+**L8 runs for all archetypes.** The scanner internally branches on `agent_type` to apply different rigor (metadata validity always; override-surface opportunities for stateless; sanctum-conflict detection for memory/autonomous).
 
 ## Execution
 
@@ -79,7 +82,7 @@ uv run ./scripts/prepass-sanctum-architecture.py {skill-path} -o {report-dir}/sa
 After scripts complete, spawn all scanners as parallel subagents.
 
 **With pre-pass (L1, L2, L3, L7):** provide pre-pass JSON path.
-**Without pre-pass (L4, L5, L6):** provide skill path and output directory.
+**Without pre-pass (L4, L5, L6, L8):** provide skill path and output directory.
 
 **Memory agent check:** Read `sanctum-architecture-prepass.json`. If `is_memory_agent` is `true`, include L7 in the parallel spawn. If `false`, skip L7.
 

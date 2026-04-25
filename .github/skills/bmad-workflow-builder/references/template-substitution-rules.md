@@ -22,6 +22,18 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 - `{if-module}` ... `{/if-module}` → Remove the entire block including markers
 - `{if-standalone}` ... `{/if-standalone}` → Keep the content inside
 
+## Customization Conditionals
+
+### When Customization Is Opted In
+
+- `{if-customizable}` ... `{/if-customizable}` → Keep the content inside; emit `customize.toml` alongside SKILL.md.
+- Lifted configurable scalars are referenced in SKILL.md body as `{workflow.<name>}` (e.g. `{workflow.brief_template}`). These are resolved at runtime by the resolver, not at build time — emit them verbatim.
+
+### When Customization Is Not Opted In
+
+- `{if-customizable}` ... `{/if-customizable}` → Remove the entire block including markers.
+- Do NOT emit `customize.toml`. Use hardcoded paths and values in SKILL.md throughout.
+
 ## Beyond the Template
 
 The builder determines the rest of the skill structure — body sections, phases, stages, scripts, external skills, headless mode, role guidance — based on the skill type classification and requirements gathered during the build process. The template intentionally does not prescribe these; the builder has the context to craft them.

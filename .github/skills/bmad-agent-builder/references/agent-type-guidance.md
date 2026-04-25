@@ -60,6 +60,27 @@ After determining the agent type, assess relationship depth. This informs which 
 
 Confirm your assessment with the user: "It sounds like this is more of a [long-term creative partnership / focused domain tool] — does that feel right?"
 
+## Customization Surface by Archetype
+
+Every agent emits a `customize.toml` — the metadata block (`code`, `name`, `title`, `icon`, `description`, `agent_type`) is required for all three types to satisfy the module.yaml roster contract. The override surface beneath it is opt-in and differs by archetype:
+
+- **Stateless agent** — natural candidate for the override surface. Exposes `activation_steps_prepend/append`, `persistent_facts`, and any agent-specific scalars (e.g. swappable reference docs, output paths). Offer the opt-in during Phase 3; accept either answer.
+
+- **Memory agent** — sanctum is the primary behavior-customization surface. PERSONA.md, CREED.md, BOND.md, CAPABILITIES.md are calibrated by First Breath and evolved by the owner. A TOML override surface competes with that. **Default the opt-in to no.** Opt in only when the user has a specific pre-sanctum-load need (e.g. org-mandated compliance preload) that the sanctum cannot express.
+
+- **Autonomous agent** — same as memory. PULSE.md already owns autonomous behavior configuration. Default to no; opt in only with cause.
+
+### First-Breath-Named Agents
+
+Memory and autonomous agents whose name is learned during First Breath ship with `name = ""` in `customize.toml`. The owner fills the name post-activation by adding a stanza to `{project-root}/_bmad/custom/config.toml`:
+
+```toml
+[agents.creative-muse]
+name = "Zephyr"
+```
+
+The installer and any roster-consuming UIs tolerate empty `name` and fall back to `title` for display until the owner fills it in. Do not prompt the user for a name at build time for these archetypes — the First Breath experience is where the name is born.
+
 ## Edge Cases
 
 - **"I'm not sure if it needs memory"** — Ask: "If you used this agent every day for a month, would the 30th session be different from the 1st?" If yes, it needs memory.

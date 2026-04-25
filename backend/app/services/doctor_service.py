@@ -9,8 +9,8 @@ from app.schemas.doctor import Doctor
 logger = logging.getLogger(__name__)
 
 _DOCTORS_FILE = Path(__file__).parent.parent.parent / "data" / "doctors.json"
-_GP_SPECIALTY = "Γενική Ιατρική"
-_FALLBACK_NOTE = "Δεν βρέθηκε διαθέσιμος ειδικός — συνιστάται Γενικός Ιατρός."
+_GP_SPECIALTY = "General Practice"
+_FALLBACK_NOTE = "No available specialist found — General Practitioner recommended."
 
 _doctors_by_specialty: dict[str, list[Doctor]] = {}
 _all_doctors: list[Doctor] = []
@@ -65,7 +65,7 @@ def get_match(specialty: str) -> Doctor:
                 fallback_note=_FALLBACK_NOTE,
             )
     return Doctor(
-        name="Γενικός Ιατρός",
+        name="General Practitioner",
         specialty=_GP_SPECIALTY,
         availability=False,
         fallback_note=_FALLBACK_NOTE,

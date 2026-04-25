@@ -134,7 +134,7 @@ async def test_triage_tier3_llm_parse_error_returns_safe_default(monkeypatch):
     monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(side_effect=_LLMParseError("bad")))
     result = await triage_classify("πόνος", "patient-003")
     assert result.mts_level == 3
-    assert result.specialty == "Γενική Ιατρική"
+    assert result.specialty == "General Practice"
     assert result.rag_used is False
 
 
@@ -142,7 +142,7 @@ async def test_triage_tier3_unexpected_exception_returns_safe_default(monkeypatc
     monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=RuntimeError("boom")))
     result = await triage_classify("πόνος", "patient-004")
     assert result.mts_level == 3
-    assert result.specialty == "Γενική Ιατρική"
+    assert result.specialty == "General Practice"
 
 
 async def test_triage_classify_never_raises(monkeypatch):
