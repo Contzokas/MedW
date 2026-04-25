@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import TriageForm from "@/app/components/TriageForm"
 import TriageResult from "@/app/components/TriageResult"
 import Disclaimer from "@/app/components/Disclaimer"
@@ -10,12 +10,27 @@ import { useLang } from "@/app/lib/lang-context"
 
 export default function Home() {
   const [result, setResult] = useState<TriageResponse | null>(null)
+  const [heroVisible, setHeroVisible] = useState(true)
+  const heroRef = useRef<HTMLElement>(null)
   const { t } = useLang()
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeroVisible(entry.isIntersecting),
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const showDisclaimer = result !== null && heroVisible
 
   return (
     <>
       {/* ── Hero ── */}
-      <section className="snap-section hero-section relative min-h-screen flex flex-col items-center px-4">
+      <section ref={heroRef} className="snap-section hero-section relative min-h-screen flex flex-col items-center px-4">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="hero-orb-1 absolute w-[680px] h-[680px] rounded-full -top-48 -left-24" />
           <div className="hero-orb-2 absolute w-[560px] h-[560px] rounded-full -bottom-36 -right-24" />
@@ -48,9 +63,9 @@ export default function Home() {
               )}
             </div>
 
-            {/* Back button + disclaimer */}
+            {/* Back button */}
             {result !== null && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-4">
                 <button
                   type="button"
                   onClick={() => setResult(null)}
@@ -61,7 +76,6 @@ export default function Home() {
                   </svg>
                   {t.result.back}
                 </button>
-                <Disclaimer />
               </div>
             )}
 
@@ -80,6 +94,19 @@ export default function Home() {
           </svg>
         </a>
       </section>
+
+      {/* Fixed disclaimer bar — above EmergencyBar, only while result is shown in hero */}
+      <div
+        role="note"
+        aria-live="polite"
+        className={`fixed inset-x-0 bottom-10 z-40 transition-all duration-300 ${
+          showDisclaimer
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-2 pointer-events-none"
+        }`}
+      >
+        <Disclaimer />
+      </div>
 
       <TeamSection />
     </>
