@@ -8,6 +8,10 @@ on:
       - feature/deploy-to-runai
   workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
 
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   ORG: contzokas
@@ -35,6 +39,15 @@ jobs:
       env:            ${{ steps.resolve.outputs.env }}
       sha_short:      ${{ steps.resolve.outputs.sha_short }}
       immutable_tag:  ${{ steps.resolve.outputs.immutable_tag }}
+      node_ip:        ${{ steps.resolve.outputs.node_ip }}
+      chroma_url:     ${{ steps.resolve.outputs.chroma_url }}
+      ollama_url:     ${{ steps.resolve.outputs.ollama_url }}
+      backend_url:    ${{ steps.resolve.outputs.backend_url }}
+      frontend_url:   ${{ steps.resolve.outputs.frontend_url }}
+      port_chroma:    ${{ steps.resolve.outputs.port_chroma }}
+      port_ollama:    ${{ steps.resolve.outputs.port_ollama }}
+      port_backend:   ${{ steps.resolve.outputs.port_backend }}
+      port_frontend:  ${{ steps.resolve.outputs.port_frontend }}
     steps:
       - name: Resolve tag and suffix from branch
         id: resolve
@@ -59,19 +72,45 @@ jobs:
           SHA_SHORT="${GITHUB_SHA::7}"
           IMMUTABLE_TAG="${TAG}-${SHA_SHORT}"
 
+          # Fixed NodePorts per environment — never change between deploys.
+          # Port scheme: base + offset (0=prod, 10=dev, 20=test)
+          NODE_IP="10.184.94.23"
+          if [ "$SUFFIX" = "" ]; then
+            PORT_CHROMA=30808; PORT_OLLAMA=31434; PORT_BACKEND=30800; PORT_FRONTEND=30300
+          elif [ "$SUFFIX" = "-dev" ]; then
+            PORT_CHROMA=30818; PORT_OLLAMA=31444; PORT_BACKEND=30810; PORT_FRONTEND=30310
+          else
+            PORT_CHROMA=30828; PORT_OLLAMA=31454; PORT_BACKEND=30820; PORT_FRONTEND=30320
+          fi
+          CHROMA_URL="http://${NODE_IP}:${PORT_CHROMA}"
+          OLLAMA_URL="http://${NODE_IP}:${PORT_OLLAMA}"
+          BACKEND_URL="http://${NODE_IP}:${PORT_BACKEND}"
+          FRONTEND_URL="http://${NODE_IP}:${PORT_FRONTEND}"
+
           echo "tag=$TAG"       >> $GITHUB_OUTPUT
           echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
           echo "env=$ENV"       >> $GITHUB_OUTPUT
           echo "sha_short=$SHA_SHORT"         >> $GITHUB_OUTPUT
           echo "immutable_tag=$IMMUTABLE_TAG" >> $GITHUB_OUTPUT
+          echo "node_ip=$NODE_IP"             >> $GITHUB_OUTPUT
+          echo "port_chroma=$PORT_CHROMA"     >> $GITHUB_OUTPUT
+          echo "port_ollama=$PORT_OLLAMA"     >> $GITHUB_OUTPUT
+          echo "port_backend=$PORT_BACKEND"   >> $GITHUB_OUTPUT
+          echo "port_frontend=$PORT_FRONTEND" >> $GITHUB_OUTPUT
+          echo "chroma_url=$CHROMA_URL"       >> $GITHUB_OUTPUT
+          echo "ollama_url=$OLLAMA_URL"       >> $GITHUB_OUTPUT
+          echo "backend_url=$BACKEND_URL"     >> $GITHUB_OUTPUT
+          echo "frontend_url=$FRONTEND_URL"   >> $GITHUB_OUTPUT
 
           echo "──────────────────────────────────"
-          echo "  Branch : $BRANCH"
-          echo "  Tag    : $TAG"
-          echo "  SHA    : $SHA_SHORT"
-          echo "  Deploy : $IMMUTABLE_TAG"
-          echo "  Suffix : ${SUFFIX:-(none)}"
-          echo "  Env    : $ENV"
+          echo "  Branch   : $BRANCH"
+          echo "  Tag      : $TAG"
+          echo "  SHA      : $SHA_SHORT"
+          echo "  Deploy   : $IMMUTABLE_TAG"
+          echo "  Suffix   : ${SUFFIX:-(none)}"
+          echo "  Env      : $ENV"
+          echo "  Node IP  : $NODE_IP"
+          echo "  Ports    : chroma=$PORT_CHROMA ollama=$PORT_OLLAMA backend=$PORT_BACKEND frontend=$PORT_FRONTEND"
           echo "──────────────────────────────────"
 
   # ─────────────────────────────────────────────────────────────────────────
@@ -238,6 +277,14 @@ jobs:
       OLLAMA_WARMUP_KEEP_ALIVE: ${{ vars.OLLAMA_WARMUP_KEEP_ALIVE || '30m' }}
       OLLAMA_WARMUP_RETRIES: ${{ vars.OLLAMA_WARMUP_RETRIES || '24' }}
       OLLAMA_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.OLLAMA_WARMUP_RETRY_DELAY_SECONDS || '5' }}
+      CHROMA_URL:   ${{ needs.setup.outputs.chroma_url }}
+      OLLAMA_URL:   ${{ needs.setup.outputs.ollama_url }}
+      BACKEND_URL:  ${{ needs.setup.outputs.backend_url }}
+      FRONTEND_URL: ${{ needs.setup.outputs.frontend_url }}
+      PORT_CHROMA:   ${{ needs.setup.outputs.port_chroma }}
+      PORT_OLLAMA:   ${{ needs.setup.outputs.port_ollama }}
+      PORT_BACKEND:  ${{ needs.setup.outputs.port_backend }}
+      PORT_FRONTEND: ${{ needs.setup.outputs.port_frontend }}
     steps:
       - uses: actions/checkout@v4
 
@@ -312,6 +359,11 @@ jobs:
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${{ env.IMMUTABLE_TAG }}"
           echo "  Ollama cfg  : model=${{ env.OLLAMA_MODEL }} timeout=${{ env.OLLAMA_TIMEOUT }} parallel=${{ env.OLLAMA_NUM_PARALLEL }} max_loaded=${{ env.OLLAMA_MAX_LOADED_MODELS }} flash=${{ env.OLLAMA_FLASH_ATTENTION }}"
           echo "  Warmup cfg  : enabled=${{ env.OLLAMA_WARMUP_ENABLED }} keep_alive=${{ env.OLLAMA_WARMUP_KEEP_ALIVE }} retries=${{ env.OLLAMA_WARMUP_RETRIES }} retry_delay=${{ env.OLLAMA_WARMUP_RETRY_DELAY_SECONDS }}s"
+          echo "  Fixed URLs  :"
+          echo "    ChromaDB  → ${{ env.CHROMA_URL }}  (NodePort ${{ env.PORT_CHROMA }})"
+          echo "    Ollama    → ${{ env.OLLAMA_URL }}  (NodePort ${{ env.PORT_OLLAMA }})"
+          echo "    Backend   → ${{ env.BACKEND_URL }}  (NodePort ${{ env.PORT_BACKEND }})"
+          echo "    Frontend  → ${{ env.FRONTEND_URL }}  (NodePort ${{ env.PORT_FRONTEND }})"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale app workloads so the new image + env vars take effect ─
@@ -364,6 +416,7 @@ jobs:
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${IMMUTABLE_TAG}" \
             --arg pvc "chroma-pvc${SUFFIX}" \
+            --argjson portChroma "${PORT_CHROMA}" \
             '{
               name: $name,
               projectId: $projectId,
@@ -376,7 +429,7 @@ jobs:
                   {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
                   {name: "CHROMA_SERVER_PORT", value: "8000"}
                 ],
-                ports: [{container: 8000, serviceType: "NodePort"}],
+                ports: [{container: 8000, serviceType: "NodePort", nodePort: $portChroma}],
                 storage: {
                   pvc: [{
                     path: "/chroma/chroma",
@@ -417,6 +470,7 @@ jobs:
             --arg ollamaFlashAttention "${OLLAMA_FLASH_ATTENTION}" \
             --arg ollamaNumParallel "${OLLAMA_NUM_PARALLEL}" \
             --arg ollamaMaxLoadedModels "${OLLAMA_MAX_LOADED_MODELS}" \
+            --argjson portOllama "${PORT_OLLAMA}" \
             '{
               name: $name,
               projectId: $projectId,
@@ -437,7 +491,7 @@ jobs:
                 ],
                 command: $cmd,
                 args: $cmdargs,
-                ports: [{container: 11434, serviceType: "NodePort"}],
+                ports: [{container: 11434, serviceType: "NodePort", nodePort: $portOllama}],
                 storage: {
                   pvc: [{
                     path: "/root/.ollama",
@@ -464,68 +518,17 @@ jobs:
             echo "Ollama failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
-      # ── Resolve data-service URLs from Run:ai API ─────────────────────────
-      # Polls /api/v1/workloads until each workload's phase is Running, then
-      # extracts the NodePort from the API response and constructs a URL.
-      # The node IP is static (NODE_IP env), only the port is dynamic.
-      - name: Resolve ChromaDB and Ollama URLs
-        env:
-          NODE_IP: "10.184.94.23"
+      # ── URLs are pre-computed from fixed NodePorts in the setup job ─────────
+      # No polling needed — ports are stable across all deploys.
+      - name: Set service URLs
         run: |
-          # Progress logs go to stderr so stdout only contains the resolved URL
-          # (or nothing on failure) — safe to capture via command substitution.
-          # The Run:ai API returns connection info at:
-          #   .urls[0]                                    → "10.184.94.23:31977"
-          #   .environments[0].connections[0].url         → "10.184.94.23:31977"
-          # Values are IP:port without scheme — we prepend http:// here.
-          resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120  # 10 minutes @ 5s interval
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                echo "  [$i] Workload $workload_name not found yet" >&2
-                sleep 5
-                continue
-              fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name -> ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"
-                  return 0
-                fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2
-                return 1
-              fi
-              sleep 5
-            done
-            echo "  ERROR: $workload_name did not reach Running within timeout" >&2
-            return 1
-          }
-
-          CHROMA_URL=$(resolve_url "medw-chromadb${SUFFIX}" "http") || CHROMA_URL=""
-          OLLAMA_URL=$(resolve_url "medw-ollama${SUFFIX}" "http") || OLLAMA_URL=""
-
-          # GitHub var fallbacks if API extraction fails
-          [ -z "$CHROMA_URL" ] && CHROMA_URL="${{ vars.CHROMA_URL }}"
-          [ -z "$OLLAMA_URL" ] && OLLAMA_URL="${{ vars.OLLAMA_URL }}"
-
-          if [ -z "$CHROMA_URL" ] || [ -z "$OLLAMA_URL" ]; then
-            echo "Failed to resolve service URLs. Set CHROMA_URL / OLLAMA_URL GitHub vars as fallback."
-            exit 1
-          fi
-          echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
-          echo "OLLAMA_URL=$OLLAMA_URL" >> "$GITHUB_ENV"
-          echo "Resolved CHROMA_URL=$CHROMA_URL"
-          echo "Resolved OLLAMA_URL=$OLLAMA_URL"
+          echo "CHROMA_URL=${{ env.CHROMA_URL }}" >> "$GITHUB_ENV"
+          echo "OLLAMA_URL=${{ env.OLLAMA_URL }}" >> "$GITHUB_ENV"
+          echo "BACKEND_URL=${{ env.BACKEND_URL }}" >> "$GITHUB_ENV"
+          echo "  ChromaDB → ${{ env.CHROMA_URL }}"
+          echo "  Ollama   → ${{ env.OLLAMA_URL }}"
+          echo "  Backend  → ${{ env.BACKEND_URL }}"
+          echo "  Frontend → ${{ env.FRONTEND_URL }}"
 
       - name: Deploy Backend
         run: |
@@ -545,6 +548,7 @@ jobs:
             --arg ollamaWarmupRetryDelaySeconds "${OLLAMA_WARMUP_RETRY_DELAY_SECONDS}" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
+            --argjson portBackend "${PORT_BACKEND}" \
             '{
               name: $name,
               projectId: $projectId,
@@ -563,7 +567,7 @@ jobs:
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],
-                ports: [{container: 8000, serviceType: "NodePort"}]
+                ports: [{container: 8000, serviceType: "NodePort", nodePort: $portBackend}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
@@ -582,49 +586,6 @@ jobs:
             echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
-      - name: Resolve Backend URL
-        run: |
-          resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                sleep 5
-                continue
-              fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name -> ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"
-                  return 0
-                fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2
-                return 1
-              fi
-              sleep 5
-            done
-            echo "  ERROR: $workload_name did not reach Running within timeout" >&2
-            return 1
-          }
-
-          BACKEND_URL=$(resolve_url "medw-backend${SUFFIX}") || BACKEND_URL=""
-          [ -z "$BACKEND_URL" ] && BACKEND_URL="${{ vars.BACKEND_URL }}"
-          if [ -z "$BACKEND_URL" ]; then
-            echo "Failed to resolve backend URL. Set BACKEND_URL GitHub var as fallback."
-            exit 1
-          fi
-          echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
-          echo "Resolved BACKEND_URL=$BACKEND_URL"
-
       - name: Deploy Frontend
         run: |
           FRONTEND_JSON=$(jq -n \
@@ -632,7 +593,8 @@ jobs:
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${IMMUTABLE_TAG}" \
-            --arg backendUrl "$BACKEND_URL" \
+            --arg backendUrl "${{ env.BACKEND_URL }}" \
+            --argjson portFrontend "${PORT_FRONTEND}" \
             '{
               name: $name,
               projectId: $projectId,
@@ -643,7 +605,7 @@ jobs:
                 environmentVariables: [
                   {name: "BACKEND_URL", value: $backendUrl}
                 ],
-                ports: [{container: 3000, serviceType: "NodePort"}]
+                ports: [{container: 3000, serviceType: "NodePort", nodePort: $portFrontend}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
