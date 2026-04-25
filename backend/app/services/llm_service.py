@@ -1,14 +1,40 @@
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
+from typing import Any
 
-from langchain_community.chat_models import ChatOllama
+import httpx
+
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.core.config import OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_TIMEOUT
+from app.core.config import (
+    OLLAMA_HOST,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT,
+    OLLAMA_WARMUP_ENABLED,
+    OLLAMA_WARMUP_KEEP_ALIVE,
+    OLLAMA_WARMUP_RETRIES,
+    OLLAMA_WARMUP_RETRY_DELAY_SECONDS,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+_warmup_state: dict[str, Any] = {
+    "in_progress": False,
+    "attempts": 0,
+    "started_at": None,
+    "last_attempt_at": None,
+    "last_success_at": None,
+    "last_error": None,
+}
 
 MTS_LABELS = {
     1: "Immediate",
@@ -86,6 +112,8 @@ def _build_chain():
         model=OLLAMA_MODEL,
         temperature=0,
         request_timeout=OLLAMA_TIMEOUT,
+        num_ctx=131072,
+        keep_alive=-1,
     )
     prompt = ChatPromptTemplate.from_messages(
         [("system", _SYSTEM_PROMPT), ("human", _HUMAN_TEMPLATE)]
@@ -106,6 +134,83 @@ def _get_chain():
 
 def _invoke_chain_sync(symptoms: str, context: str) -> str:
     return _get_chain().invoke({"symptoms": symptoms, "context": context})
+
+
+async def warmup_model() -> None:
+    _warmup_state["in_progress"] = True
+    _warmup_state["attempts"] = 0
+    _warmup_state["started_at"] = _utc_now_iso()
+    _warmup_state["last_error"] = None
+
+    if not OLLAMA_WARMUP_ENABLED:
+        _warmup_state["in_progress"] = False
+        logger.info("Ollama warmup disabled via OLLAMA_WARMUP_ENABLED")
+        return
+
+    payload: dict[str, Any] = {
+        "model": OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": "ping"}],
+        "stream": False,
+        "options": {"num_predict": 1},
+        "keep_alive": "-1",
+    }
+
+    timeout = httpx.Timeout(timeout=float(OLLAMA_TIMEOUT))
+    endpoint = f"{OLLAMA_HOST.rstrip('/')}/api/chat"
+
+    for attempt in range(1, OLLAMA_WARMUP_RETRIES + 1):
+        _warmup_state["attempts"] = attempt
+        _warmup_state["last_attempt_at"] = _utc_now_iso()
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(endpoint, json=payload)
+                response.raise_for_status()
+            logger.info(
+                "Ollama warmup succeeded for model '%s' on attempt %s",
+                OLLAMA_MODEL,
+                attempt,
+            )
+            _get_chain()
+            _warmup_state["last_success_at"] = _utc_now_iso()
+            _warmup_state["last_error"] = None
+            _warmup_state["in_progress"] = False
+            return
+        except Exception as exc:  # noqa: BLE001
+            _warmup_state["last_error"] = f"{type(exc).__name__}: {exc}"
+            logger.warning(
+                "Ollama warmup attempt %s/%s failed: %s",
+                attempt,
+                OLLAMA_WARMUP_RETRIES,
+                type(exc).__name__,
+            )
+            if attempt < OLLAMA_WARMUP_RETRIES:
+                await asyncio.sleep(OLLAMA_WARMUP_RETRY_DELAY_SECONDS)
+
+    _warmup_state["in_progress"] = False
+    logger.error(
+        "Ollama warmup failed after %s attempts; continuing without blocking startup",
+        OLLAMA_WARMUP_RETRIES,
+    )
+
+
+def get_warmup_status() -> dict[str, Any]:
+    ready = (not OLLAMA_WARMUP_ENABLED) or (_warmup_state["last_success_at"] is not None)
+
+    return {
+        "enabled": OLLAMA_WARMUP_ENABLED,
+        "ready": ready,
+        "model": OLLAMA_MODEL,
+        "timeout_seconds": OLLAMA_TIMEOUT,
+        "keep_alive": OLLAMA_WARMUP_KEEP_ALIVE,
+        "max_retries": OLLAMA_WARMUP_RETRIES,
+        "retry_delay_seconds": OLLAMA_WARMUP_RETRY_DELAY_SECONDS,
+        "in_progress": _warmup_state["in_progress"],
+        "attempts": _warmup_state["attempts"],
+        "started_at": _warmup_state["started_at"],
+        "last_attempt_at": _warmup_state["last_attempt_at"],
+        "last_success_at": _warmup_state["last_success_at"],
+        "last_error": _warmup_state["last_error"],
+    }
 
 
 def _parse_response(raw: str) -> dict:

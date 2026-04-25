@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/lib/theme-context";
+import { LangProvider } from "@/app/lib/lang-context";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import LangToggle from "@/app/components/LangToggle";
+import EmergencyBar from "@/app/components/EmergencyBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,17 +34,17 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <header className="border-b border-border bg-card">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="flex h-14 sm:h-16 items-center justify-between">
-                <div className="text-xl font-bold text-foreground">
-                  MEDΩ
-                </div>
-                <ThemeToggle />
-              </div>
+          <LangProvider>
+            {/* Floating controls — top right */}
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+              <LangToggle />
+              <ThemeToggle />
             </div>
-          </header>
-          <main className="flex-1">{children}</main>
+
+            <main className="flex-1 flex flex-col">{children}</main>
+
+            <EmergencyBar />
+          </LangProvider>
         </ThemeProvider>
       </body>
     </html>

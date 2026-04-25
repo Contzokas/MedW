@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { QueueEntry } from "@/app/lib/types"
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+import { buildApiUrl, resolveApiBase } from "@/app/lib/backendResolver"
 
 function isQueueEntry(value: unknown): value is QueueEntry {
   if (typeof value !== "object" || value === null) {
@@ -30,33 +29,47 @@ export function useTriageStream(): QueueEntry[] {
   const [entries, setEntries] = useState<QueueEntry[]>([])
 
   useEffect(() => {
-    const es = new EventSource(`${API_BASE}/api/v1/triage/queue`)
+    let es: EventSource | null = null
+    let cancelled = false
 
-    es.addEventListener("triage_update", (event: MessageEvent) => {
-      const entry = toQueueEntry(event.data)
-      if (!entry) {
+    const setup = async () => {
+      const apiBase = await resolveApiBase()
+
+      if (cancelled) {
         return
       }
 
-      setEntries(prev => {
-        const exists = prev.some(
-          existing =>
-            existing.patient_id === entry.patient_id &&
-            existing.timestamp === entry.timestamp &&
-            existing.mts_level === entry.mts_level &&
-            existing.specialty === entry.specialty,
-        )
+      es = new EventSource(buildApiUrl(apiBase, "/api/v1/triage/queue"))
 
-        if (exists) {
-          return prev
+      es.addEventListener("triage_update", (event: MessageEvent) => {
+        const entry = toQueueEntry(event.data)
+        if (!entry) {
+          return
         }
 
-        return [entry, ...prev]
+        setEntries(prev => {
+          const exists = prev.some(
+            existing =>
+              existing.patient_id === entry.patient_id &&
+              existing.timestamp === entry.timestamp &&
+              existing.mts_level === entry.mts_level &&
+              existing.specialty === entry.specialty,
+          )
+
+          if (exists) {
+            return prev
+          }
+
+          return [entry, ...prev]
+        })
       })
-    })
+    }
+
+    void setup()
 
     return () => {
-      es.close()
+      cancelled = true
+      es?.close()
     }
   }, [])
 

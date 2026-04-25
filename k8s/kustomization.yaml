@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Run:ai project "medo" on cluster "runai-kiefer"
+# Namespace follows Run:ai convention: runai-<project-name>
+namespace: runai-medo
+
+resources:
+  - namespace.yaml
+  - pvcs.yaml
+  - configmap-ollama-entrypoint.yaml
+  - ollama-deployment.yaml
+  - chromadb-deployment.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml

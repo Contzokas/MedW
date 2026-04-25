@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: runai-medo
+  labels:
+    app.kubernetes.io/name: medw
+    runai/queue: medo        # ties this namespace to the Run:ai project "medo"

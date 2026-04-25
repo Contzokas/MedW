@@ -3,6 +3,17 @@
 import { useState } from "react"
 import { submitTriage } from "@/app/lib/api"
 import { TriageResponse } from "@/app/lib/types"
+import { useLang } from "@/app/lib/lang-context"
+
+function generatePatientId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try { return crypto.randomUUID() } catch { /* insecure context */ }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
 
 interface TriageFormProps {
   onResult: (result: TriageResponse) => void
@@ -12,17 +23,16 @@ export default function TriageForm({ onResult }: TriageFormProps) {
   const [symptoms, setSymptoms] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useLang()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isLoading) {
-      return
-    }
+    if (isLoading) return
     setIsLoading(true)
     setError(null)
 
     try {
-      const patientId = crypto.randomUUID()
+      const patientId = generatePatientId()
       const result = await submitTriage(symptoms, patientId)
       onResult(result)
       setSymptoms("")

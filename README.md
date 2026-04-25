@@ -161,6 +161,82 @@ Full project documentation is in [`docs/`](docs/):
 
 ---
 
+## Run:ai Deployment (NVIDIA GPU — Kubernetes)
+
+For production / cluster deployment on a Run:ai-managed Kubernetes cluster.
+
+### Prerequisites
+
+- `kubectl` configured against your cluster
+- Run:ai project `medw` with ≥ 1 GPU quota
+- Images pushed to GHCR (done automatically by the CI pipeline on push to `main`)
+
+### One-command deploy
+
+```bash
+kubectl apply -k k8s/
+```
+
+This creates the `medw` namespace and deploys all four services in the correct order.
+
+### Check status
+
+```bash
+# All pods
+kubectl get pods -n medw -o wide
+
+# GPU allocation via Run:ai CLI
+runai list jobs -p medw
+
+# Logs
+kubectl logs -n medw deployment/medw-ollama -f
+kubectl logs -n medw deployment/medw-backend -f
+```
+
+### Access the app
+
+```bash
+# Frontend (patient triage + nurse dashboard)
+kubectl port-forward -n medw svc/frontend 3000:3000
+# → http://localhost:3000
+
+# Backend API / Swagger
+kubectl port-forward -n medw svc/backend 8000:8000
+# → http://localhost:8000/docs
+
+# Ollama directly (optional debugging)
+kubectl port-forward -n medw svc/ollama 11434:11434
+# → curl http://localhost:11434/api/tags
+```
+
+### CI/CD
+
+Push to `main` automatically builds & pushes images to `ghcr.io/medw/` and
+re-deploys the cluster. Requires one repository secret:
+
+| Secret | Value |
+|---|---|
+| `KUBECONFIG` | base64-encoded kubeconfig for the cluster |
+| `NEXT_PUBLIC_API_URL` | *(optional)* external backend URL if using Ingress |
+
+Add secrets at **Settings → Secrets and variables → Actions**.
+
+### Manifest structure
+
+```
+k8s/
+├── namespace.yaml                  # medw namespace
+├── pvcs.yaml                       # ollama-pvc (20Gi) + chroma-pvc (5Gi)
+├── configmap-ollama-entrypoint.yaml
+├── ollama-deployment.yaml          # GPU workload (runai-scheduler, nvidia.com/gpu: 1)
+├── chromadb-deployment.yaml
+├── backend-deployment.yaml
+├── frontend-deployment.yaml
+└── kustomization.yaml              # kubectl apply -k k8s/
+```
+
+---
+
 ## License
 
 Apache 2.0

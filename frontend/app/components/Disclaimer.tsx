@@ -1,4 +1,10 @@
+"use client"
+
+import { useLang } from "@/app/lib/lang-context"
+
 export default function Disclaimer() {
+  const { t } = useLang()
+
   return (
     <div
       role="note"
