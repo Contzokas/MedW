@@ -11,6 +11,8 @@ on:
 env:
   REGISTRY: ghcr.io
   ORG: contzokas
+  CHROMA_UPSTREAM_IMAGE: chromadb/chroma:1.5.7
+  OLLAMA_UPSTREAM_IMAGE: ollama/ollama:latest
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
   RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
@@ -73,7 +75,7 @@ jobs:
           echo "──────────────────────────────────"
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 1 & 2: Build images (parallel)
+  # Job 1-4: Build/mirror images (parallel)
   # ─────────────────────────────────────────────────────────────────────────
   build-backend:
     name: Build backend → :${{ needs.setup.outputs.tag }}
@@ -152,6 +154,58 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  mirror-chromadb:
+    name: Mirror chromadb → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mirror ChromaDB image to GHCR
+        env:
+          TARGET_REPO: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb
+          TAG: ${{ needs.setup.outputs.tag }}
+          IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
+        run: |
+          docker pull "${{ env.CHROMA_UPSTREAM_IMAGE }}"
+          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$TAG"
+          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$IMMUTABLE_TAG"
+          docker push "$TARGET_REPO:$TAG"
+          docker push "$TARGET_REPO:$IMMUTABLE_TAG"
+
+  mirror-ollama:
+    name: Mirror ollama → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mirror Ollama image to GHCR
+        env:
+          TARGET_REPO: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama
+          TAG: ${{ needs.setup.outputs.tag }}
+          IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
+        run: |
+          docker pull "${{ env.OLLAMA_UPSTREAM_IMAGE }}"
+          docker tag "${{ env.OLLAMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$TAG"
+          docker tag "${{ env.OLLAMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$IMMUTABLE_TAG"
+          docker push "$TARGET_REPO:$TAG"
+          docker push "$TARGET_REPO:$IMMUTABLE_TAG"
+
   # ─────────────────────────────────────────────────────────────────────────
   # Job 3: Deploy via Run:ai REST API (no CLI needed)
   #
@@ -168,7 +222,7 @@ jobs:
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
     runs-on: ubuntu-latest
-    needs: [setup, build-backend, build-frontend]
+    needs: [setup, build-backend, build-frontend, mirror-chromadb, mirror-ollama]
     environment: ${{ needs.setup.outputs.env }}
     env:
       TAG:           ${{ needs.setup.outputs.tag }}
@@ -242,6 +296,11 @@ jobs:
           echo "    medw-backend${{ env.SUFFIX }}"
           echo "    medw-frontend${{ env.SUFFIX }}"
           echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
+          echo "  Images      :"
+          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${{ env.IMMUTABLE_TAG }}"
+          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.IMMUTABLE_TAG }}"
+          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
+          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${{ env.IMMUTABLE_TAG }}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale app workloads so the new image + env vars take effect ─
@@ -292,13 +351,14 @@ jobs:
             --arg name "medw-chromadb${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${IMMUTABLE_TAG}" \
             --arg pvc "chroma-pvc${SUFFIX}" \
             '{
               name: $name,
               projectId: $projectId,
               clusterId: $clusterId,
               spec: {
-                image: "chromadb/chroma:1.5.7",
+                image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
                 environmentVariables: [
                   {name: "IS_PERSISTENT", value: "TRUE"},
@@ -338,6 +398,7 @@ jobs:
             --arg name "medw-ollama${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${IMMUTABLE_TAG}" \
             --arg pvc "ollama-pvc${SUFFIX}" \
             --arg cmd "/bin/sh" \
             --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull medgemma:27b && wait'" \
@@ -346,7 +407,7 @@ jobs:
               projectId: $projectId,
               clusterId: $clusterId,
               spec: {
-                image: "ollama/ollama:latest",
+                image: $image,
                 compute: {
                   cpuCoreRequest: 24, cpuCoreLimit: 24,
                   cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
