@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { submitTriage } from "@/app/lib/api"
 import { TriageResponse } from "@/app/lib/types"
+import { useLang } from "@/app/lib/lang-context"
 
 function generatePatientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -22,12 +23,11 @@ export default function TriageForm({ onResult }: TriageFormProps) {
   const [symptoms, setSymptoms] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useLang()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isLoading) {
-      return
-    }
+    if (isLoading) return
     setIsLoading(true)
     setError(null)
 
@@ -38,7 +38,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
       setSymptoms("")
     } catch (err) {
       console.error("[TriageForm] submit error:", err)
-      setError("Παρουσιάστηκε σφάλμα. Παρακαλώ δοκιμάστε ξανά.")
+      setError(t.form.error)
     } finally {
       setIsLoading(false)
     }
@@ -48,7 +48,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label htmlFor="symptoms" className="block text-sm font-medium text-foreground">
-          Συμπτώματα
+          {t.form.label}
         </label>
         <textarea
           id="symptoms"
@@ -57,7 +57,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
           required
           disabled={isLoading}
           className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 sm:text-sm bg-card"
-          placeholder="Περιγράψτε τα συμπτώματά σας (π.χ. πόνος στο στήθος, δυσκολία αναπνοής)..."
+          placeholder={t.form.placeholder}
           value={symptoms}
           onChange={(e) => setSymptoms(e.target.value)}
         />
@@ -74,7 +74,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
         disabled={isLoading}
         className="w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isLoading ? "Ανάλυση σε εξέλιξη..." : "Εκτίμηση Συμπτωμάτων"}
+        {isLoading ? t.form.loading : t.form.submit}
       </button>
     </form>
   )
