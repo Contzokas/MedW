@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,6 +45,49 @@ MTS_LABELS = {
     5: "Non-urgent",
 }
 
+MTS_LABELS_EL = {
+    1: "Άμεση Αντιμετώπιση",
+    2: "Πολύ Επείγον",
+    3: "Επείγον",
+    4: "Λιγότερο Επείγον",
+    5: "Μη Επείγον",
+}
+
+SPECIALTY_TRANSLATIONS_EL_TO_EN = {
+    "Καρδιολογία": "Cardiology",
+    "Νευρολογία": "Neurology",
+    "Γαστρεντερολογία": "Gastroenterology",
+    "Ορθοπεδική": "Orthopedics",
+    "Πνευμονολογία": "Pulmonology",
+    "Παθολογία": "Internal Medicine",
+    "Γενική Ιατρική": "General Practice",
+    "Ουρολογία": "Urology",
+    "Δερματολογία": "Dermatology",
+    "Ψυχιατρική": "Psychiatry",
+    "Ωτορινολαρυγγολογία": "Otolaryngology",
+    "Οφθαλμολογία": "Ophthalmology",
+    "Γυναικολογία": "Gynecology",
+    "Γενική Χειρουργική": "General Surgery",
+}
+
+SPECIALTY_TRANSLATIONS_EN_TO_EL = {v: k for k, v in SPECIALTY_TRANSLATIONS_EL_TO_EN.items()}
+
+_PROMPT_LANGUAGE_HINT = {
+    "el": "Greek",
+    "en": "English",
+}
+
+_GREEK_CHAR_RE = re.compile(r"[\u0370-\u03FF\u1F00-\u1FFF]")
+
+# TODO: Greek medical terminology validation required in Sprint 1.
+# Run classify() against ≥20 Greek symptom test cases covering MTS levels 1–5.
+# If MTS classification accuracy falls below 80%:
+#   Fallback strategy: translate `symptoms` to English before LLM inference,
+#   then instruct the model to return `reasoning` in Greek.
+#   Implement as: symptoms_en = translate_to_english(symptoms); classify(symptoms_en, context)
+#   Translation can use a secondary Ollama call or a lightweight library (e.g., googletrans).
+#   Document accuracy results and chosen approach in the Story 2.2 dev agent record.
+
 _SYSTEM_PROMPT = (
     "You are a medical triage assistant using the Manchester Triage System (MTS). "
     "Analyse the patient's symptoms using the provided clinical context. "
@@ -52,10 +96,11 @@ _SYSTEM_PROMPT = (
 
 _HUMAN_TEMPLATE = (
     "Clinical context:\n{context}\n\n"
-    "Patient symptoms:\n{symptoms}\n\n"
+    "Patient symptoms ({input_language}):\n{symptoms}\n\n"
     "Return JSON with exactly these fields:\n"
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-    '"specialty": "<English specialty name>", "reasoning": "<explanation in English>"}}\n\n'
+    '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
+    "Use {output_language} for specialty and reasoning.\n"
     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
     "IMPORTANT rules for specialty selection:\n"
     "- Always choose the MOST SPECIFIC specialty that matches the symptoms.\n"
@@ -63,6 +108,8 @@ _HUMAN_TEMPLATE = (
     "- Prefer specific specialties: Cardiology, Neurology, Gastroenterology, Orthopedics, Pulmonology, "
     "Urology, Dermatology, Psychiatry, ENT, Ophthalmology, Gynecology, General Surgery, Vascular Surgery, "
     "Toxicology, Endocrinology, Infectious Disease, Internal Medicine.\n"
+    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική).\n"
+    "- If output language is English, specialty must be an English name (e.g. Cardiology, Neurology, General Practice).\n"
     "- Do NOT default to MTS level 3 (Urgent). Assign the level that genuinely reflects symptom severity.\n"
     "- Level 1: life-threatening (cardiac arrest, anaphylaxis, severe trauma)\n"
     "- Level 2: potentially life-threatening (chest pain, stroke signs, severe bleeding)\n"
@@ -132,8 +179,17 @@ def _get_chain():
     return _chain
 
 
-def _invoke_chain_sync(symptoms: str, context: str) -> str:
-    return _get_chain().invoke({"symptoms": symptoms, "context": context})
+def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el") -> str:
+    output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
+    input_language = output_language
+    return _get_chain().invoke(
+        {
+            "symptoms": symptoms,
+            "context": context,
+            "output_language": output_language,
+            "input_language": input_language,
+        }
+    )
 
 
 async def warmup_model() -> None:
@@ -213,7 +269,65 @@ def get_warmup_status() -> dict[str, Any]:
     }
 
 
-def _parse_response(raw: str) -> dict:
+def _contains_greek(text: str) -> bool:
+    return bool(_GREEK_CHAR_RE.search(text))
+
+
+def _normalize_specialty(text: str) -> str:
+    return " ".join(text.strip().split()).lower()
+
+
+def _translate_specialty(value: str, lang: str) -> str:
+    if lang == "en":
+        normalized = _normalize_specialty(value)
+        for greek, english in SPECIALTY_TRANSLATIONS_EL_TO_EN.items():
+            if _normalize_specialty(greek) == normalized:
+                return english
+        return value
+
+    if lang == "el":
+        normalized = _normalize_specialty(value)
+        for english, greek in SPECIALTY_TRANSLATIONS_EN_TO_EL.items():
+            if _normalize_specialty(english) == normalized:
+                return greek
+        return value
+
+    return value
+
+
+def _enforce_output_language(data: dict, lang: str) -> dict:
+    if lang not in {"en", "el"}:
+        return data
+
+    specialty = data["specialty"]
+    reasoning = data["reasoning"]
+
+    specialty_has_greek = _contains_greek(specialty)
+    reasoning_has_greek = _contains_greek(reasoning)
+
+    if lang == "el":
+        translated_specialty = _translate_specialty(specialty, "el")
+        if not specialty_has_greek:
+            if translated_specialty != specialty:
+                data["specialty"] = translated_specialty
+            else:
+                raise LLMParseError("Response language mismatch: expected Greek output")
+        if not reasoning_has_greek:
+            raise LLMParseError("Response language mismatch: expected Greek output")
+        return data
+
+    translated_specialty = _translate_specialty(specialty, "en")
+    if specialty_has_greek:
+        if translated_specialty == specialty:
+            raise LLMParseError("Response language mismatch: expected English output")
+        data["specialty"] = translated_specialty
+    if reasoning_has_greek:
+        raise LLMParseError("Response language mismatch: expected English output")
+
+    return data
+
+
+def _parse_response(raw: str, lang: str = "el") -> dict:
     json_str = _extract_json_object(raw)
     if not json_str:
         logger.warning("LLM response contained no JSON object")
@@ -243,20 +357,28 @@ def _parse_response(raw: str) -> dict:
         if not isinstance(data[field], str) or not data[field].strip():
             raise LLMParseError(f"Field '{field}' must be a non-empty string")
 
-    expected_label = MTS_LABELS[mts_level]
-    if data["mts_label"] != expected_label:
+    expected_label_en = MTS_LABELS[mts_level]
+    expected_label_el = MTS_LABELS_EL[mts_level]
+    allowed_labels = {expected_label_en, expected_label_el}
+
+    if data["mts_label"] not in allowed_labels:
         raise LLMParseError(
-            f"mts_label mismatch: level {mts_level} requires '{expected_label}', got '{data['mts_label']}'"
+            f"mts_label mismatch: level {mts_level} requires one of {sorted(allowed_labels)}, got '{data['mts_label']}'"
         )
 
+    if lang == "el":
+        data["mts_label"] = expected_label_el
+    else:
+        data["mts_label"] = expected_label_en
+
     data["mts_level"] = mts_level
-    return data
+    return _enforce_output_language(data, lang)
 
 
-async def classify(symptoms: str, context: str) -> dict:
+async def classify(symptoms: str, context: str, lang: str = "el") -> dict:
     try:
-        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context)
-        return _parse_response(raw)
+        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
+        return _parse_response(raw, lang)
     except LLMParseError:
         raise
     except Exception as exc:

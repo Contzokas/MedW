@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, constr
 
 from app.schemas.doctor import Doctor
@@ -6,6 +8,7 @@ from app.schemas.doctor import Doctor
 class TriageRequest(BaseModel):
     symptoms: constr(strip_whitespace=True, min_length=1)
     patient_id: constr(strip_whitespace=True, min_length=1)
+    lang: Literal["en", "el"] = "el"
 
 
 class TriageResponse(BaseModel):

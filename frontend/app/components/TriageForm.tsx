@@ -23,7 +23,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
   const [symptoms, setSymptoms] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +33,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
 
     try {
       const patientId = generatePatientId()
-      const result = await submitTriage(symptoms, patientId)
+      const result = await submitTriage(symptoms, patientId, lang)
       onResult(result)
       setSymptoms("")
     } catch (err) {

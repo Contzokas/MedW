@@ -8,11 +8,16 @@ VALID_JSON = (
     '"specialty": "Καρδιολογία", "reasoning": "Πόνος στο στήθος με ακτινοβολία."}'
 )
 
+VALID_JSON_EN = (
+    '{"mts_level": 2, "mts_label": "Very Urgent", '
+    '"specialty": "Cardiology", "reasoning": "Chest pain radiating to the left arm."}'
+)
+
 
 def test_parse_response_returns_correct_dict():
     result = _parse_response(VALID_JSON)
     assert result["mts_level"] == 2
-    assert result["mts_label"] == "Very Urgent"
+    assert result["mts_label"] == "Πολύ Επείγον"
     assert result["specialty"] == "Καρδιολογία"
     assert "reasoning" in result
 
@@ -60,7 +65,7 @@ def test_parse_response_raises_on_float_mts_level():
 
 
 async def test_classify_returns_dict_with_mocked_chain(monkeypatch):
-    def mock_invoke(symptoms, context):
+    def mock_invoke(symptoms, context, lang="el"):
         return VALID_JSON
 
     monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
@@ -70,7 +75,7 @@ async def test_classify_returns_dict_with_mocked_chain(monkeypatch):
 
 
 async def test_classify_raises_llm_parse_error_on_bad_response(monkeypatch):
-    def mock_invoke(symptoms, context):
+    def mock_invoke(symptoms, context, lang="el"):
         return "not json at all"
 
     monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
@@ -79,12 +84,70 @@ async def test_classify_raises_llm_parse_error_on_bad_response(monkeypatch):
 
 
 async def test_classify_wraps_chain_exception_in_llm_parse_error(monkeypatch):
-    def mock_invoke(symptoms, context):
+    def mock_invoke(symptoms, context, lang="el"):
         raise ConnectionError("Ollama unreachable")
 
     monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
     with pytest.raises(LLMParseError, match="LLM service error"):
         await classify("πόνος", "context")
+
+
+def test_parse_response_accepts_greek_mts_label_when_lang_is_el():
+    greek_label = (
+        '{"mts_level": 2, "mts_label": "Πολύ Επείγον", '
+        '"specialty": "Καρδιολογία", "reasoning": "Πόνος στο στήθος."}'
+    )
+    result = _parse_response(greek_label, lang="el")
+    assert result["mts_label"] == "Πολύ Επείγον"
+
+
+def test_parse_response_rejects_english_output_when_lang_is_el():
+    english_payload = (
+        '{"mts_level": 2, "mts_label": "Very Urgent", '
+        '"specialty": "Cardiology", "reasoning": "Chest pain with radiation."}'
+    )
+    with pytest.raises(LLMParseError, match="expected Greek output"):
+        _parse_response(english_payload, lang="el")
+
+
+def test_parse_response_normalizes_english_mts_label_when_lang_is_el():
+    mixed_payload = (
+        '{"mts_level": 2, "mts_label": "Very Urgent", '
+        '"specialty": "Καρδιολογία", "reasoning": "Πόνος στο στήθος."}'
+    )
+    result = _parse_response(mixed_payload, lang="el")
+    assert result["mts_label"] == "Πολύ Επείγον"
+
+
+def test_parse_response_rejects_greek_reasoning_when_lang_is_en():
+    greek_reasoning = (
+        '{"mts_level": 2, "mts_label": "Very Urgent", '
+        '"specialty": "Cardiology", "reasoning": "Πόνος στο στήθος."}'
+    )
+    with pytest.raises(LLMParseError, match="expected English output"):
+        _parse_response(greek_reasoning, lang="en")
+
+
+def test_parse_response_translates_greek_specialty_when_lang_is_en():
+    greek_specialty = (
+        '{"mts_level": 2, "mts_label": "Very Urgent", '
+        '"specialty": "Καρδιολογία", "reasoning": "Chest pain with radiation."}'
+    )
+    result = _parse_response(greek_specialty, lang="en")
+    assert result["specialty"] == "Cardiology"
+
+
+async def test_classify_passes_lang_to_chain(monkeypatch):
+    captured = {}
+
+    def mock_invoke(symptoms, context, lang):
+        captured["lang"] = lang
+        return VALID_JSON_EN
+
+    monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
+    result = await classify("chest pain", "MTS clinical context", lang="en")
+    assert captured["lang"] == "en"
+    assert result["specialty"] == "Cardiology"
 
 
 # ── Story 2.3: triage_service tests ──────────────────────────────────────────
@@ -126,7 +189,7 @@ async def test_triage_tier2_rag_unavailable_falls_back_to_llm(monkeypatch):
     result = await triage_classify("πόνος", "patient-002")
     assert result.rag_used is False
     assert result.mts_level == 2
-    mock_llm.assert_called_once_with(symptoms="πόνος", context="")
+    mock_llm.assert_called_once_with(symptoms="πόνος", context="", lang="el")
 
 
 async def test_triage_tier3_llm_parse_error_returns_safe_default(monkeypatch):
@@ -143,6 +206,38 @@ async def test_triage_tier3_unexpected_exception_returns_safe_default(monkeypatc
     result = await triage_classify("πόνος", "patient-004")
     assert result.mts_level == 3
     assert result.specialty == "General Practice"
+
+
+async def test_triage_en_passes_lang_to_llm_and_returns_english_default_on_failure(monkeypatch):
+    llm_mock = AsyncMock(side_effect=_LLMParseError("bad"))
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr("app.services.triage_service.llm_classify", llm_mock)
+
+    result = await triage_classify("chest pain", "patient-en-001", lang="en")
+
+    assert result.mts_label == "Urgent"
+    assert result.specialty == "General Practice"
+    assert "please contact a doctor" in result.reasoning
+    llm_mock.assert_called_once_with(symptoms="chest pain", context="ctx", lang="en")
+
+
+async def test_triage_en_translates_english_specialty_for_doctor_lookup(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr(
+        "app.services.triage_service.llm_classify",
+        AsyncMock(return_value={
+            "mts_level": 2,
+            "mts_label": "Very Urgent",
+            "specialty": "Cardiology",
+            "reasoning": "Chest pain with radiation.",
+        }),
+    )
+
+    result = await triage_classify("chest pain", "patient-en-002", lang="en")
+
+    assert result.specialty == "Cardiology"
+    assert result.doctor.specialty == "Cardiology"
+    assert result.doctor.name.startswith("Δρ.")
 
 
 async def test_triage_classify_never_raises(monkeypatch):

@@ -1,6 +1,7 @@
 export interface TriageRequest {
   symptoms: string
   patient_id: string
+  lang: "en" | "el"
 }
 
 export interface Doctor {

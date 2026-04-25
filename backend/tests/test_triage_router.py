@@ -40,6 +40,7 @@ async def test_triage_post_returns_200_with_all_fields(client):
     assert "redirect_url" in data
     assert "reasoning" in data
     assert "rag_used" in data
+    mock_classify.assert_called_once_with("πόνος στο στήθος", "test-001", "el")
 
 
 @pytest.mark.asyncio
@@ -54,6 +55,28 @@ async def test_triage_response_is_flat_no_envelope(client):
     assert "data" not in data
     assert "success" not in data
     assert "detail" not in data
+
+
+@pytest.mark.asyncio
+async def test_triage_post_forwards_lang_to_service(client):
+    with patch("app.services.triage_service.classify", new_callable=AsyncMock) as mock_classify:
+        mock_classify.return_value = _MOCK_RESPONSE
+        response = await client.post(
+            "/api/v1/triage",
+            json={"symptoms": "chest pain", "patient_id": "test-english", "lang": "en"},
+        )
+
+    assert response.status_code == 200
+    mock_classify.assert_called_once_with("chest pain", "test-english", "en")
+
+
+@pytest.mark.asyncio
+async def test_triage_invalid_lang_returns_422(client):
+    response = await client.post(
+        "/api/v1/triage",
+        json={"symptoms": "chest pain", "patient_id": "test-english", "lang": "fr"},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
