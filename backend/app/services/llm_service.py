@@ -31,7 +31,19 @@ _HUMAN_TEMPLATE = (
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
     '"specialty": "<English specialty name>", "reasoning": "<explanation in English>"}}\n\n'
     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
-    "specialty must be an English medical specialty name (e.g. Cardiology, Neurology, General Practice)."
+    "IMPORTANT rules for specialty selection:\n"
+    "- Always choose the MOST SPECIFIC specialty that matches the symptoms.\n"
+    "- Only use General Practice when symptoms are truly vague, systemic, or do not fit any specific specialty.\n"
+    "- Prefer specific specialties: Cardiology, Neurology, Gastroenterology, Orthopedics, Pulmonology, "
+    "Urology, Dermatology, Psychiatry, ENT, Ophthalmology, Gynecology, General Surgery, Vascular Surgery, "
+    "Toxicology, Endocrinology, Infectious Disease, Internal Medicine.\n"
+    "- Do NOT default to MTS level 3 (Urgent). Assign the level that genuinely reflects symptom severity.\n"
+    "- Level 1: life-threatening (cardiac arrest, anaphylaxis, severe trauma)\n"
+    "- Level 2: potentially life-threatening (chest pain, stroke signs, severe bleeding)\n"
+    "- Level 3: urgent but stable (moderate pain, worsening chronic condition)\n"
+    "- Level 4: less urgent (mild symptoms, stable chronic issues, minor complaints)\n"
+    "- Level 5: non-urgent (very mild, routine, information-seeking)\n"
+    "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage."
 )
 
 
