@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -109,6 +109,8 @@ def _build_chain():
         model=OLLAMA_MODEL,
         temperature=0,
         request_timeout=OLLAMA_TIMEOUT,
+        num_ctx=131072,
+        keep_alive=-1,
     )
     prompt = ChatPromptTemplate.from_messages(
         [("system", _SYSTEM_PROMPT), ("human", _HUMAN_TEMPLATE)]
@@ -147,7 +149,7 @@ async def warmup_model() -> None:
         "messages": [{"role": "user", "content": "ping"}],
         "stream": False,
         "options": {"num_predict": 1},
-        "keep_alive": OLLAMA_WARMUP_KEEP_ALIVE,
+        "keep_alive": "-1",
     }
 
     timeout = httpx.Timeout(timeout=float(OLLAMA_TIMEOUT))
