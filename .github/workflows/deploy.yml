@@ -322,10 +322,10 @@ jobs:
           echo "  URLs resolved at runtime via Run:ai API after workloads reach Running"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── Delete stale app workloads so the new image + env vars take effect ─
-      # Data services (ChromaDB, Ollama) are kept to preserve PVC state.
-      # Backend + Frontend are always recreated.
-      - name: Delete existing backend & frontend workloads
+      # ── Delete stale workloads so new image + env vars always take effect ──
+      # PVCs (ollama-pvc, chroma-pvc) are independent of workload lifecycle
+      # and are retained — so the pulled model survives Ollama pod recreation.
+      - name: Delete existing workloads
         run: |
           delete_workload() {
             local name="$1"
@@ -357,6 +357,7 @@ jobs:
             echo "  WARNING: $name not fully removed after 150s — proceeding anyway"
           }
 
+          delete_workload "medw-ollama${SUFFIX}"
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
 
