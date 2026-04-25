@@ -432,7 +432,8 @@ jobs:
                   {name: "OLLAMA_MODEL", value: $ollamaModel},
                   {name: "OLLAMA_FLASH_ATTENTION", value: $ollamaFlashAttention},
                   {name: "OLLAMA_NUM_PARALLEL", value: $ollamaNumParallel},
-                  {name: "OLLAMA_MAX_LOADED_MODELS", value: $ollamaMaxLoadedModels}
+                  {name: "OLLAMA_MAX_LOADED_MODELS", value: $ollamaMaxLoadedModels},
+                  {name: "OLLAMA_KEEP_ALIVE", value: "-1"}
                 ],
                 command: $cmd,
                 args: $cmdargs,
