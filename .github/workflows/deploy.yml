@@ -28,9 +28,11 @@ jobs:
     name: Resolve deployment environment
     runs-on: ubuntu-latest
     outputs:
-      tag:    ${{ steps.resolve.outputs.tag }}
-      suffix: ${{ steps.resolve.outputs.suffix }}
-      env:    ${{ steps.resolve.outputs.env }}
+      tag:            ${{ steps.resolve.outputs.tag }}
+      suffix:         ${{ steps.resolve.outputs.suffix }}
+      env:            ${{ steps.resolve.outputs.env }}
+      sha_short:      ${{ steps.resolve.outputs.sha_short }}
+      immutable_tag:  ${{ steps.resolve.outputs.immutable_tag }}
     steps:
       - name: Resolve tag and suffix from branch
         id: resolve
@@ -52,13 +54,20 @@ jobs:
             ENV="test"
           fi
 
+          SHA_SHORT="${GITHUB_SHA::7}"
+          IMMUTABLE_TAG="${TAG}-${SHA_SHORT}"
+
           echo "tag=$TAG"       >> $GITHUB_OUTPUT
           echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
           echo "env=$ENV"       >> $GITHUB_OUTPUT
+          echo "sha_short=$SHA_SHORT"         >> $GITHUB_OUTPUT
+          echo "immutable_tag=$IMMUTABLE_TAG" >> $GITHUB_OUTPUT
 
           echo "──────────────────────────────────"
           echo "  Branch : $BRANCH"
           echo "  Tag    : $TAG"
+          echo "  SHA    : $SHA_SHORT"
+          echo "  Deploy : $IMMUTABLE_TAG"
           echo "  Suffix : ${SUFFIX:-(none)}"
           echo "  Env    : $ENV"
           echo "──────────────────────────────────"
@@ -91,7 +100,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend
           tags: |
             type=raw,value=${{ needs.setup.outputs.tag }}
-            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+            type=raw,value=${{ needs.setup.outputs.immutable_tag }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -128,7 +137,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend
           tags: |
             type=raw,value=${{ needs.setup.outputs.tag }}
-            type=sha,prefix=${{ needs.setup.outputs.tag }}-,format=short
+            type=raw,value=${{ needs.setup.outputs.immutable_tag }}
 
       # The backend URL is now resolved at runtime via the BACKEND_URL env var
       # and proxied through Next.js rewrites (see frontend/next.config.ts).
@@ -162,8 +171,10 @@ jobs:
     needs: [setup, build-backend, build-frontend]
     environment: ${{ needs.setup.outputs.env }}
     env:
-      TAG:    ${{ needs.setup.outputs.tag }}
-      SUFFIX: ${{ needs.setup.outputs.suffix }}
+      TAG:           ${{ needs.setup.outputs.tag }}
+      SUFFIX:        ${{ needs.setup.outputs.suffix }}
+      SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
+      IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -222,6 +233,7 @@ jobs:
           echo "  Environment : ${{ needs.setup.outputs.env }}"
           echo "  Branch      : ${{ github.ref_name }}"
           echo "  Image tag   : ${{ env.TAG }}"
+          echo "  Immutable   : ${{ env.IMMUTABLE_TAG }}"
           echo "  Suffix      : ${{ env.SUFFIX }}"
           echo "  Cluster     : ${{ env.RUNAI_CLUSTER_ID }}"
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
@@ -446,7 +458,7 @@ jobs:
             --arg name "medw-backend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${TAG}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${IMMUTABLE_TAG}" \
             --arg ollamaUrl "$OLLAMA_URL" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
@@ -532,7 +544,7 @@ jobs:
             --arg name "medw-frontend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${TAG}" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${IMMUTABLE_TAG}" \
             --arg backendUrl "$BACKEND_URL" \
             '{
               name: $name,
