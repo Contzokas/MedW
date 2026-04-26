@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ollama-pvc
+  name: nim-pvc
   namespace: runai-medo
   labels:
     app.kubernetes.io/part-of: medw
@@ -10,7 +10,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi   # mistral:7b ~4 GB; room for additional models
+      storage: 500Gi   # NIM engine cache for 253B model (~250 GB FP8 optimised)
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

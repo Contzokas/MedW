@@ -1,0 +1,115 @@
+# NIM — GPU workload (Run:ai scheduled) — 3× NVIDIA B200 (Blackwell)
+#
+# Cluster:  runai-kiefer
+# Project:  medo
+# Namespace: runai-medo  (Run:ai convention: runai-<project>)
+#
+# Model: nvidia/nemotron-3-super-120b-a12b
+# Image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+# Requires: NGC_API_KEY secret (genericsecret-ngc) for model download
+# Registry auth: dockerregistry-nvcr-io
+#
+# Targeting: 3× NVIDIA B200 (Blackwell, 192 GB HBM3e each = 576 GB total)
+# NIM auto-selects tensor parallelism across all detected GPUs.
+# 253B model FP8 ~250 GB fits across 3× B200 (576 GB total HBM3e).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medw-nim
+  namespace: runai-medo
+  labels:
+    app: medw-nim
+    app.kubernetes.io/part-of: medw
+    gpu-type: b200
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medw-nim
+  template:
+    metadata:
+      labels:
+        app: medw-nim
+        gpu-type: b200
+      annotations:
+        scheduling.run.ai/fraction: "3"
+    spec:
+      schedulerName: runai-scheduler
+
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-B200
+
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+      imagePullSecrets:
+        - name: dockerregistry-nvcr-io
+
+      containers:
+        - name: nim
+          image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+          ports:
+            - containerPort: 8000
+              name: nim-api
+
+          env:
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: genericsecret-ngc
+                  key: NGC_API_KEY
+            - name: NIM_CACHE_PATH
+              value: "/opt/nim/.cache"
+
+          resources:
+            requests:
+              memory: "96Gi"
+              cpu: "24"
+            limits:
+              memory: "96Gi"
+              cpu: "24"
+              nvidia.com/gpu: 3
+
+          readinessProbe:
+            httpGet:
+              path: /v1/health/ready
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /v1/health/live
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 5
+
+          volumeMounts:
+            - name: nim-cache
+              mountPath: /opt/nim/.cache
+
+      volumes:
+        - name: nim-cache
+          persistentVolumeClaim:
+            claimName: nim-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nim
+  namespace: runai-medo
+  labels:
+    app: medw-nim
+    app.kubernetes.io/part-of: medw
+spec:
+  selector:
+    app: medw-nim
+  ports:
+    - name: nim-api
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

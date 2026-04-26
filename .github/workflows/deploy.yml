@@ -15,7 +15,7 @@ env:
   REGISTRY: ghcr.io
   ORG: contzokas
   CHROMA_UPSTREAM_IMAGE: chromadb/chroma:1.5.7
-  OLLAMA_UPSTREAM_IMAGE: ollama/ollama:latest
+  NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
   RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
@@ -184,39 +184,13 @@ jobs:
           docker push "$TARGET_REPO:$TAG"
           docker push "$TARGET_REPO:$IMMUTABLE_TAG"
 
-  mirror-ollama:
-    name: Mirror ollama → :${{ needs.setup.outputs.tag }}
-    runs-on: ubuntu-latest
-    needs: setup
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Mirror Ollama image to GHCR
-        env:
-          TARGET_REPO: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama
-          TAG: ${{ needs.setup.outputs.tag }}
-          IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-        run: |
-          docker pull "${{ env.OLLAMA_UPSTREAM_IMAGE }}"
-          docker tag "${{ env.OLLAMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$TAG"
-          docker tag "${{ env.OLLAMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$IMMUTABLE_TAG"
-          docker push "$TARGET_REPO:$TAG"
-          docker push "$TARGET_REPO:$IMMUTABLE_TAG"
-
   # ─────────────────────────────────────────────────────────────────────────
   # Job 3: Deploy via Run:ai REST API (no CLI needed)
   #
   # Workload names are suffixed by branch:
-  #   feature/deploy-to-runai → medw-ollama-test, medw-backend-test, ...
-  #   dev                     → medw-ollama-dev,  medw-backend-dev,  ...
-  #   main                    → medw-ollama,       medw-backend,       ...
+  #   feature/deploy-to-runai → medw-nim-test, medw-backend-test, ...
+  #   dev                     → medw-nim-dev,  medw-backend-dev,  ...
+  #   main                    → medw-nim,       medw-backend,       ...
   #
   # Required secrets (Settings → Secrets → Actions):
   #   RUNAI_CLIENT_ID     — from Run:ai → Settings → Application
@@ -226,7 +200,7 @@ jobs:
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
     runs-on: ubuntu-latest
-    needs: [setup, build-backend, build-frontend, mirror-chromadb, mirror-ollama]
+    needs: [setup, build-backend, build-frontend, mirror-chromadb]
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
@@ -236,15 +210,11 @@ jobs:
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
       SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-      OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'medgemma:27b' }}
-      OLLAMA_TIMEOUT: ${{ vars.OLLAMA_TIMEOUT || '120' }}
-      OLLAMA_NUM_PARALLEL: ${{ vars.OLLAMA_NUM_PARALLEL || '1' }}
-      OLLAMA_MAX_LOADED_MODELS: ${{ vars.OLLAMA_MAX_LOADED_MODELS || '1' }}
-      OLLAMA_FLASH_ATTENTION: ${{ vars.OLLAMA_FLASH_ATTENTION || '0' }}
-      OLLAMA_WARMUP_ENABLED: ${{ vars.OLLAMA_WARMUP_ENABLED || 'true' }}
-      OLLAMA_WARMUP_KEEP_ALIVE: ${{ vars.OLLAMA_WARMUP_KEEP_ALIVE || '30m' }}
-      OLLAMA_WARMUP_RETRIES: ${{ vars.OLLAMA_WARMUP_RETRIES || '24' }}
-      OLLAMA_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.OLLAMA_WARMUP_RETRY_DELAY_SECONDS || '5' }}
+      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
+      NIM_TIMEOUT: ${{ vars.NIM_TIMEOUT || '120' }}
+      NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
+      NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
+      NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -311,20 +281,20 @@ jobs:
           echo "    medw-chromadb${{ env.SUFFIX }}"
           echo "    medw-backend${{ env.SUFFIX }}"
           echo "    medw-frontend${{ env.SUFFIX }}"
-          echo "    medw-ollama${{ env.SUFFIX }}  ← B200 GPU"
+          echo "    medw-nim${{ env.SUFFIX }}  ← 3× B200 GPU"
           echo "  Images      :"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${{ env.IMMUTABLE_TAG }}"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.IMMUTABLE_TAG }}"
           echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${{ env.IMMUTABLE_TAG }}"
-          echo "  Ollama cfg  : model=${{ env.OLLAMA_MODEL }} timeout=${{ env.OLLAMA_TIMEOUT }} parallel=${{ env.OLLAMA_NUM_PARALLEL }} max_loaded=${{ env.OLLAMA_MAX_LOADED_MODELS }} flash=${{ env.OLLAMA_FLASH_ATTENTION }}"
-          echo "  Warmup cfg  : enabled=${{ env.OLLAMA_WARMUP_ENABLED }} keep_alive=${{ env.OLLAMA_WARMUP_KEEP_ALIVE }} retries=${{ env.OLLAMA_WARMUP_RETRIES }} retry_delay=${{ env.OLLAMA_WARMUP_RETRY_DELAY_SECONDS }}s"
+          echo "    ${{ env.NIM_IMAGE }}"
+          echo "  NIM cfg     : model=${{ env.NIM_MODEL }} timeout=${{ env.NIM_TIMEOUT }}"
+          echo "  Warmup cfg  : enabled=${{ env.NIM_WARMUP_ENABLED }} retries=${{ env.NIM_WARMUP_RETRIES }} retry_delay=${{ env.NIM_WARMUP_RETRY_DELAY_SECONDS }}s"
           echo "  URLs resolved at runtime via Run:ai API after workloads reach Running"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale workloads so new image + env vars always take effect ──
-      # PVCs (ollama-pvc, chroma-pvc) are independent of workload lifecycle
-      # and are retained — so the pulled model survives Ollama pod recreation.
+      # PVCs (nim-pvc, chroma-pvc) are independent of workload lifecycle
+      # and are retained — so the cached NIM engine survives pod recreation.
       - name: Delete existing workloads
         run: |
           delete_workload() {
@@ -357,7 +327,7 @@ jobs:
             echo "  WARNING: $name not fully removed after 150s — proceeding anyway"
           }
 
-          delete_workload "medw-ollama${SUFFIX}"
+          delete_workload "medw-nim${SUFFIX}"
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
 
@@ -412,47 +382,37 @@ jobs:
             echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
-      - name: Deploy Ollama (B200 GPU)
+      - name: Deploy NIM (3× B200 GPU)
         run: |
-          OLLAMA_JSON=$(jq -n \
-            --arg name "medw-ollama${SUFFIX}" \
+          NIM_JSON=$(jq -n \
+            --arg name "medw-nim${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-ollama:${IMMUTABLE_TAG}" \
-            --arg pvc "ollama-pvc${SUFFIX}" \
-            --arg cmd "/bin/sh" \
-            --arg cmdargs "-c 'ollama serve & sleep 10 && ollama pull ${OLLAMA_MODEL} && wait'" \
-            --arg ollamaModel "${OLLAMA_MODEL}" \
-            --arg ollamaFlashAttention "${OLLAMA_FLASH_ATTENTION}" \
-            --arg ollamaNumParallel "${OLLAMA_NUM_PARALLEL}" \
-            --arg ollamaMaxLoadedModels "${OLLAMA_MAX_LOADED_MODELS}" \
+            --arg image "${{ env.NIM_IMAGE }}" \
+            --arg pvc "nim-pvc${SUFFIX}" \
             '{
               name: $name,
               projectId: $projectId,
               clusterId: $clusterId,
               spec: {
                 image: $image,
+                imagePullSecrets: [{secretId: "dockerregistry-nvcr-io"}],
                 compute: {
                   cpuCoreRequest: 24, cpuCoreLimit: 24,
                   cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
                   gpuDevicesRequest: 3
                 },
                 environmentVariables: [
-                  {name: "OLLAMA_MODEL", value: $ollamaModel},
-                  {name: "OLLAMA_FLASH_ATTENTION", value: $ollamaFlashAttention},
-                  {name: "OLLAMA_NUM_PARALLEL", value: $ollamaNumParallel},
-                  {name: "OLLAMA_MAX_LOADED_MODELS", value: $ollamaMaxLoadedModels},
-                  {name: "OLLAMA_KEEP_ALIVE", value: "-1"}
+                  {name: "NGC_API_KEY", secretId: "genericsecret-ngc", secretKey: "NGC_API_KEY"},
+                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
-                command: $cmd,
-                args: $cmdargs,
-                ports: [{container: 11434, serviceType: "NodePort"}],
+                ports: [{container: 8000, serviceType: "NodePort"}],
                 storage: {
                   pvc: [{
-                    path: "/root/.ollama",
+                    path: "/opt/nim/.cache",
                     claimName: $pvc,
                     existingPvc: false,
-                    claimInfo: { size: "100Gi" }
+                    claimInfo: { size: "500Gi" }
                   }]
                 }
               }
@@ -461,22 +421,22 @@ jobs:
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d "$OLLAMA_JSON") || true
+            -d "$NIM_JSON") || true
           STATUS=$(echo "$RESP" | tail -1)
           BODY=$(echo "$RESP" | head -n -1)
-          echo "Ollama response (HTTP $STATUS): $BODY"
+          echo "NIM response (HTTP $STATUS): $BODY"
           if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Ollama submitted"
+            echo "NIM submitted"
           elif [ "$STATUS" = "409" ]; then
-            echo "Ollama already exists — skipping"
+            echo "NIM already exists — skipping"
           else
-            echo "Ollama failed (HTTP $STATUS): $BODY" && exit 1
+            echo "NIM failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
       # ── Resolve data-service URLs from Run:ai API ─────────────────────────
       # Run:ai does not support fixed NodePorts — poll until Running then
       # extract the assigned NodePort from the workload's URL field.
-      - name: Resolve ChromaDB and Ollama URLs
+      - name: Resolve ChromaDB and NIM URLs
         run: |
           resolve_url() {
             local workload_name="$1"
@@ -507,16 +467,16 @@ jobs:
           }
 
           CHROMA_URL=$(resolve_url "medw-chromadb${SUFFIX}") || CHROMA_URL=""
-          OLLAMA_URL=$(resolve_url "medw-ollama${SUFFIX}") || OLLAMA_URL=""
+          NIM_URL=$(resolve_url "medw-nim${SUFFIX}") || NIM_URL=""
           [ -z "$CHROMA_URL" ] && CHROMA_URL="${{ vars.CHROMA_URL }}"
-          [ -z "$OLLAMA_URL" ] && OLLAMA_URL="${{ vars.OLLAMA_URL }}"
-          if [ -z "$CHROMA_URL" ] || [ -z "$OLLAMA_URL" ]; then
+          [ -z "$NIM_URL" ] && NIM_URL="${{ vars.NIM_URL }}"
+          if [ -z "$CHROMA_URL" ] || [ -z "$NIM_URL" ]; then
             echo "Failed to resolve service URLs"; exit 1
           fi
           echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
-          echo "OLLAMA_URL=$OLLAMA_URL" >> "$GITHUB_ENV"
+          echo "NIM_BASE_URL=${NIM_URL}/v1" >> "$GITHUB_ENV"
           echo "Resolved CHROMA_URL=$CHROMA_URL"
-          echo "Resolved OLLAMA_URL=$OLLAMA_URL"
+          echo "Resolved NIM_BASE_URL=${NIM_URL}/v1"
 
       - name: Deploy Backend
         run: |
@@ -527,13 +487,12 @@ jobs:
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${IMMUTABLE_TAG}" \
-            --arg ollamaUrl "$OLLAMA_URL" \
-            --arg ollamaModel "${OLLAMA_MODEL}" \
-            --arg ollamaTimeout "${OLLAMA_TIMEOUT}" \
-            --arg ollamaWarmupEnabled "${OLLAMA_WARMUP_ENABLED}" \
-            --arg ollamaWarmupKeepAlive "${OLLAMA_WARMUP_KEEP_ALIVE}" \
-            --arg ollamaWarmupRetries "${OLLAMA_WARMUP_RETRIES}" \
-            --arg ollamaWarmupRetryDelaySeconds "${OLLAMA_WARMUP_RETRY_DELAY_SECONDS}" \
+            --arg nimBaseUrl "$NIM_BASE_URL" \
+            --arg nimModel "${NIM_MODEL}" \
+            --arg nimTimeout "${NIM_TIMEOUT}" \
+            --arg nimWarmupEnabled "${NIM_WARMUP_ENABLED}" \
+            --arg nimWarmupRetries "${NIM_WARMUP_RETRIES}" \
+            --arg nimWarmupRetryDelaySeconds "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
             '{
@@ -544,13 +503,12 @@ jobs:
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
-                  {name: "OLLAMA_HOST", value: $ollamaUrl},
-                  {name: "OLLAMA_MODEL", value: $ollamaModel},
-                  {name: "OLLAMA_TIMEOUT", value: $ollamaTimeout},
-                  {name: "OLLAMA_WARMUP_ENABLED", value: $ollamaWarmupEnabled},
-                  {name: "OLLAMA_WARMUP_KEEP_ALIVE", value: $ollamaWarmupKeepAlive},
-                  {name: "OLLAMA_WARMUP_RETRIES", value: $ollamaWarmupRetries},
-                  {name: "OLLAMA_WARMUP_RETRY_DELAY_SECONDS", value: $ollamaWarmupRetryDelaySeconds},
+                  {name: "NIM_BASE_URL", value: $nimBaseUrl},
+                  {name: "NIM_MODEL", value: $nimModel},
+                  {name: "NIM_TIMEOUT", value: $nimTimeout},
+                  {name: "NIM_WARMUP_ENABLED", value: $nimWarmupEnabled},
+                  {name: "NIM_WARMUP_RETRIES", value: $nimWarmupRetries},
+                  {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySeconds},
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],

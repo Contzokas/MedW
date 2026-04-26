@@ -26,11 +26,11 @@ spec:
             - containerPort: 8000
               name: http
           env:
-            - name: OLLAMA_HOST
-              value: "http://ollama:11434"
-            - name: OLLAMA_MODEL
-              value: "medgemma:27b"
-            - name: OLLAMA_TIMEOUT
+            - name: NIM_BASE_URL
+              value: "http://nim:8000/v1"
+            - name: NIM_MODEL
+              value: "nvidia/nemotron-3-super-120b-a12b"
+            - name: NIM_TIMEOUT
               value: "120"
             - name: CHROMA_HOST
               value: "chromadb"

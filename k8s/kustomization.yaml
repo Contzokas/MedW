@@ -8,8 +8,7 @@ namespace: runai-medo
 resources:
   - namespace.yaml
   - pvcs.yaml
-  - configmap-ollama-entrypoint.yaml
-  - ollama-deployment.yaml
+  - nim-deployment.yaml
   - chromadb-deployment.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml

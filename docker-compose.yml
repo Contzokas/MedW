@@ -2,28 +2,26 @@ name: medw
 
 networks:
   medw-internal:
-    # Internal network: ollama and chromadb ports are not published to host (NFR5, NFR7, NFR20)
+    # Internal network: nim and chromadb ports are not published to host (NFR5, NFR7, NFR20)
   medw-external:
     # External network: backend and frontend exposed to host
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: medw-ollama
+  nim:
+    image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+    container_name: medw-nim
     networks:
       - medw-internal
     volumes:
-      - ollama_data:/root/.ollama
-      - ./docker/ollama-entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+      - nim_cache:/opt/nim/.cache
     environment:
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-medgemma:27b}
+      - NGC_API_KEY=${NGC_API_KEY}
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q \"${OLLAMA_MODEL:-medgemma:27b}\" || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/health/ready || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 10
-      start_period: 600s  # 10 min — model pull on first run can take time
+      start_period: 600s  # 10 min — model engine optimisation on first run
     restart: unless-stopped
     deploy:
       resources:
@@ -45,7 +43,7 @@ services:
       - ANONYMIZED_TELEMETRY=FALSE
       - CHROMA_SERVER_PORT=8000
     depends_on:
-      ollama:
+      nim:
         condition: service_healthy
     restart: unless-stopped
 
@@ -60,7 +58,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - NIM_BASE_URL=http://nim:8000/v1
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
     healthcheck:
@@ -92,5 +90,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  ollama_data:
+  nim_cache:
   chroma_data:

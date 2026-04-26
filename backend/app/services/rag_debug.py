@@ -627,7 +627,7 @@ async def debug_full_pipeline(
             "duration_ms": round(llm_duration, 3),
             "raw_response": raw_response,
             "response_length": len(raw_response) if raw_response else 0,
-            "model_used": os.environ.get("OLLAMA_MODEL", "unknown"),
+            "model_used": os.environ.get("NIM_MODEL", "unknown"),
         }
     except Exception as exc:
         llm_duration = (time.perf_counter() - llm_start) * 1000
