@@ -382,22 +382,9 @@ jobs:
             echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
           fi
 
-      - name: Fetch NGC_API_KEY from Run:ai credential
-        run: |
-          CRED_RESP=$(curl -sSL \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/credentials/genericsecret-ngc" \
-            -H "Authorization: Bearer $TOKEN")
-          echo "DEBUG credential response: $CRED_RESP"
-          NGC_KEY=$(echo "$CRED_RESP" | jq -r '.password // .value // .secret // .data.NGC_API_KEY // empty')
-          if [ -z "$NGC_KEY" ] || [ "$NGC_KEY" = "null" ]; then
-            echo "Could not retrieve NGC_API_KEY from Run:ai credentials API"
-            echo "Please add NGC_API_KEY as a GitHub Actions repository secret"
-            exit 1
-          fi
-          echo "NGC_API_KEY=$NGC_KEY" >> "$GITHUB_ENV"
-          echo "NGC_API_KEY retrieved"
-
       - name: Deploy NIM (3× B200 GPU)
+        env:
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
           NIM_JSON=$(jq -n \
             --arg name "medw-nim${SUFFIX}" \
