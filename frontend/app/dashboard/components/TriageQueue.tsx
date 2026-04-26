@@ -2,26 +2,28 @@
 
 import { useTriageStream } from "@/app/lib/useTriageStream"
 import TriageQueueItem from "@/app/dashboard/components/TriageQueueItem"
+import { toCaps } from "@/app/lib/casing"
 
 export default function TriageQueue() {
   const entries = useTriageStream()
+  const h = (text: string) => toCaps(text, "el")
 
   return (
     <div className="bg-card shadow rounded-lg overflow-hidden border border-border">
       <table className="min-w-full divide-y divide-border">
         <thead className="bg-muted">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Ώρα (Τοπική)
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wider">
+              {h("Ώρα (Τοπική)")}
             </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              ID Ασθενούς
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wider">
+              {h("ID Ασθενούς")}
             </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Επίπεδο MTS
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wider">
+              {h("Επίπεδο MTS")}
             </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Ειδικότητα
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wider">
+              {h("Ειδικότητα")}
             </th>
           </tr>
         </thead>

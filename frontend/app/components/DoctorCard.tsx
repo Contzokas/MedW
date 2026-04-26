@@ -2,6 +2,7 @@
 
 import { Doctor } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
+import { toCaps } from "@/app/lib/casing"
 
 interface DoctorCardProps {
   doctor: Doctor
@@ -9,11 +10,11 @@ interface DoctorCardProps {
 }
 
 export default function DoctorCard({ doctor, redirectUrl }: DoctorCardProps) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{t.doctor.label}</p>
+      <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">{toCaps(t.doctor.label, lang)}</p>
       <p className="mt-1 text-lg font-semibold text-foreground">{doctor.name}</p>
       <p className="text-sm text-foreground">{doctor.specialty}</p>
 

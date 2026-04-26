@@ -102,8 +102,9 @@
 }
 
 html {
+  font-size: 90%;
   scroll-behavior: smooth;
-  scroll-snap-type: y proximity;
+  scroll-snap-type: y mandatory;
   overflow-x: hidden;
 }
 

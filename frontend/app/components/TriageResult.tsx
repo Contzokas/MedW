@@ -3,6 +3,7 @@
 import DoctorCard from "@/app/components/DoctorCard"
 import { TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
+import { toCaps } from "@/app/lib/casing"
 
 interface TriageResultProps {
   result: TriageResponse
@@ -17,7 +18,7 @@ const MTS_COLORS: Record<number, { bg: string; text: string }> = {
 }
 
 export default function TriageResult({ result }: TriageResultProps) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
   const { bg, text } = MTS_COLORS[result.mts_level] ?? { bg: "bg-muted", text: "text-foreground" }
 
   return (
@@ -33,16 +34,16 @@ export default function TriageResult({ result }: TriageResultProps) {
               {result.mts_level}
             </span>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                {t.result.mtsLabel}
+              <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">
+                {toCaps(t.result.mtsLabel, lang)}
               </p>
               <p className="text-xl font-bold text-foreground">{result.mts_label}</p>
             </div>
           </div>
 
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              {t.result.specialty}
+            <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">
+              {toCaps(t.result.specialty, lang)}
             </p>
             <p className="mt-1 text-base font-semibold text-foreground">{result.specialty}</p>
           </div>
@@ -54,8 +55,8 @@ export default function TriageResult({ result }: TriageResultProps) {
 
       {/* Reasoning */}
       <div className="border-t border-border pt-5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2">
-          {t.result.reasoning}
+        <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground mb-2">
+          {toCaps(t.result.reasoning, lang)}
         </p>
         <p className="text-sm text-foreground leading-relaxed">{result.reasoning}</p>
       </div>

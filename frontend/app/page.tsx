@@ -7,12 +7,22 @@ import Disclaimer from "@/app/components/Disclaimer"
 import TeamSection from "@/app/components/TeamSection"
 import { TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
+import { toCaps } from "@/app/lib/casing"
 
 export default function Home() {
   const [result, setResult] = useState<TriageResponse | null>(null)
   const [heroVisible, setHeroVisible] = useState(true)
   const heroRef = useRef<HTMLElement>(null)
-  const { t } = useLang()
+  const { t, lang } = useLang()
+
+  const scrollToBottom = () => {
+    const bottomAnchor = document.getElementById("page-bottom")
+    if (bottomAnchor) {
+      bottomAnchor.scrollIntoView({ behavior: "smooth", block: "end" })
+      return
+    }
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" })
+  }
 
   useEffect(() => {
     const el = heroRef.current
@@ -49,8 +59,8 @@ export default function Home() {
                   MED<span className="logo-omega text-primary transition-colors group-hover:text-primary-hover">Ω</span>
                 </h1>
               </button>
-              <p className="mt-3 text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
-                {t.hero.subtitle}
+              <p className="mt-3 text-xs font-medium tracking-[0.15em] text-muted-foreground">
+                {toCaps(t.hero.subtitle, lang)}
               </p>
             </div>
 
@@ -83,16 +93,17 @@ export default function Home() {
         </div>
 
         {/* Scroll indicator */}
-        <a
-          href="#about"
+        <button
+          type="button"
+          onClick={scrollToBottom}
           className="relative self-center flex flex-col items-center gap-1.5 pb-20 pt-4 text-muted-foreground/40 hover:text-primary transition-colors"
           aria-label={t.hero.scrollLabel}
         >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.25em]">{t.hero.scroll}</span>
+          <span className="text-[10px] font-semibold tracking-[0.25em]">{toCaps(t.hero.scroll, lang)}</span>
           <svg className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
-        </a>
+        </button>
       </section>
 
       {/* Fixed disclaimer bar — above EmergencyBar, only while result is shown in hero */}
@@ -109,6 +120,23 @@ export default function Home() {
       </div>
 
       <TeamSection />
+      <div id="page-bottom" className="h-px snap-end snap-always" aria-hidden="true" />
+
+      {/* Back to top — visible only when hero is out of view (user is at the bottom) */}
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Back to top"
+        className={`fixed bottom-12 right-4 z-40 flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover transition-all duration-300 ${
+          !heroVisible
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-2 pointer-events-none"
+        }`}
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
     </>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useLang } from "@/app/lib/lang-context"
-import Image from "next/image"
+import { toCaps } from "@/app/lib/casing"
 
 const AVATAR_GRADIENTS = [
   "from-blue-400 to-blue-600",
@@ -24,7 +24,7 @@ const TEAM = [
 ] as const
 
 export default function TeamSection() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   return (
     <section
@@ -36,8 +36,8 @@ export default function TeamSection() {
         <h2 className="text-6xl sm:text-7xl font-black tracking-tight text-foreground select-none">
           MED<span className="logo-omega text-primary">Ω</span>
         </h2>
-        <p className="mt-3 text-xs font-medium tracking-[0.15em] uppercase text-muted-foreground">
-          {t.hero.subtitle}
+        <p className="mt-3 text-xs font-medium tracking-[0.15em] text-muted-foreground">
+          {toCaps(t.hero.subtitle, lang)}
         </p>
       </div>
 
@@ -48,8 +48,8 @@ export default function TeamSection() {
           id="about-content"
           className="flex flex-col justify-center px-8 sm:px-14 lg:px-20 py-16 lg:border-r border-border border-b lg:border-b-0"
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-6">
-            {t.team.about}
+          <p className="text-[10px] font-bold tracking-[0.3em] text-primary mb-6">
+            {toCaps(t.team.about, lang)}
           </p>
 
           <div className="space-y-3 mb-8">
@@ -80,16 +80,18 @@ export default function TeamSection() {
           id="team"
           className="flex flex-col items-center justify-center px-8 sm:px-14 lg:px-20 py-16 bg-muted/20"
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary mb-12 self-start lg:self-auto">
-            {t.team.team}
+          <p className="text-[10px] font-bold tracking-[0.3em] text-primary mb-12 self-start lg:self-auto">
+            {toCaps(t.team.team, lang)}
           </p>
 
           <div className="flex flex-wrap justify-center gap-10 lg:gap-14 max-w-2xl">
             {TEAM.map(({ id, nameKey, roleKey, imgSrc, gradient, socials }) => (
-              <div key={id} className="group flex flex-col items-center gap-4 w-28 text-center cursor-default transition-all hover:-translate-y-1">
+              <div
+                key={id}
+                className="flex w-28 cursor-default flex-col items-center gap-4 text-center"
+              >
                 <div
-                  className={`w-24 h-24 rounded-full bg-gradient-to-br ${gradient} p-1 shadow-xl shadow-primary/15 group-hover:shadow-primary/40 group-hover:scale-105`}
-                  style={{ transition: "transform 220ms ease, box-shadow 320ms ease" }}
+                  className={`triage-card h-24 w-24 rounded-full bg-gradient-to-br ${gradient} p-1`}
                 >
                   <img src={imgSrc} alt={t.team.members[nameKey]} className="w-full h-full rounded-full object-cover bg-card shadow-inner" />
                 </div>
@@ -98,10 +100,10 @@ export default function TeamSection() {
                   <div className="text-sm font-semibold text-foreground/90 leading-tight">
                     {t.team.members[nameKey]}
                   </div>
-                  <div className="text-[10px] font-medium tracking-wide uppercase text-muted-foreground">
-                    {t.team.roles[roleKey]}
+                  <div className="text-[10px] font-medium tracking-wide text-muted-foreground">
+                    {toCaps(t.team.roles[roleKey], lang)}
                   </div>
-                  
+
                   {/* Social Links */}
                   <div className="flex gap-2.5 mt-1.5">
                     {socials.linkedin && (
