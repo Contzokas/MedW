@@ -52,3 +52,5 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(doctors.router, prefix="/api/v1")
 from app.routers import triage
 app.include_router(triage.router, prefix="/api/v1")
+from app.routers import rag_debug
+app.include_router(rag_debug.router, prefix="/api/v1")
