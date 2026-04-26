@@ -13,7 +13,7 @@ Patient describes symptoms (Greek)
          │
          ▼
   RAG retrieval (ChromaDB)
-  + LLM classification (Mistral-7B via Ollama)
+  + LLM classification (medgemma:27b via Ollama)
          │
          ▼
   MTS level (1–5) + Specialty + Doctor match
@@ -31,10 +31,10 @@ All inference runs **on-premise** — patient data never leaves the host (GDPR A
 | Layer | Technology |
 |---|---|
 | Backend API | Python 3.11 · FastAPI · Pydantic |
-| AI/LLM | Mistral-7B · Ollama · LangChain |
-| RAG | ChromaDB 1.5.7 · sentence-transformers |
-| Frontend | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 |
-| Infrastructure | Docker Compose · NVIDIA GPU (optional) |
+| AI/LLM | medgemma:27b · Ollama · LangChain 1.2.15 |
+| RAG | ChromaDB 1.5.7 · sentence-transformers (all-MiniLM-L6-v2) |
+| Frontend | Next.js 16.2.4 · React 19.2.4 · TypeScript 5 · Tailwind CSS v4 |
+| Infrastructure | Docker Compose · NVIDIA GPU (optional) · Kubernetes (Run:ai) |
 
 ---
 
@@ -59,7 +59,7 @@ docker compose up --build
 | Backend API | http://localhost:8000 |
 | API docs (Swagger) | http://localhost:8000/docs |
 
-> **First run:** Ollama pulls the Mistral-7B model (~4 GB). Allow up to 10 minutes.
+> **First run:** Ollama pulls the medgemma:27b model. Allow up to 10 minutes.
 > Subsequent starts use the cached model.
 
 ### Prerequisites
@@ -71,13 +71,16 @@ docker compose up --build
 
 ## Features
 
-- **Greek symptom input** — patients describe symptoms naturally in Greek
+- **Greek symptom input** — patients describe symptoms naturally in Greek (English also supported)
 - **MTS triage** — AI classifies urgency across 5 levels (Immediate → Non-urgent)
 - **RAG-augmented** — clinical guidelines retrieved from ChromaDB to improve accuracy
 - **Doctor matching** — recommends an available doctor by specialty; falls back to GP
 - **Fail-safe pipeline** — always returns a usable response, even if AI services fail
 - **Real-time nurse dashboard** — Server-Sent Events stream, no polling
 - **On-premise inference** — GDPR-compliant, zero external API calls for patient data
+- **RAG debug system** — 11 gated introspection endpoints for pipeline troubleshooting
+- **Dark/light theme** — with system preference detection and persistence
+- **Bilingual UI** — full English/Greek interface with proper Greek casing
 
 ---
 
@@ -87,22 +90,29 @@ docker compose up --build
 MedW/
 ├── backend/              # FastAPI backend + AI services
 │   ├── app/
-│   │   ├── routers/      # HTTP endpoints
+│   │   ├── routers/      # HTTP endpoints (health, doctors, triage, rag_debug)
 │   │   ├── services/     # Triage, LLM, RAG, doctor matching
 │   │   ├── schemas/      # Pydantic data models
 │   │   └── core/         # Config, SSE queue
 │   ├── data/
-│   │   ├── doctors.json  # Doctor dataset (20 doctors, 15 specialties)
+│   │   ├── doctors.json  # Doctor dataset (21 doctors, 12 specialties)
 │   │   └── corpus/       # RAG knowledge base (MTS guidelines + specialties)
-│   └── tests/            # pytest test suite (46 tests)
+│   └── tests/            # pytest test suite
 ├── frontend/             # Next.js UI
 │   └── app/
 │       ├── page.tsx          # Patient triage page (/)
 │       ├── dashboard/        # Nurse dashboard (/dashboard)
-│       ├── components/       # TriageForm, TriageResult, DoctorCard, Disclaimer
-│       └── lib/              # API client, types, SSE hook
+│       ├── components/       # TriageForm, TriageResult, DoctorCard, Disclaimer, etc.
+│       ├── lib/              # API client, types, SSE hook, translations, contexts
+│       └── api/              # Runtime config + backend proxy routes
 ├── docker/
 │   └── ollama-entrypoint.sh  # Model pull on first run
+├── k8s/                     # Kubernetes manifests (Run:ai cluster)
+│   ├── kustomization.yaml
+│   ├── ollama-deployment.yaml   # GPU: NVIDIA B200 via runai-scheduler
+│   ├── chromadb-deployment.yaml
+│   ├── backend-deployment.yaml
+│   └── frontend-deployment.yaml
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -114,6 +124,7 @@ MedW/
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/v1/health` | Liveness probe |
+| `GET` | `/api/v1/health/warmup` | Health check with LLM warmup status |
 | `POST` | `/api/v1/triage` | Submit symptoms → MTS result |
 | `GET` | `/api/v1/doctors` | List doctors (optional `?specialty=`) |
 | `GET` | `/api/v1/triage/queue` | SSE stream for nurse dashboard |
@@ -126,13 +137,14 @@ Full API documentation: [docs/api-contracts-backend.md](docs/api-contracts-backe
 
 | Variable | Default | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend URL (baked into frontend at build time) |
-| `OLLAMA_MODEL` | `mistral:7b` | Ollama model to use |
+| `BACKEND_URL` | `http://localhost:8000` | Backend URL (used by frontend proxy) |
+| `OLLAMA_MODEL` | `medgemma:27b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://ollama:11434` | Ollama service URL |
 | `OLLAMA_TIMEOUT` | `30` | LLM inference timeout (seconds) |
 | `CHROMA_HOST` | `chromadb` | ChromaDB host |
 | `CHROMA_PORT` | `8000` | ChromaDB port |
 | `QUEUE_MAX_ENTRIES` | `1000` | Max SSE queue size |
+| `RAG_DEBUG_ENABLED` | `false` | Enable RAG debug endpoints (dev only) |
 
 ---
 
@@ -141,7 +153,7 @@ Full API documentation: [docs/api-contracts-backend.md](docs/api-contracts-backe
 ```bash
 cd backend
 pip install -r requirements.txt
-pytest                           # Run all 46 tests
+pytest                           # Run all tests
 pytest --cov=app --cov-report=term-missing   # With coverage
 ```
 
@@ -168,8 +180,8 @@ For production / cluster deployment on a Run:ai-managed Kubernetes cluster.
 ### Prerequisites
 
 - `kubectl` configured against your cluster
-- Run:ai project `medw` with ≥ 1 GPU quota
-- Images pushed to GHCR (done automatically by the CI pipeline on push to `main`)
+- Run:ai project `medo` with ≥ 1 GPU quota
+- Images pushed to GHCR (done automatically by CI on push to `main`)
 
 ### One-command deploy
 
@@ -177,63 +189,36 @@ For production / cluster deployment on a Run:ai-managed Kubernetes cluster.
 kubectl apply -k k8s/
 ```
 
-This creates the `medw` namespace and deploys all four services in the correct order.
+This creates the `runai-medo` namespace and deploys all four services in the correct order.
 
 ### Check status
 
 ```bash
-# All pods
-kubectl get pods -n medw -o wide
-
-# GPU allocation via Run:ai CLI
-runai list jobs -p medw
-
-# Logs
-kubectl logs -n medw deployment/medw-ollama -f
-kubectl logs -n medw deployment/medw-backend -f
+kubectl get pods -n runai-medo -o wide
+runai list workloads -p medo
+kubectl logs -n runai-medo deployment/medw-ollama -f
 ```
 
 ### Access the app
 
 ```bash
 # Frontend (patient triage + nurse dashboard)
-kubectl port-forward -n medw svc/frontend 3000:3000
+kubectl port-forward -n runai-medo svc/frontend 3000:3000
 # → http://localhost:3000
 
 # Backend API / Swagger
-kubectl port-forward -n medw svc/backend 8000:8000
+kubectl port-forward -n runai-medo svc/backend 8000:8000
 # → http://localhost:8000/docs
-
-# Ollama directly (optional debugging)
-kubectl port-forward -n medw svc/ollama 11434:11434
-# → curl http://localhost:11434/api/tags
 ```
 
 ### CI/CD
 
-Push to `main` automatically builds & pushes images to `ghcr.io/medw/` and
-re-deploys the cluster. Requires one repository secret:
+Push to `main` automatically builds & pushes images to `ghcr.io/contzokas/medw-*` and
+re-deploys the cluster.
 
 | Secret | Value |
 |---|---|
 | `KUBECONFIG` | base64-encoded kubeconfig for the cluster |
-| `NEXT_PUBLIC_API_URL` | *(optional)* external backend URL if using Ingress |
-
-Add secrets at **Settings → Secrets and variables → Actions**.
-
-### Manifest structure
-
-```
-k8s/
-├── namespace.yaml                  # medw namespace
-├── pvcs.yaml                       # ollama-pvc (20Gi) + chroma-pvc (5Gi)
-├── configmap-ollama-entrypoint.yaml
-├── ollama-deployment.yaml          # GPU workload (runai-scheduler, nvidia.com/gpu: 1)
-├── chromadb-deployment.yaml
-├── backend-deployment.yaml
-├── frontend-deployment.yaml
-└── kustomization.yaml              # kubectl apply -k k8s/
-```
 
 ---
 
