@@ -383,8 +383,6 @@ jobs:
           fi
 
       - name: Deploy NIM (3× B200 GPU)
-        env:
-          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
           NIM_JSON=$(jq -n \
             --arg name "medw-nim${SUFFIX}" \
@@ -392,7 +390,6 @@ jobs:
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.NIM_IMAGE }}" \
             --arg pvc "nim-pvc${SUFFIX}" \
-            --arg ngcApiKey "$NGC_API_KEY" \
             '{
               name: $name,
               projectId: $projectId,
@@ -406,7 +403,7 @@ jobs:
                   gpuDevicesRequest: 3
                 },
                 environmentVariables: [
-                  {name: "NGC_API_KEY", value: $ngcApiKey},
+                  {name: "NGC_API_KEY", credentialId: "genericsecret-ngc"},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
