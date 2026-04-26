@@ -14,13 +14,13 @@ const AVATAR_GRADIENTS = [
 ]
 
 const TEAM = [
-  { id: 1, nameKey: "athanasios", roleKey: "ux", imgSrc: "https://i.pravatar.cc/150?u=6", gradient: AVATAR_GRADIENTS[0], socials: { linkedin: "", github: "" } },
+  { id: 1, nameKey: "athanasios", roleKey: "ux", imgSrc: "https://i.pravatar.cc/150?u=6", gradient: AVATAR_GRADIENTS[0], socials: { linkedin: "https://www.linkedin.com/in/athanasios-neofytos-7a10a92a0/", github: "https://github.com/Thanoufrios" } },
   { id: 2, nameKey: "constantinos", roleKey: "ai", imgSrc: "https://avatars.githubusercontent.com/u/136539747?v=4", gradient: AVATAR_GRADIENTS[1], socials: { linkedin: "https://www.linkedin.com/in/constantinos-tzokas/", github: "https://github.com/Contzokas"} },
-  { id: 3, nameKey: "dimitrisD", roleKey: "backend", imgSrc: "https://avatars.githubusercontent.com/u/77115711?v=4", gradient: AVATAR_GRADIENTS[2], socials: { linkedin: "", github: "https://github.com/dimitriadisdim" } },
-  { id: 4, nameKey: "dimitrisP", roleKey: "frontend", imgSrc: "/team/mitsos.jpeg", gradient: AVATAR_GRADIENTS[3], socials: { linkedin: "", github: "" } },
-  { id: 5, nameKey: "orestis", roleKey: "data", imgSrc: "https://avatars.githubusercontent.com/u/39314198?v=4", gradient: AVATAR_GRADIENTS[4], socials: { linkedin: "", github: "https://github.com/itsmeorestis" } },
-  { id: 6, nameKey: "sotiris", roleKey: "pm", imgSrc: "/team/sotiris.jpeg", gradient: AVATAR_GRADIENTS[5], socials: { linkedin: "", github: "" } },
-  { id: 7, nameKey: "stella", roleKey: "ux", imgSrc: "/team/stella.jpeg", gradient: AVATAR_GRADIENTS[6], socials: { linkedin: "", github: "" } },
+  { id: 3, nameKey: "dimitrisD", roleKey: "backend", imgSrc: "https://avatars.githubusercontent.com/u/77115711?v=4", gradient: AVATAR_GRADIENTS[2], socials: { linkedin: "https://www.linkedin.com/in/dimitrios-dimitriadis-40111a309/", github: "https://github.com/dimitriadisdim" } },
+  { id: 4, nameKey: "dimitrisP", roleKey: "frontend", imgSrc: "/team/mitsos.jpeg", gradient: AVATAR_GRADIENTS[3], socials: { linkedin: "https://www.linkedin.com/in/dimitris-papamargaritis-4065a028b/", github: "https://github.com/DimitrisPapamargaritis" } },
+  { id: 5, nameKey: "orestis", roleKey: "infra", imgSrc: "https://avatars.githubusercontent.com/u/39314198?v=4", gradient: AVATAR_GRADIENTS[4], socials: { linkedin: "https://www.linkedin.com/in/bushpreni/", github: "https://github.com/itsmeorestis" } },
+  { id: 6, nameKey: "sotiris", roleKey: "data_eng", imgSrc: "/team/sotiris.jpeg", gradient: AVATAR_GRADIENTS[5], socials: { linkedin: "https://www.linkedin.com/in/sotiris-papadopoulos-5627642b1/", github: "https://github.com/Sotirispapad" } },
+  { id: 7, nameKey: "stella", roleKey: "pm", imgSrc: "/team/stella.jpeg", gradient: AVATAR_GRADIENTS[6], socials: { linkedin: "https://www.linkedin.com/in/stellaalousi/", github: "https://github.com/stellalousi" } },
 ] as const
 
 export default function TeamSection() {

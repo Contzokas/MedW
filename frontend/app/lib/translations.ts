@@ -56,7 +56,9 @@ export const translations = {
         backend: "Backend Developer",
         frontend: "Frontend Developer",
         data: "Data Scientist",
-        pm: "Product Manager",
+        data_eng: "Data Engineer",
+        pm: "Project Manager",
+        infra: "Infrastructure & DevOps Engineer",
       },
       socials: {
         linkedin: "LinkedIn",
@@ -119,7 +121,9 @@ export const translations = {
         backend: "Προγραμματιστής Backend",
         frontend: "Προγραμματιστής Frontend",
         data: "Επιστήμονας Δεδομένων",
-        pm: "Υπεύθυνος Προϊόντος",
+        data_eng: "Μηχανικός Δεδομένων",
+        pm: "Project Manager",
+        infra: "Infrastructure & DevOps Engineer",
       },
       socials: {
         linkedin: "LinkedIn",
