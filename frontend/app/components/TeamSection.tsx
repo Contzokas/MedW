@@ -1,6 +1,7 @@
 "use client"
 
 import { useLang } from "@/app/lib/lang-context"
+import Image from "next/image"
 
 const AVATAR_GRADIENTS = [
   "from-blue-400 to-blue-600",
@@ -13,14 +14,14 @@ const AVATAR_GRADIENTS = [
 ]
 
 const TEAM = [
-  { id: 1, name: "Athanasios Neofytos", role: "UX/UI Designer", imgSrc: "https://i.pravatar.cc/150?u=6", gradient: AVATAR_GRADIENTS[0] },
-  { id: 2, name: "Constantinos Tzokas", role: "AI Engineer", imgSrc: "https://avatars.githubusercontent.com/u/136539747?v=4", gradient: AVATAR_GRADIENTS[1] },
-  { id: 3, name: "Dimitris Dimitriadis", role: "Backend Developer", imgSrc: "https://avatars.githubusercontent.com/u/39314198?v=4", gradient: AVATAR_GRADIENTS[2] },
-  { id: 4, name: "Dimitris Papapmargaritis", role: "Frontend Developer", imgSrc: "https://media.licdn.com/dms/image/v2/D5603AQHYtaX_lXwxZg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1695826227699?e=1778716800&v=beta&t=74537WlWLLUuqU6sL0buWfH-1m92cYiEKH4Li8jYi4o", gradient: AVATAR_GRADIENTS[3] },
-  { id: 5, name: "Orestis Bushpreni", role: "Data Scientist", imgSrc: "https://avatars.githubusercontent.com/u/77115711?v=4", gradient: AVATAR_GRADIENTS[4] },
-  { id: 6, name: "Sotiris Paoadopoulos", role: "Product Manager", imgSrc: "https://media.licdn.com/dms/image/v2/D5603AQEthqn8o0dpiQ/profile-displayphoto-shrink_800_800/B56ZR6TNKdGoAg-/0/1737218644049?e=1778716800&v=beta&t=QIb6WVYngpobWbpcMIRtT7U0xfAS6WgBNgtzMS3O_tA", gradient: AVATAR_GRADIENTS[5] },
-  { id: 7, name: "Stella Alousi", role: "UX/UI Designer", imgSrc: "https://media.licdn.com/dms/image/v2/D4D03AQHsQ0eBcG4hlA/profile-displayphoto-shrink_800_800/B4DZY.ZAGxHIAc-/0/1744803464330?e=1778716800&v=beta&t=hTNsLsMbeo8D9KQDy6voz_w2wZsveJriFTEhihWHG8M", gradient: AVATAR_GRADIENTS[6] },
-]
+  { id: 1, nameKey: "athanasios", roleKey: "ux", imgSrc: "https://i.pravatar.cc/150?u=6", gradient: AVATAR_GRADIENTS[0], socials: { linkedin: "", github: "" } },
+  { id: 2, nameKey: "constantinos", roleKey: "ai", imgSrc: "https://avatars.githubusercontent.com/u/136539747?v=4", gradient: AVATAR_GRADIENTS[1], socials: { linkedin: "https://www.linkedin.com/in/constantinos-tzokas/", github: "https://github.com/Contzokas"} },
+  { id: 3, nameKey: "dimitrisD", roleKey: "backend", imgSrc: "https://avatars.githubusercontent.com/u/77115711?v=4", gradient: AVATAR_GRADIENTS[2], socials: { linkedin: "", github: "https://github.com/dimitriadisdim" } },
+  { id: 4, nameKey: "dimitrisP", roleKey: "frontend", imgSrc: "/team/mitsos.jpeg", gradient: AVATAR_GRADIENTS[3], socials: { linkedin: "", github: "" } },
+  { id: 5, nameKey: "orestis", roleKey: "data", imgSrc: "https://avatars.githubusercontent.com/u/39314198?v=4", gradient: AVATAR_GRADIENTS[4], socials: { linkedin: "", github: "https://github.com/itsmeorestis" } },
+  { id: 6, nameKey: "sotiris", roleKey: "pm", imgSrc: "/team/sotiris.jpeg", gradient: AVATAR_GRADIENTS[5], socials: { linkedin: "", github: "" } },
+  { id: 7, nameKey: "stella", roleKey: "ux", imgSrc: "/team/stella.jpeg", gradient: AVATAR_GRADIENTS[6], socials: { linkedin: "", github: "" } },
+] as const
 
 export default function TeamSection() {
   const { t } = useLang()
@@ -52,19 +53,14 @@ export default function TeamSection() {
           </p>
 
           <div className="space-y-3 mb-8">
-            <div className="h-9 w-3/4 rounded-lg bg-muted" />
-            <div className="h-9 w-1/2 rounded-lg bg-muted/60" />
+            <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground leading-tight">
+              {t.team.projectTitle}
+            </h3>
           </div>
 
-          <div className="space-y-2 mb-6">
-            {[100, 90, 95, 80, 88].map((w, i) => (
-              <div key={i} className="h-3.5 rounded bg-muted/50" style={{ width: `${w}%` }} />
-            ))}
-          </div>
-          <div className="space-y-2 mb-10">
-            {[92, 85, 70].map((w, i) => (
-              <div key={i} className="h-3.5 rounded bg-muted/40" style={{ width: `${w}%` }} />
-            ))}
+          <div className="space-y-4 mb-10 text-muted-foreground text-sm sm:text-base leading-relaxed max-w-2xl">
+            <p>{t.team.projectBody1}</p>
+            <p>{t.team.projectBody2}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -89,21 +85,35 @@ export default function TeamSection() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-10 lg:gap-14 max-w-2xl">
-            {TEAM.map(({ id, name, role, imgSrc, gradient }) => (
+            {TEAM.map(({ id, nameKey, roleKey, imgSrc, gradient, socials }) => (
               <div key={id} className="group flex flex-col items-center gap-4 w-28 text-center cursor-default transition-all hover:-translate-y-1">
                 <div
                   className={`w-24 h-24 rounded-full bg-gradient-to-br ${gradient} p-1 shadow-xl shadow-primary/15 group-hover:shadow-primary/40 group-hover:scale-105`}
                   style={{ transition: "transform 220ms ease, box-shadow 320ms ease" }}
                 >
-                  <img src={imgSrc} alt={name} className="w-full h-full rounded-full object-cover bg-card shadow-inner" />
+                  <img src={imgSrc} alt={t.team.members[nameKey]} className="w-full h-full rounded-full object-cover bg-card shadow-inner" />
                 </div>
 
                 <div className="flex flex-col items-center gap-1.5 w-full mt-2">
                   <div className="text-sm font-semibold text-foreground/90 leading-tight">
-                    {name}
+                    {t.team.members[nameKey]}
                   </div>
                   <div className="text-[10px] font-medium tracking-wide uppercase text-muted-foreground">
-                    {role}
+                    {t.team.roles[roleKey]}
+                  </div>
+                  
+                  {/* Social Links */}
+                  <div className="flex gap-2.5 mt-1.5">
+                    {socials.linkedin !== "" && (
+                      <a href={socials.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-[#0A66C2] transition-colors" aria-label={`LinkedIn ${t.team.members[nameKey]}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                      </a>
+                    )}
+                    {socials.github !== "" && (
+                      <a href={socials.github} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label={`GitHub ${t.team.members[nameKey]}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

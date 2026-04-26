@@ -38,6 +38,30 @@ export const translations = {
     team: {
       about: "About the Project",
       team: "The Team",
+      projectTitle: "AI-powered Medical Triage for the NHS",
+      projectBody1: "MEDΩ is an intelligent medical triage assistant designed for the Greek National Health System (ESY) and developed for the Kiefer AI Open Hackathon. When patients describe their symptoms, the system instantly provides a Manchester Triage System (MTS) classification and routes them to the correct medical specialty and an available doctor.",
+      projectBody2: "By effectively addressing the issue of approximately 7 million annual appointments directed to the wrong specialty due to a lack of clinical guidance, MEDΩ aims to significantly reduce waiting times, enhance early intervention, and optimize the overall workflow for healthcare professionals.",
+      members: {
+        athanasios: "Athanasios Neofytos",
+        constantinos: "Constantinos Tzokas",
+        dimitrisD: "Dimitris Dimitriadis",
+        dimitrisP: "Dimitris Papamargaritis",
+        orestis: "Orestis Bushpreni",
+        sotiris: "Sotiris Papadopoulos",
+        stella: "Stella Alousi",
+      },
+      roles: {
+        ux: "UX/UI Designer",
+        ai: "AI Engineer",
+        backend: "Backend Developer",
+        frontend: "Frontend Developer",
+        data: "Data Scientist",
+        pm: "Product Manager",
+      },
+      socials: {
+        linkedin: "LinkedIn",
+        github: "GitHub",
+      }
     },
   },
   el: {
@@ -77,6 +101,26 @@ export const translations = {
     team: {
       about: "Για το Έργο",
       team: "Η Ομάδα",
+      projectTitle: "Ιατρική Διαλογή με Τεχνητή Νοημοσύνη για το ΕΣΥ",
+      projectBody1: "Το MEDΩ είναι ένας έξυπνος ιατρικός βοηθός διαλογής (triage) που σχεδιάστηκε για το Εθνικό Σύστημα Υγείας (ΕΣΥ) και αναπτύχθηκε στο πλαίσιο του Kiefer AI Open Hackathon. Όταν οι ασθενείς περιγράφουν τα συμπτώματά τους, το σύστημα παρέχει άμεσα ταξινόμηση βάσει του συστήματος διαλογής Manchester (MTS) και τους κατευθύνει στη σωστή ιατρική ειδικότητα και στον κατάλληλο διαθέσιμο ιατρό.",
+      projectBody2: "Αντιμετωπίζοντας αποτελεσματικά το πρόβλημα περίπου 7 εκατομμυρίων ετήσιων ραντεβού που κατευθύνονται σε λανθασμένη ειδικότητα λόγω έλλειψης κλινικής καθοδήγησης, το MEDΩ στοχεύει στη σημαντική μείωση των χρόνων αναμονής, στην ενίσχυση της έγκαιρης παρέμβασης και στη βελτιστοποίηση της συνολικής ροής εργασιών για τους επαγγελματίες υγείας.",
+      members: {
+        athanasios: "Αθανάσιος Νεόφυτος",
+        constantinos: "Κωνσταντίνος Τζόκας",
+        dimitrisD: "Δημήτρης Δημητριάδης",
+        dimitrisP: "Δημήτρης Παπαμαργαρίτης",
+        orestis: "Ορέστης Μπουσπρένι",
+        sotiris: "Σωτήρης Παπαδόπουλος",
+        stella: "Στέλλα Αλούση",
+      },
+      roles: {
+        ux: "Σχεδιαστής UX/UI",
+        ai: "Μηχανικός AI",
+        backend: "Προγραμματιστής Backend",
+        frontend: "Προγραμματιστής Frontend",
+        data: "Επιστήμονας Δεδομένων",
+        pm: "Υπεύθυνος Προϊόντος",
+      }
     },
   },
 } satisfies Record<Lang, unknown>
