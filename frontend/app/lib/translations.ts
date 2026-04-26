@@ -120,6 +120,10 @@ export const translations = {
         frontend: "Προγραμματιστής Frontend",
         data: "Επιστήμονας Δεδομένων",
         pm: "Υπεύθυνος Προϊόντος",
+      },
+      socials: {
+        linkedin: "LinkedIn",
+        github: "GitHub",
       }
     },
   },
