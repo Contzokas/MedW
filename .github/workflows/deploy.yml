@@ -399,7 +399,7 @@ jobs:
               clusterId: $clusterId,
               spec: {
                 image: $image,
-                imagePullSecrets: ["dockerregistry-nvcr-io"],
+                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
                 compute: {
                   cpuCoreRequest: 24, cpuCoreLimit: 24,
                   cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
