@@ -1,0 +1,22 @@
+[
+  {"name": "Δρ. Αλέξανδρος Παπαδόπουλος", "specialty": "Cardiology", "availability": true},
+  {"name": "Δρ. Μαρία Νικολάου", "specialty": "Cardiology", "availability": false},
+  {"name": "Δρ. Γεώργιος Κωνσταντίνου", "specialty": "Orthopedics", "availability": true},
+  {"name": "Δρ. Ελένη Σταματίου", "specialty": "Neurology", "availability": true},
+  {"name": "Δρ. Νικόλαος Ανδρέου", "specialty": "Pulmonology", "availability": true},
+  {"name": "Δρ. Σοφία Δημητρίου", "specialty": "Gastroenterology", "availability": false},
+  {"name": "Δρ. Κωνσταντίνος Παπανδρέου", "specialty": "General Practice", "availability": true},
+  {"name": "Δρ. Χριστίνα Βασιλείου", "specialty": "General Practice", "availability": true},
+  {"name": "Δρ. Αθηνά Μιχαηλίδου", "specialty": "Dermatology", "availability": true},
+  {"name": "Δρ. Σπύρος Αντωνίου", "specialty": "Internal Medicine", "availability": false},
+  {"name": "Δρ. Ανδρέας Μαρκόπουλος", "specialty": "Urology", "availability": false},
+  {"name": "Δρ. Αναστασία Οικονόμου", "specialty": "Psychiatry", "availability": true},
+  {"name": "Δρ. Μαρία Παπαγεωργίου", "specialty": "Gynecology", "availability": true},
+  {"name": "Δρ. Ιωάννης Μητρόπουλος", "specialty": "Pediatrics", "availability": false},
+  {"name": "Δρ. Κατερίνα Λάμπρου", "specialty": "Ophthalmology", "availability": true},
+  {"name": "Δρ. Βασίλειος Σαμαράς", "specialty": "ENT", "availability": true},
+  {"name": "Δρ. Φωτεινή Καρρά", "specialty": "Endocrinology", "availability": true},
+  {"name": "Δρ. Δημήτριος Αλεξίου", "specialty": "Internal Medicine", "availability": true},
+  {"name": "Δρ. Πελαγία Ρήγα", "specialty": "General Surgery", "availability": false},
+  {"name": "Δρ. Θεόδωρος Γαλάνης", "specialty": "Cardiology", "availability": true}
+]

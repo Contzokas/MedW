@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --info: #0891b2;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --primary: #3b82f6;
+    --primary-hover: #60a5fa;
+    --muted: #1f2937;
+    --muted-foreground: #9ca3af;
+    --border: #374151;
+    --card: #1f2937;
+    --card-foreground: #ededed;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --success: #22c55e;
+    --warning: #eab308;
+    --info: #06b6d4;
+  }
+}
+
+/* Explicitly override system dark preference when user selects light mode */
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --info: #0891b2;
+}
+
+[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --border: #374151;
+  --card: #1f2937;
+  --card-foreground: #ededed;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #22c55e;
+  --warning: #eab308;
+  --info: #06b6d4;
+}
+
+/* Theme transitions with reduced motion support */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+}
+
+html {
+  font-size: 90%;
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── Hero background (applied directly on the section element) ── */
+.hero-section {
+  background: linear-gradient(160deg, #eff4ff 0%, #fafcff 45%, #edf6ff 100%);
+}
+
+/* Fallback before JS hydrates the data-theme attribute */
+@media (prefers-color-scheme: dark) {
+  .hero-section {
+    background: linear-gradient(160deg, #07091c 0%, #0a0b18 45%, #060a1a 100%);
+  }
+}
+
+/* data-theme overrides always win over the media query */
+[data-theme="light"] .hero-section {
+  background: linear-gradient(160deg, #eff4ff 0%, #fafcff 45%, #edf6ff 100%);
+}
+
+[data-theme="dark"] .hero-section {
+  background: linear-gradient(160deg, #07091c 0%, #0a0b18 45%, #060a1a 100%);
+}
+
+/* Animated glowing orbs */
+.hero-orb-1 {
+  background: radial-gradient(circle at center, rgba(37, 99, 235, 0.32) 0%, transparent 65%);
+  animation: orb-drift-1 14s ease-in-out infinite;
+  filter: blur(1px);
+}
+
+.hero-orb-2 {
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 65%);
+  animation: orb-drift-2 20s ease-in-out infinite;
+  filter: blur(1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero-orb-1 { background: radial-gradient(circle at center, rgba(59, 130, 246, 0.38) 0%, transparent 65%); }
+  .hero-orb-2 { background: radial-gradient(circle at center, rgba(129, 140, 248, 0.28) 0%, transparent 65%); }
+}
+
+[data-theme="light"] .hero-orb-1 { background: radial-gradient(circle at center, rgba(37, 99, 235, 0.32) 0%, transparent 65%); }
+[data-theme="light"] .hero-orb-2 { background: radial-gradient(circle at center, rgba(99, 102, 241, 0.2) 0%, transparent 65%); }
+[data-theme="dark"]  .hero-orb-1 { background: radial-gradient(circle at center, rgba(59, 130, 246, 0.38) 0%, transparent 65%); }
+[data-theme="dark"]  .hero-orb-2 { background: radial-gradient(circle at center, rgba(129, 140, 248, 0.28) 0%, transparent 65%); }
+
+.hero-section:hover .hero-orb-1,
+.hero-section:hover .hero-orb-2 {
+  animation-play-state: paused;
+}
+
+@keyframes orb-drift-1 {
+  0%, 100% { transform: translate(0,    0); }
+  33%       { transform: translate(45px, -35px); }
+  66%       { transform: translate(-30px, 28px); }
+}
+
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate(0,    0); }
+  33%       { transform: translate(-40px, 45px); }
+  66%       { transform: translate(35px, -25px); }
+}
+
+/* ── Triage card — constant glow ── */
+.triage-card {
+  box-shadow:
+    0 0 0 1.5px rgba(37, 99, 235, 0.30),
+    0 8px 20px  rgba(37, 99, 235, 0.12),
+    0 28px 52px rgba(37, 99, 235, 0.16);
+  transition: box-shadow 400ms ease;
+}
+
+.triage-card:hover {
+  box-shadow:
+    0 0 0 1.5px rgba(37, 99, 235, 0.40),
+    0 8px 24px  rgba(37, 99, 235, 0.16),
+    0 32px 58px rgba(37, 99, 235, 0.20),
+    0 4px 8px   rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .triage-card {
+  box-shadow:
+    0 0 0 1.5px rgba(59, 130, 246, 0.38),
+    0 8px 20px  rgba(59, 130, 246, 0.14),
+    0 28px 52px rgba(59, 130, 246, 0.22),
+    0 2px 4px   rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .triage-card:hover {
+  box-shadow:
+    0 0 0 1.5px rgba(59, 130, 246, 0.50),
+    0 8px 24px  rgba(59, 130, 246, 0.20),
+    0 32px 60px rgba(59, 130, 246, 0.28),
+    0 4px 8px   rgba(0, 0, 0, 0.45);
+}
+
+/* ── Logo Ω glow ── */
+.logo-omega {
+  text-shadow: 0 0 18px rgba(37, 99, 235, 0.45), 0 0 40px rgba(37, 99, 235, 0.2);
+}
+
+[data-theme="dark"] .logo-omega {
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.65), 0 0 50px rgba(59, 130, 246, 0.35), 0 0 80px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Emergency 166 glow ── */
+.emergency-number {
+  text-shadow: 0 0 16px rgba(220, 38, 38, 0.45), 0 0 32px rgba(220, 38, 38, 0.2);
+}
+
+[data-theme="dark"] .emergency-number {
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.65), 0 0 40px rgba(239, 68, 68, 0.35), 0 0 70px rgba(239, 68, 68, 0.15);
+}
+
+/* ── Floating theme toggle ── */
+.theme-toggle-btn {
+  transition: box-shadow 300ms ease, border-color 300ms ease, background-color 150ms ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0,0,0,0.04);
+}
+
+.theme-toggle-btn:hover {
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.2), 0 0 0 1px rgba(37, 99, 235, 0.3);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+[data-theme="dark"] .theme-toggle-btn {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+[data-theme="dark"] .theme-toggle-btn:hover {
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* ── Scroll-snap sections ── */
+.snap-section {
+  scroll-snap-align: start;
+}
