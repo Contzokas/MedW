@@ -1,191 +1,90 @@
 # Component Inventory — Frontend
 
-> Generated: 2026-04-18 | Part: `frontend` | Framework: Next.js 16 / React 19
-
----
-
-## Overview
-
-8 React components across 2 routes. All components use Tailwind CSS v4. UI language is Greek throughout.
-
----
-
-## Shared Components (`app/components/`)
-
-### `TriageForm`
-
-**File:** `app/components/TriageForm.tsx`
-**Type:** Client component (`"use client"`)
-
-Patient-facing symptom input form. Manages local form state and submits to the triage API.
-
-| Prop | Type | Description |
-|---|---|---|
-| `onResult` | `(result: TriageResponse) => void` | Callback when triage result is received |
-
-**Behaviour:**
-- Renders a `<textarea>` for Greek symptom input
-- Generates `patient_id` via `crypto.randomUUID()` on submit
-- Calls `submitTriage(symptoms, patientId)` from `lib/api.ts`
-- Shows Greek error message on failure
-- Disables input and button during loading
-- Passes result up to parent via `onResult` callback
-
-**State:**
-- `symptoms: string`
-- `isLoading: boolean`
-- `error: string | null`
-
----
-
-### `TriageResult`
-
-**File:** `app/components/TriageResult.tsx`
-**Type:** Server component (no client hooks)
-
-Displays the triage result after a successful submission.
-
-| Prop | Type | Description |
-|---|---|---|
-| `result` | `TriageResponse` | Full triage response from the API |
-
-**Renders:**
-1. `<Disclaimer />` — always shown first
-2. MTS level badge (color-coded circle, 1–5)
-3. MTS label text (Greek)
-4. Recommended specialty (Greek name)
-5. `<DoctorCard />` with doctor info and redirect link
-6. Reasoning text (Greek, from LLM)
-
-**MTS color mapping:**
-
-| Level | Class |
-|---|---|
-| 1–2 | `bg-red-600 text-white` |
-| 3 | `bg-orange-500 text-white` |
-| 4–5 | `bg-green-600 text-white` |
-
----
-
-### `DoctorCard`
-
-**File:** `app/components/DoctorCard.tsx`
-**Type:** Server component
-
-Displays a matched doctor's details and a link to finddoctors.gov.gr.
-
-| Prop | Type | Description |
-|---|---|---|
-| `doctor` | `Doctor` | Doctor data (name, specialty, availability, fallback_note) |
-| `redirectUrl` | `string` | URL to finddoctors.gov.gr search for this doctor/specialty |
-
-**Renders:**
-- Doctor name and specialty
-- `fallback_note` (amber warning text) if non-null (GP fallback used)
-- External link to `finddoctors.gov.gr` (opens in new tab, `rel="noopener noreferrer"`)
-
----
-
-### `Disclaimer`
-
-**File:** `app/components/Disclaimer.tsx`
-**Type:** Server component (no props)
-
-Medical disclaimer shown on every triage result. ARIA-labelled for accessibility.
-
-**Content:** Greek text noting MEDΩ is an AI tool, not a clinical diagnosis; directs to ΕΚΑΒ 166 for emergencies.
-
----
-
-## Dashboard Components (`app/dashboard/components/`)
-
-### `TriageQueue`
-
-**File:** `app/dashboard/components/TriageQueue.tsx`
-**Type:** Client component (`"use client"`)
-
-Real-time triage queue table for the nurse dashboard. Consumes the SSE stream.
-
-**No props.**
-
-**Behaviour:**
-- Calls `useTriageStream()` hook — connects to `GET /api/v1/triage/queue` SSE endpoint
-- Renders a `<table>` with columns: Time, Patient ID, MTS Level, Specialty
-- Shows empty-state message when queue is empty
-- New entries prepend to the top (newest first)
-
----
-
-### `TriageQueueItem`
-
-**File:** `app/dashboard/components/TriageQueueItem.tsx`
-**Type:** Server component
-
-A single row in the triage queue table.
-
-| Prop | Type | Description |
-|---|---|---|
-| `entry` | `QueueEntry` | Queue entry data |
-
-**Renders:**
-- Local time (`toLocaleTimeString("el-GR")`)
-- Truncated patient ID (first 8 chars + `...`)
-- MTS level badge (Greek label, same color coding as `TriageResult`)
-- Specialty (Greek)
-- Row background: `bg-red-50` for MTS ≤ 2, `bg-white` otherwise
-
-**MTS Greek labels:**
-
-| Level | Greek Label |
-|---|---|
-| 1 | Άμεση Αντιμετώπιση |
-| 2 | Πολύ Επείγον |
-| 3 | Επείγον |
-| 4 | Λιγότερο Επείγον |
-| 5 | Μη Επείγον |
+> Generated: 2026-04-26 | Scan: Exhaustive
 
 ---
 
 ## Pages
 
-### `app/page.tsx` — Patient Triage Page (`/`)
-
-**Type:** Client component (`"use client"`)
-
-Root patient interface. Manages state toggle between form and result.
-
-**State:** `result: TriageResponse | null`
-
-**Conditional render:**
-- `result === null` → `<TriageForm onResult={setResult} />`
-- `result !== null` → `<TriageResult result={result} />`
-
-**Persistent UI:**
-- Clickable `MEDΩ` heading resets `result` to `null` (back to form)
-- Emergency banner: `166` (ΕΚΑΒ) always visible at bottom
+| Component | File | Route | Purpose |
+|---|---|---|---|
+| `Home` | `app/page.tsx` | `/` | Patient triage: hero, form, result, team |
+| `Dashboard` | `app/dashboard/page.tsx` | `/dashboard` | Nurse dashboard: real-time queue |
 
 ---
 
-### `app/dashboard/page.tsx` — Nurse Dashboard (`/dashboard`)
+## UI Components
 
-**Type:** Server component
+### Patient-Facing
 
-Simple layout wrapper for the nurse dashboard.
+| Component | File | Props | Description |
+|---|---|---|---|
+| `TriageForm` | `components/TriageForm.tsx` | `onResult: (TriageResponse) => void` | Symptom textarea + submit. Generates UUID patient_id. |
+| `TriageResult` | `components/TriageResult.tsx` | `result: TriageResponse` | MTS level (color-coded), specialty, reasoning, DoctorCard. |
+| `DoctorCard` | `components/DoctorCard.tsx` | `doctor: Doctor`, `redirectUrl: string` | Doctor info + finddoctors.gov.gr link. |
+| `Disclaimer` | `components/Disclaimer.tsx` | — | Medical disclaimer banner. |
+| `TeamSection` | `components/TeamSection.tsx` | — | Project info + team wall, social links, tech badges. |
 
-**Renders:** `<h1>` + `<TriageQueue />`
+### Global
+
+| Component | File | Description |
+|---|---|---|
+| `EmergencyBar` | `components/EmergencyBar.tsx` | Fixed bottom bar, 166 emergency number. |
+| `ThemeToggle` | `components/ThemeToggle.tsx` | Dark/light toggle (moon/sun). |
+| `LangToggle` | `components/LangToggle.tsx` | EN/EL switcher. |
+
+### Dashboard
+
+| Component | File | Props | Description |
+|---|---|---|---|
+| `TriageQueue` | `dashboard/components/TriageQueue.tsx` | — | Real-time queue table via useTriageStream. |
+| `TriageQueueItem` | `dashboard/components/TriageQueueItem.tsx` | `entry: QueueEntry` | Row with MTS badge, Greek locale time. |
 
 ---
 
-## Lib (not components)
+## Contexts & Hooks
 
-### `lib/api.ts`
+| Name | File | Purpose |
+|---|---|---|
+| `LangProvider` / `useLang` | `lib/lang-context.tsx` | EN/EL language state, translation accessor |
+| `ThemeProvider` / `useTheme` | `lib/theme-context.tsx` | Dark/light theme, localStorage persistence |
+| `useTriageStream` | `lib/useTriageStream.ts` | EventSource SSE hook with deduplication |
 
-`submitTriage(symptoms, patientId)` — fetch wrapper for `POST /api/v1/triage`.
+---
 
-### `lib/types.ts`
+## API & Utilities
 
-TypeScript interfaces mirroring backend Pydantic schemas: `TriageRequest`, `TriageResponse`, `Doctor`, `QueueEntry`.
+| Module | File | Purpose |
+|---|---|---|
+| `api` | `lib/api.ts` | `submitTriage()` — POST /api/v1/triage |
+| `backendResolver` | `lib/backendResolver.ts` | Dynamic backend URL with 2min cache |
+| `types` | `lib/types.ts` | TriageRequest, Doctor, TriageResponse, QueueEntry |
+| `translations` | `lib/translations.ts` | Full EN/EL translations object |
+| `casing` | `lib/casing.ts` | `toCaps()` — Greek-aware uppercase |
 
-### `lib/useTriageStream.ts`
+---
 
-`useTriageStream(): QueueEntry[]` — custom React hook. Manages `EventSource` lifecycle, validates incoming JSON with type guard, deduplicates entries.
+## API Routes (Server-Side)
+
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/config` | GET | `{ backendUrl }` from env |
+| `/api/proxy/[...path]` | ALL | Backend proxy with header forwarding |
+
+---
+
+## Component Tree
+
+```
+RootLayout
+├── ThemeProvider → LangProvider
+│   ├── Home (/)
+│   │   ├── Hero + TriageForm → submitTriage()
+│   │   ├── TriageResult → DoctorCard
+│   │   ├── Disclaimer
+│   │   └── TeamSection
+│   ├── Dashboard (/dashboard)
+│   │   └── TriageQueue → TriageQueueItem[]
+│   ├── EmergencyBar (fixed bottom)
+│   └── ThemeToggle + LangToggle (fixed top-right)
+```

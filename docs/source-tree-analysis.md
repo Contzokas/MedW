@@ -1,142 +1,149 @@
-# Source Tree Analysis — MedW
+# Source Tree Analysis
 
-> Generated: 2026-04-18 | Scan: Exhaustive | Branch: dev
+> Generated: 2026-04-26 | Scan: Exhaustive | Branch: dev
 
 ---
 
-## Repository Structure
+## Annotated Directory Tree
 
 ```
 MedW/                                    # Project root
-│
-├── backend/                             # Part 1: FastAPI backend service
-│   ├── main.py                          # ← Entry point: FastAPI app, CORS, lifespan, router registration
-│   ├── requirements.txt                 # Python dependencies
+├── backend/                             # FastAPI REST + SSE API (Part: backend)
+│   ├── main.py                          # ENTRY POINT — FastAPI app, lifespan (seed, warmup)
+│   ├── requirements.txt                 # Python dependencies (FastAPI, LangChain, ChromaDB)
+│   ├── Dockerfile                       # Python 3.11-slim, uvicorn
+│   ├── .dockerignore                    # Exclude __pycache__, .venv, .env
 │   ├── pytest.ini                       # pytest config (asyncio_mode=auto)
-│   ├── Dockerfile                       # python:3.11-slim, uvicorn on :8000
-│   ├── .dockerignore
-│   │
 │   ├── app/
-│   │   ├── core/
-│   │   │   ├── config.py                # Env-driven config: OLLAMA_HOST, CHROMA_HOST, QUEUE_MAX_ENTRIES, etc.
-│   │   │   └── queue.py                 # In-memory async deque + asyncio.Event for SSE signalling
-│   │   │
-│   │   ├── routers/
-│   │   │   ├── health.py                # GET /api/v1/health
-│   │   │   ├── doctors.py               # GET /api/v1/doctors?specialty=
-│   │   │   └── triage.py                # POST /api/v1/triage + GET /api/v1/triage/queue (SSE)
-│   │   │
-│   │   ├── schemas/
-│   │   │   ├── doctor.py                # Doctor Pydantic model
-│   │   │   └── triage.py                # TriageRequest, TriageResponse, QueueEntry models
-│   │   │
-│   │   └── services/
-│   │       ├── triage_service.py        # Orchestration: RAG → LLM → doctor match → queue append
-│   │       ├── llm_service.py           # LangChain + ChatOllama: MTS classification, JSON parsing
-│   │       ├── rag_service.py           # ChromaDB client: corpus seeding + similarity retrieval
-│   │       └── doctor_service.py        # Static doctor dataset loader + specialty matching
-│   │
-│   ├── data/
-│   │   ├── doctors.json                 # Static fixture: 20 doctors across 15 Greek specialties
-│   │   └── corpus/
-│   │       ├── mts_guidelines.md        # Manchester Triage System reference (RAG source)
-│   │       └── specialty_reference.md   # Greek medical specialty reference (RAG source)
-│   │
-│   └── tests/
-│       ├── conftest.py                  # pytest asyncio setup
-│       ├── test_triage_router.py        # Router-level tests (httpx AsyncClient, mocked service)
-│       ├── test_sse_queue.py            # SSE queue and generator tests
-│       ├── test_triage_service.py       # Triage orchestration tests
-│       ├── test_rag_service.py          # RAG service tests
-│       └── test_doctor_service.py       # Doctor dataset and matching tests
+│   │   ├── core/                        # Core infrastructure
+│   │   │   ├── config.py                # Environment config (OLLAMA_*, CHROMA_*, QUEUE_*)
+│   │   │   └── queue.py                 # In-memory async queue for SSE streaming
+│   │   ├── routers/                     # HTTP API endpoints
+│   │   │   ├── health.py                # GET /api/v1/health, /api/v1/health/warmup
+│   │   │   ├── doctors.py               # GET /api/v1/doctors
+│   │   │   ├── triage.py                # POST /api/v1/triage, GET /api/v1/triage/queue (SSE)
+│   │   │   └── rag_debug.py             # /api/v1/rag/debug/* (11 endpoints, gated)
+│   │   ├── schemas/                     # Pydantic data models
+│   │   │   ├── triage.py                # TriageRequest, TriageResponse, QueueEntry
+│   │   │   └── doctor.py                # Doctor model
+│   │   └── services/                    # Business logic layer
+│   │       ├── triage_service.py        # Orchestration: RAG → LLM → doctor match → queue
+│   │       ├── llm_service.py           # Ollama LLM classification (LangChain)
+│   │       ├── rag_service.py           # ChromaDB RAG retrieval (TOP_K=3)
+│   │       ├── rag_debug.py             # Pipeline debugging & introspection
+│   │       └── doctor_service.py        # Doctor data loading, specialty matching, GP fallback
+│   ├── data/                            # Static data assets
+│   │   ├── doctors.json                 # 21 doctors, 12 specialties
+│   │   └── corpus/                      # RAG knowledge base
+│   │       ├── mts_guidelines.md        # Manchester Triage System clinical guidelines
+│   │       └── specialty_reference.md   # Symptom-to-specialty mapping (14 specialties)
+│   └── tests/                           # pytest test suite
+│       ├── conftest.py                  # Test configuration
+│       ├── test_triage_router.py        # API contract tests
+│       ├── test_triage_service.py       # Orchestration + fallback tests
+│       ├── test_rag_service.py          # RAG retrieval tests
+│       ├── test_rag_debug.py            # Debug pipeline tests
+│       ├── test_doctor_service.py       # Doctor matching tests
+│       └── test_sse_queue.py            # SSE streaming queue tests
 │
-├── frontend/                            # Part 2: Next.js frontend
-│   ├── next.config.ts                   # Next.js config
-│   ├── tsconfig.json                    # TypeScript config
-│   ├── package.json                     # Dependencies: Next.js 16.2.4, React 19.2.4, Tailwind v4
-│   ├── postcss.config.mjs               # Tailwind CSS PostCSS config
-│   ├── eslint.config.mjs                # ESLint config
-│   ├── Dockerfile                       # node:20-alpine, npm ci, next build, next start :3000
-│   ├── .dockerignore
-│   ├── .env.local                       # NEXT_PUBLIC_API_URL (local dev override)
-│   │
-│   ├── app/                             # Next.js App Router root
-│   │   ├── layout.tsx                   # Root layout: Geist fonts, Greek lang, metadata
-│   │   ├── page.tsx                     # ← Patient triage page (MedΩ home): TriageForm → TriageResult
-│   │   ├── globals.css                  # Tailwind base + global styles
-│   │   │
-│   │   ├── components/                  # Shared UI components
-│   │   │   ├── TriageForm.tsx           # Symptom textarea + submit → calls POST /api/v1/triage
-│   │   │   ├── TriageResult.tsx         # MTS badge + specialty + DoctorCard + reasoning
-│   │   │   ├── DoctorCard.tsx           # Doctor info + finddoctors.gov.gr redirect link
-│   │   │   └── Disclaimer.tsx           # Medical disclaimer (EKAB/166 emergency notice)
-│   │   │
-│   │   ├── dashboard/                   # Nurse dashboard route
-│   │   │   ├── page.tsx                 # ← Nurse dashboard entry point
-│   │   │   └── components/
-│   │   │       ├── TriageQueue.tsx       # Table consuming SSE stream via useTriageStream hook
-│   │   │       └── TriageQueueItem.tsx   # Table row: time, patient ID, MTS badge, specialty
-│   │   │
-│   │   └── lib/
-│   │       ├── api.ts                   # submitTriage() → POST /api/v1/triage
-│   │       ├── types.ts                 # TypeScript interfaces: Doctor, TriageRequest/Response, QueueEntry
-│   │       └── useTriageStream.ts       # useTriageStream() hook: EventSource → GET /api/v1/triage/queue
-│   │
-│   └── public/                          # Static assets (Next.js SVG icons)
+├── frontend/                            # Next.js 16 UI (Part: frontend)
+│   ├── package.json                     # Dependencies: next 16.2.4, react 19.2.4
+│   ├── next.config.ts                   # Standalone output, no rewrites (proxy via API route)
+│   ├── tsconfig.json                    # TypeScript 5, ES2017 target, @/* path alias
+│   ├── postcss.config.mjs               # Tailwind CSS v4 PostCSS plugin
+│   ├── eslint.config.mjs                # ESLint 9 + Next.js config
+│   ├── Dockerfile                       # Multi-stage: node:20-alpine build + standalone runner
+│   ├── .dockerignore                    # Exclude node_modules, .next, .env
+│   ├── CLAUDE.md                        # AI coding instructions
+│   ├── AGENTS.md                        # Multi-agent instructions
+│   ├── app/
+│   │   ├── layout.tsx                   # ROOT LAYOUT — ThemeProvider → LangProvider → children
+│   │   ├── page.tsx                     # ENTRY POINT (/) — Hero + TriageForm + TriageResult
+│   │   ├── globals.css                  # Tailwind v4, CSS custom properties, dark/light theme
+│   │   ├── components/                  # UI components
+│   │   │   ├── TriageForm.tsx           # Symptom textarea, submitTriage API call
+│   │   │   ├── TriageResult.tsx         # MTS result, DoctorCard, reasoning display
+│   │   │   ├── DoctorCard.tsx           # Doctor info card with finddoctors.gov.gr link
+│   │   │   ├── Disclaimer.tsx           # Medical disclaimer banner
+│   │   │   ├── EmergencyBar.tsx         # Fixed bottom bar with 166 emergency number
+│   │   │   ├── TeamSection.tsx          # Team members, social links, tech badges
+│   │   │   ├── ThemeToggle.tsx          # Dark/light mode toggle (moon/sun icon)
+│   │   │   └── LangToggle.tsx           # EN/EL language switcher
+│   │   ├── lib/                         # Utilities and shared code
+│   │   │   ├── api.ts                   # submitTriage() — POST to /api/v1/triage
+│   │   │   ├── backendResolver.ts       # Dynamic backend URL with caching + fallback
+│   │   │   ├── types.ts                 # TriageRequest, Doctor, TriageResponse, QueueEntry
+│   │   │   ├── translations.ts          # Full EN/EL translations object
+│   │   │   ├── lang-context.tsx         # LangProvider + useLang hook
+│   │   │   ├── theme-context.tsx        # ThemeProvider + useTheme hook (localStorage)
+│   │   │   ├── casing.ts                # toCaps() — Greek-aware uppercase conversion
+│   │   │   └── useTriageStream.ts       # useTriageStream() — EventSource SSE hook
+│   │   ├── api/                         # Next.js API routes (server-side)
+│   │   │   ├── config/route.ts          # GET /api/config → { backendUrl }
+│   │   │   └── proxy/[...path]/route.ts # Backend proxy (all HTTP methods)
+│   │   └── dashboard/                   # Nurse dashboard route
+│   │       ├── page.tsx                 # Dashboard page (/dashboard)
+│   │       └── components/
+│   │           ├── TriageQueue.tsx      # Real-time queue table (useTriageStream)
+│   │           └── TriageQueueItem.tsx  # Single queue row with MTS badge
+│   └── README.md                        # Frontend-specific docs
 │
-├── docker/
-│   └── ollama-entrypoint.sh             # Pulls OLLAMA_MODEL on first run, then serves
+├── docker/                              # AI pipeline infrastructure
+│   └── ollama-entrypoint.sh             # Ollama startup: serve → pull model → verify
 │
-├── docker-compose.yml                   # 4-service stack: ollama, chromadb, backend, frontend
+├── k8s/                                 # Kubernetes manifests (Run:ai cluster)
+│   ├── kustomization.yaml               # Kustomize entry: namespace, PVCs, deployments
+│   ├── namespace.yaml                   # runai-medo namespace
+│   ├── pvcs.yaml                        # ollama-pvc (20Gi), chroma-pvc (5Gi)
+│   ├── configmap-ollama-entrypoint.yaml # Entrypoint script as ConfigMap
+│   ├── ollama-deployment.yaml           # GPU: NVIDIA B200, runai-scheduler, 1×GPU
+│   ├── chromadb-deployment.yaml         # ChromaDB 1.5.7, ClusterIP
+│   ├── backend-deployment.yaml          # ghcr.io/contzokas/medw-backend:latest
+│   └── frontend-deployment.yaml         # ghcr.io/contzokas/medw-frontend:latest, NodePort
+│
+├── artifacts/                           # ML dataset artifacts
+│   └── symptom_combinations/            # Synthetic symptom dataset
+│       ├── builder_config.json          # Data Designer config
+│       ├── metadata.json                # 50 records, column statistics
+│       ├── finetune_data.jsonl          # Fine-tuning data (ChatML format)
+│       ├── test_results.json            # Baseline test results
+│       └── parquet-files/               # Parquet dataset files
+│
+├── _bmad/                               # BMAD methodology configuration
+├── _bmad-output/                        # BMAD planning/implementation artifacts
+├── docs/                                # Generated project documentation
+├── docker-compose.yml                   # 4-service orchestration
 ├── .env.example                         # Environment variable template
-│
-├── docs/                                # ← Project documentation (this directory)
-│   ├── index.md                         # Master navigation index
-│   ├── project-overview.md
-│   ├── source-tree-analysis.md          # (this file)
-│   ├── architecture-backend.md
-│   ├── architecture-frontend.md
-│   ├── architecture-ai-pipeline.md
-│   ├── api-contracts-backend.md
-│   ├── data-models-backend.md
-│   ├── component-inventory-frontend.md
-│   ├── development-guide.md
-│   ├── deployment-guide.md
-│   └── integration-architecture.md
-│
-└── _bmad-output/                        # BMAD planning and sprint artifacts
-    ├── planning-artifacts/              # PRD, architecture design, epics
-    └── implementation-artifacts/        # Per-story implementation guides and retros
+├── deploy.ps1                           # PowerShell: manual build/push/deploy to Run:ai
+├── prepare_finetune_data.py             # Convert symptom dataset to fine-tuning JSONL
+├── symptom_combinations.py              # Data Designer dataset generator config
+├── test_triage_baseline.py              # Baseline accuracy test against triage API
+├── requirements.txt                     # Root Python dependencies (artifacts scripts)
+└── README.md                            # Project README
 ```
 
 ---
 
-## Critical Directories
+## Critical Folders
 
-| Directory | Purpose |
-|---|---|
-| `backend/app/routers/` | HTTP endpoint handlers — thin layer, delegates to services |
-| `backend/app/services/` | All business logic: triage orchestration, LLM, RAG, doctor matching |
-| `backend/app/core/` | Shared infrastructure: config and the in-memory SSE queue |
-| `backend/app/schemas/` | Pydantic models — single source of truth for request/response shapes |
-| `backend/data/corpus/` | RAG knowledge base: MTS guidelines + Greek specialty reference |
-| `frontend/app/components/` | Patient-facing UI: triage form + results display |
-| `frontend/app/dashboard/` | Nurse-facing UI: real-time triage queue |
-| `frontend/app/lib/` | API client, shared TypeScript types, SSE hook |
+| Path | Purpose | Integration Points |
+|---|---|---|
+| `backend/app/services/` | Business logic (triage, LLM, RAG, doctors) | Called by routers, queues triage results |
+| `backend/app/routers/` | HTTP API endpoints | Called by frontend via proxy |
+| `backend/data/corpus/` | RAG knowledge base | Loaded by rag_service on startup |
+| `frontend/app/components/` | React UI components | Uses api.ts, types.ts, contexts |
+| `frontend/app/lib/` | Utilities, hooks, types | Shared across all components |
+| `frontend/app/dashboard/` | Nurse dashboard | Uses useTriageStream SSE hook |
+| `k8s/` | Kubernetes manifests | Deploy via `kubectl apply -k k8s/` |
+| `docker/` | Docker infrastructure | Entrypoint for Ollama model pull |
 
 ## Entry Points
 
-| Part | Entry Point | Binds to |
+| Entry Point | Type | Route/Command |
 |---|---|---|
-| Backend | `backend/main.py` | `0.0.0.0:8000` (uvicorn) |
-| Frontend | `frontend/app/page.tsx` | `/` — patient triage page |
-| Frontend | `frontend/app/dashboard/page.tsx` | `/dashboard` — nurse dashboard |
-
-## Integration Points (Cross-Part)
-
-| From | To | Protocol | Detail |
-|---|---|---|---|
-| Frontend `lib/api.ts` | Backend `POST /api/v1/triage` | REST/JSON | Symptom submission |
-| Frontend `lib/useTriageStream.ts` | Backend `GET /api/v1/triage/queue` | SSE | Real-time queue stream |
-| Backend `rag_service.py` | ChromaDB `:8000` | HTTP | Vector similarity search |
-| Backend `llm_service.py` | Ollama `:11434` | HTTP (LangChain) | LLM inference |
+| `backend/main.py` | FastAPI application | `uvicorn main:app --host 0.0.0.0 --port 8000` |
+| `frontend/app/layout.tsx` | Next.js root layout | `/` (all routes) |
+| `frontend/app/page.tsx` | Patient triage page | `/` |
+| `frontend/app/dashboard/page.tsx` | Nurse dashboard | `/dashboard` |
+| `docker-compose.yml` | Full stack | `docker compose up --build` |
+| `k8s/kustomization.yaml` | K8s deployment | `kubectl apply -k k8s/` |

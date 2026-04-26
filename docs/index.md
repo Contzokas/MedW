@@ -1,6 +1,6 @@
 # MedW Project Documentation Index
 
-> Generated: 2026-04-18 | Scan: Exhaustive | Branch: dev
+> Generated: 2026-04-26 | Scan: Exhaustive | Branch: dev
 
 This is the **primary AI context entry point** for the MedW project. Start here when beginning any AI-assisted development session.
 
@@ -9,7 +9,7 @@ This is the **primary AI context entry point** for the MedW project. Start here 
 ## Project Overview
 
 - **Type:** Multi-part application (3 parts)
-- **Domain:** Healthcare / Medical Triage
+- **Domain:** Healthcare / Medical Triage (Greek NHS — ΕΣΥ)
 - **Primary Language:** Python (backend) + TypeScript (frontend)
 - **Architecture:** FastAPI REST + SSE + Next.js + Ollama RAG pipeline
 
@@ -19,7 +19,7 @@ This is the **primary AI context entry point** for the MedW project. Start here 
 |---|---|---|---|
 | `backend` | FastAPI REST + SSE API | `backend/` | `:8000` |
 | `frontend` | Next.js 16 / TypeScript | `frontend/` | `:3000` |
-| `ai-pipeline` | Ollama (Mistral-7B) + ChromaDB | Docker services | internal |
+| `ai-pipeline` | Ollama (medgemma:27b) + ChromaDB | Docker services | internal |
 
 ---
 
@@ -27,16 +27,16 @@ This is the **primary AI context entry point** for the MedW project. Start here 
 
 ### Backend
 - **Entry point:** `backend/main.py`
-- **Tech:** Python 3.11, FastAPI, Pydantic, LangChain, ChromaDB, sentence-transformers
+- **Tech:** Python 3.11, FastAPI, Pydantic, LangChain 1.2.15, ChromaDB 1.5.7, sentence-transformers
 - **Test:** `cd backend && pytest`
 
 ### Frontend
 - **Entry points:** `frontend/app/page.tsx` (`/`) · `frontend/app/dashboard/page.tsx` (`/dashboard`)
-- **Tech:** TypeScript, Next.js 16.2.4, React 19.2.4, Tailwind CSS v4
+- **Tech:** TypeScript 5, Next.js 16.2.4, React 19.2.4, Tailwind CSS v4
 - **Dev:** `cd frontend && npm run dev`
 
 ### AI Pipeline
-- **LLM:** Mistral-7B via `http://ollama:11434` (LangChain `ChatOllama`)
+- **LLM:** medgemma:27b via `http://ollama:11434` (LangChain `ChatOllama`)
 - **RAG:** ChromaDB `clinical_context` collection, top-3 retrieval, `all-MiniLM-L6-v2` embeddings
 - **Corpus:** `backend/data/corpus/mts_guidelines.md` + `specialty_reference.md`
 
@@ -59,14 +59,14 @@ cp .env.example .env && docker compose up --build
 - [Integration Architecture](./integration-architecture.md) — Cross-part data flows, Docker networks, startup order, shared contracts
 
 ### Reference
-- [API Contracts — Backend](./api-contracts-backend.md) — All 4 endpoints with request/response schemas
-- [Data Models — Backend](./data-models-backend.md) — Pydantic schemas, TypeScript mirrors, doctor dataset
-- [Component Inventory — Frontend](./component-inventory-frontend.md) — All 8 React components with props and behaviour
+- [API Contracts — Backend](./api-contracts-backend.md) — All endpoints with request/response schemas
+- [Data Models — Backend](./data-models-backend.md) — Pydantic schemas, TypeScript mirrors, doctor dataset, RAG corpus
+- [Component Inventory — Frontend](./component-inventory-frontend.md) — All React components with props, hooks, contexts
 - [Source Tree Analysis](./source-tree-analysis.md) — Annotated directory tree, entry points, critical paths
 
 ### Guides
 - [Development Guide](./development-guide.md) — Local setup, running tests, common dev tasks
-- [Deployment Guide](./deployment-guide.md) — Docker Compose deployment, GPU setup, volume management
+- [Deployment Guide](./deployment-guide.md) — Docker Compose, Kubernetes/Run:ai, GPU setup, CI/CD
 
 ---
 
@@ -97,4 +97,4 @@ cp .env.example .env && docker compose up --build
 | Architecture design | `_bmad-output/planning-artifacts/architecture.md` | Original system design |
 | Epics | `_bmad-output/planning-artifacts/epics.md` | Epic breakdown |
 | Sprint status | `_bmad-output/implementation-artifacts/sprint-status.yaml` | Current sprint tracker |
-| Story guides | `_bmad-output/implementation-artifacts/` | Per-story implementation guides (1.1 – 4.2) |
+| Story guides | `_bmad-output/implementation-artifacts/` | Per-story implementation guides |

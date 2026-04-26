@@ -1,163 +1,149 @@
 # Integration Architecture — MedW
 
-> Generated: 2026-04-18 | Scan: Exhaustive
+> Generated: 2026-04-26 | Scan: Exhaustive
 
 ---
 
-## Overview
-
-MedW is a multi-part system with three logical parts:
-
-1. **backend** — FastAPI REST + SSE API (`backend/`)
-2. **frontend** — Next.js patient UI and nurse dashboard (`frontend/`)
-3. **ai-pipeline** — Ollama (Mistral-7B) + ChromaDB RAG (Docker services)
-
-All four Docker services communicate over two isolated Docker networks.
-
----
-
-## Network Topology
+## Data Flow Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  medw-external network                                    │
-│                                                           │
-│   ┌─────────────────┐       ┌─────────────────────────┐  │
-│   │    frontend      │       │        backend           │  │
-│   │  Next.js :3000  │──────►│   FastAPI :8000          │  │
-│   │  (host-exposed) │  HTTP │   (host-exposed)         │  │
-│   └─────────────────┘  SSE  └────────────┬────────────┘  │
-│                                           │               │
-└───────────────────────────────────────────┼───────────────┘
-                                            │
-┌───────────────────────────────────────────┼───────────────┐
-│  medw-internal network                    │               │
-│                                           ▼               │
-│   ┌─────────────────┐       ┌─────────────────────────┐  │
-│   │    ollama        │       │       chromadb           │  │
-│   │  Mistral-7B     │◄──────│  Vector store :8000      │  │
-│   │  :11434         │       │  (NOT host-exposed)      │  │
-│   │  (NOT exposed)  │       └─────────────────────────┘  │
-│   └─────────────────┘                                     │
-└───────────────────────────────────────────────────────────┘
+┌──────────┐     HTTP/Proxy      ┌──────────┐     HTTP      ┌──────────┐
+│ Frontend │ ──────────────────► │ Backend  │ ───────────► │ ChromaDB │
+│ (Next.js)│                     │ (FastAPI)│              │  (RAG)   │
+│  :3000   │ ◄────────────────── │  :8000   │              │  :8000   │
+│          │   JSON response      │          │              └──────────┘
+│          │                      │          │     HTTP
+│          │                      │          │ ───────────► ┌──────────┐
+│          │ ◄──── SSE stream ────│          │              │ Ollama   │
+│          │   (EventSource)      │          │ ◄─────────── │ (LLM)    │
+└──────────┘                      └──────────┘   LLM        │  :11434  │
+     ▲                                  ▲        response   └──────────┘
+     │                                  │
+     │          SSE (/api/v1/triage/queue)
+     └──────────────────────────────────┘
 ```
 
 ---
 
 ## Integration Points
 
-### 1. Frontend → Backend (REST)
+### 1. Frontend → Backend (API Proxy)
 
-| Field | Value |
+| Property | Value |
 |---|---|
-| From | `frontend/app/lib/api.ts` — `submitTriage()` |
-| To | `backend` — `POST /api/v1/triage` |
-| Protocol | HTTP/REST, JSON |
-| Auth | None (open, demo scope) |
-| Request | `{ symptoms: string, patient_id: string }` |
-| Response | `TriageResponse` — see [data-models-backend.md](./data-models-backend.md) |
-| Error handling | Frontend catches non-2xx and shows Greek error message |
-| Config | `NEXT_PUBLIC_API_URL` env var (default: `http://localhost:8000`) |
+| **From** | Frontend (`/api/proxy/[...path]`) |
+| **To** | Backend (`http://backend:8000`) |
+| **Protocol** | HTTP (all methods: GET, POST, PUT, DELETE, PATCH) |
+| **Discovery** | Runtime via `BACKEND_URL` env var + `/api/config` endpoint |
+| **Timeout** | 5 seconds (307 redirect fallback) |
+| **Auth** | None (internal network) |
 
-### 2. Frontend → Backend (SSE)
+**Endpoints called:**
+- `POST /api/v1/triage` — symptom submission
+- `GET /api/v1/doctors` — doctor listing
+- `GET /api/v1/health` — health check
 
-| Field | Value |
+### 2. Backend → ChromaDB (RAG Retrieval)
+
+| Property | Value |
 |---|---|
-| From | `frontend/app/lib/useTriageStream.ts` — `useTriageStream()` |
-| To | `backend` — `GET /api/v1/triage/queue` |
-| Protocol | Server-Sent Events (`text/event-stream`) |
-| Auth | None |
-| Event name | `triage_update` |
-| Data | `QueueEntry` JSON — `{ patient_id, mts_level, specialty, timestamp }` |
-| Keepalive | Backend emits `: ping\n\n` every 15 s of inactivity |
-| Reconnect | Browser EventSource handles automatic reconnect |
-| Headers sent | `Cache-Control: no-cache`, `Connection: keep-alive`, `X-Accel-Buffering: no` |
+| **From** | Backend `rag_service` |
+| **To** | ChromaDB (`http://chromadb:8000`) |
+| **Protocol** | ChromaDB HTTP API |
+| **Connection** | Lazy singleton, persistent |
+| **Error handling** | Fallback: proceed without RAG context |
 
-### 3. Backend → ChromaDB (RAG retrieval)
+**Operations:**
+- Collection check/create on startup
+- Seed corpus documents with embeddings (idempotent)
+- Similarity search: `query(query_texts, n_results=3)`
 
-| Field | Value |
+### 3. Backend → Ollama (LLM Inference)
+
+| Property | Value |
 |---|---|
-| From | `backend/app/services/rag_service.py` |
-| To | `chromadb` service — `http://chromadb:8000` |
-| Protocol | HTTP (ChromaDB Python client `chromadb.HttpClient`) |
-| Collection | `clinical_context` |
-| Embedding model | `all-MiniLM-L6-v2` (sentence-transformers, runs inside backend) |
-| Query | Top-3 similarity results for patient symptom string |
-| Startup | `seed_corpus_if_empty()` — seeds corpus from `data/corpus/*.md` on first boot |
-| Failure mode | `RAGUnavailableError` → triage service falls back to LLM base knowledge |
+| **From** | Backend `llm_service` (via LangChain) |
+| **To** | Ollama (`http://ollama:11434`) |
+| **Protocol** | Ollama REST API (via LangChain `ChatOllama`) |
+| **Connection** | Lazy singleton chain |
+| **Timeout** | `OLLAMA_TIMEOUT` (30s Docker, 120s K8s) |
+| **Error handling** | Fallback: safe default (MTS 3, GP) |
 
-### 4. Backend → Ollama (LLM inference)
+**Operations:**
+- Warmup on startup (configurable retries)
+- `chain.invoke()` for triage classification
 
-| Field | Value |
+### 4. Backend → Frontend (SSE Stream)
+
+| Property | Value |
 |---|---|
-| From | `backend/app/services/llm_service.py` |
-| To | `ollama` service — `http://ollama:11434` |
-| Protocol | HTTP (LangChain `ChatOllama`) |
-| Model | `mistral:7b` (default, configurable via `OLLAMA_MODEL`) |
-| Timeout | `OLLAMA_TIMEOUT` seconds (default: 30 s) |
-| Prompt | System: MTS instructions; Human: clinical context + Greek symptoms |
-| Response | JSON object: `{ mts_level, mts_label, specialty, reasoning }` |
-| Failure mode | `LLMParseError` → triage service returns `_SAFE_DEFAULT` response |
-
----
-
-## Triage Pipeline — End-to-End Data Flow
-
-```
-Patient (browser)
-  │  POST /api/v1/triage  { symptoms, patient_id }
-  ▼
-backend/routers/triage.py — perform_triage()
-  │
-  ├─► rag_service.retrieve_context(symptoms)
-  │       └─► chromadb.query(symptoms, top_k=3)  →  clinical context string
-  │
-  ├─► llm_service.classify(symptoms, context)
-  │       └─► Ollama/Mistral-7B (LangChain chain)  →  { mts_level, mts_label, specialty, reasoning }
-  │
-  ├─► doctor_service.get_match(specialty)
-  │       └─► doctors.json index  →  Doctor object
-  │
-  ├─► Build TriageResponse (+ redirect_url to finddoctors.gov.gr)
-  │
-  ├─► queue.append_entry(QueueEntry)  →  asyncio.Event.set()
-  │
-  └─► Return TriageResponse  →  Patient browser
-                                   │
-                                   │  SSE GET /api/v1/triage/queue
-                                   ▼
-                              Nurse browser (dashboard)
-                              useTriageStream() hook
-                              EventSource receives triage_update event
-                              Table row added in real time
-```
-
----
-
-## Startup / Dependency Order
-
-Docker Compose enforces startup ordering:
-
-```
-ollama (healthcheck: model loaded)
-  └─► chromadb (depends_on: ollama healthy)
-        └─► backend (depends_on: chromadb started)
-              └─► frontend (depends_on: backend healthy)
-```
-
-Backend lifespan on startup:
-1. `seed_corpus_if_empty()` — populates ChromaDB collection from `data/corpus/*.md`
-2. `doctor_service.load_doctors()` — loads and indexes `data/doctors.json`
+| **From** | Backend `/api/v1/triage/queue` |
+| **To** | Frontend `useTriageStream` hook |
+| **Protocol** | Server-Sent Events (EventSource) |
+| **Format** | `data: {json}\n\n` + `: ping\n\n` every 15s |
+| **Connection** | Persistent, auto-reconnect on disconnect |
 
 ---
 
 ## Shared Data Contracts
 
-Schemas are defined once in the backend (Pydantic) and mirrored as TypeScript interfaces in the frontend. They are kept manually in sync.
+### TriageResponse (Backend → Frontend)
 
-| Backend (Pydantic) | Frontend (TypeScript) | File |
+```typescript
+{
+  mts_level: number,      // 1-5
+  mts_label: string,      // "Immediate" | "Very Urgent" | "Urgent" | "Less Urgent" | "Non-urgent"
+  specialty: string,      // Greek or English
+  reasoning: string,
+  doctor: Doctor,
+  redirect_url: string,
+  rag_used: boolean
+}
+```
+
+### QueueEntry (Backend → Frontend via SSE)
+
+```typescript
+{
+  patient_id: string,
+  mts_level: number,
+  specialty: string,
+  timestamp: string        // ISO 8601
+}
+```
+
+---
+
+## Startup Order
+
+### Docker Compose
+
+```
+ollama (healthcheck: model loaded)
+  └──► chromadb (depends: ollama healthy)
+        └──► backend (depends: chromadb started)
+              └──► frontend (depends: backend healthy)
+```
+
+### Kubernetes
+
+```
+namespace + PVCs + ConfigMap (parallel)
+  └──► ollama (readiness: model in ollama list)
+        └──► chromadb (readiness: /api/v1/heartbeat)
+              └──► backend (readiness: /api/v1/health)
+                    └──► frontend (readiness: /)
+```
+
+---
+
+## Environment Variable Flow
+
+| Variable | Set On | Read By |
 |---|---|---|
-| `TriageRequest` | `TriageRequest` | `schemas/triage.py` / `lib/types.ts` |
-| `TriageResponse` | `TriageResponse` | `schemas/triage.py` / `lib/types.ts` |
-| `QueueEntry` | `QueueEntry` | `schemas/triage.py` / `lib/types.ts` |
-| `Doctor` | `Doctor` | `schemas/doctor.py` / `lib/types.ts` |
+| `BACKEND_URL` | docker-compose (frontend) | frontend proxy route |
+| `OLLAMA_HOST` | docker-compose (backend) | backend rag_service, llm_service |
+| `OLLAMA_MODEL` | docker-compose (ollama, backend) | ollama entrypoint, backend llm_service |
+| `CHROMA_HOST` | docker-compose (backend) | backend rag_service |
+| `CHROMA_PORT` | docker-compose (backend) | backend rag_service |
+| `RAG_DEBUG_ENABLED` | backend env | backend rag_debug router |

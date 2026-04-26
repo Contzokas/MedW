@@ -1,201 +1,88 @@
 # Architecture — Frontend (Next.js)
 
-> Generated: 2026-04-18 | Part: `frontend` | Language: TypeScript | Framework: Next.js 16.2.4
+> Generated: 2026-04-26 | Part: `frontend` | Framework: Next.js 16.2.4 / React 19.2.4
 
 ---
 
 ## Executive Summary
 
-The MedW frontend is a Next.js 16 / React 19 application serving two distinct user-facing surfaces: a patient triage form (`/`) and a nurse real-time dashboard (`/dashboard`). The patient flow is a single-page interaction — symptom input → API call → results display. The nurse dashboard consumes a live SSE stream from the backend, updating a triage queue table in real time without polling. Styling uses Tailwind CSS v4. The codebase is Greek-language UI throughout.
-
----
-
-## Technology Stack
-
-| Category | Technology | Version |
-|---|---|---|
-| Language | TypeScript | 5.x |
-| Framework | Next.js | 16.2.4 |
-| UI Library | React | 19.2.4 |
-| Styling | Tailwind CSS | 4.x |
-| CSS processing | PostCSS | — |
-| Fonts | Geist Sans + Geist Mono (next/font/google) | — |
-| Linting | ESLint + eslint-config-next | 16.2.4 |
-| Containerization | Docker (node:20-alpine) | — |
+Patient-facing Next.js 16 application with two routes: a triage page (`/`) where patients submit symptoms and receive AI-powered MTS classification, and a nurse dashboard (`/dashboard`) displaying real-time triage queue updates via Server-Sent Events. Features bilingual support (EN/EL), dark/light theme, and a runtime-configurable backend proxy.
 
 ---
 
 ## Architecture Pattern
 
-**Next.js App Router** with a clear separation of:
-- **Server components** — route pages (layout, top-level pages)
-- **Client components** — interactive UI (`"use client"` directive)
-- **Shared lib** — API client, types, custom hooks
+**Next.js App Router** with component-based architecture.
 
-```
-app/
-├── layout.tsx          (Server component — root shell, fonts, metadata)
-├── page.tsx            (Client component — patient triage page)
-├── components/         (Client components — shared UI)
-├── dashboard/
-│   ├── page.tsx        (Server component — nurse dashboard entry)
-│   └── components/     (Client components — queue table)
-└── lib/
-    ├── api.ts          (API client — fetch wrapper)
-    ├── types.ts        (TypeScript interfaces — shared contracts)
-    └── useTriageStream.ts  (Custom hook — SSE consumer)
-```
-
----
-
-## Routes
-
-| Route | Component | Description |
-|---|---|---|
-| `/` | `app/page.tsx` | Patient-facing triage form. Conditionally renders `TriageForm` or `TriageResult`. |
-| `/dashboard` | `app/dashboard/page.tsx` | Nurse-facing live triage queue dashboard. |
+- **Routing:** File-based routing via `app/` directory
+- **State Management:** React Context (Theme, Language) — no Redux/Zustand
+- **Data Fetching:** Client-side API calls via `fetch()` wrapper
+- **Real-time:** EventSource (SSE) custom hook
+- **Styling:** Tailwind CSS v4 with CSS custom properties for theming
+- **i18n:** In-file translations object (not a framework)
 
 ---
 
 ## Component Architecture
 
-### Patient Triage Flow (`/`)
+### Provider Composition
 
 ```
-page.tsx  (state: result | null)
-  ├── result === null  →  <TriageForm onResult={setResult} />
-  └── result !== null →  <TriageResult result={result} />
-                              ├── <Disclaimer />
-                              └── <DoctorCard doctor={...} redirectUrl={...} />
+layout.tsx
+└── ThemeProvider (localStorage, system preference detection)
+    └── LangProvider (EN/EL toggle state)
+        └── {children}
 ```
 
-State management is local React `useState` — no global store needed.
+### Client-Side Hooks
 
-### Nurse Dashboard (`/dashboard`)
-
-```
-dashboard/page.tsx
-  └── <TriageQueue />          (consumes useTriageStream hook)
-        └── entries.map()
-              └── <TriageQueueItem entry={entry} />
-```
-
-The `useTriageStream()` hook manages the `EventSource` lifecycle and deduplicates incoming entries by `(patient_id, timestamp, mts_level, specialty)` composite key.
-
----
-
-## Data Flow
-
-### Patient Triage Submission
-
-```
-TriageForm
-  │  onSubmit: crypto.randomUUID() → patient_id
-  │  submitTriage(symptoms, patientId)
-  │    └── fetch POST /api/v1/triage  { symptoms, patient_id }
-  │
-  └── TriageResult receives TriageResponse
-        ├── MTS level badge (color-coded 1–5)
-        ├── Recommended specialty
-        ├── DoctorCard (name, specialty, fallback note, finddoctors.gov.gr link)
-        └── Reasoning text (Greek, from LLM)
-```
-
-### Real-Time Nurse Dashboard
-
-```
-useTriageStream()
-  └── EventSource GET /api/v1/triage/queue
-        │  event: triage_update
-        │  data: { patient_id, mts_level, specialty, timestamp }
-        │
-        └── setEntries(prev => [newEntry, ...prev])   (prepend, deduplicate)
-
-TriageQueue renders entries as table rows
-TriageQueueItem displays:
-  - Local time (toLocaleTimeString("el-GR"))
-  - Patient ID (first 8 chars of UUID)
-  - MTS level badge (color-coded)
-  - Specialty (Greek name)
-  - Row background: red-50 for MTS ≤2, white otherwise
-```
-
----
-
-## State Management
-
-The frontend uses **local React state only** — no Redux, Zustand, or Context API.
-
-| State | Location | Type |
+| Hook | Purpose | Implementation |
 |---|---|---|
-| Triage result | `app/page.tsx` | `TriageResponse \| null` |
-| Form input | `TriageForm.tsx` | `string` |
-| Loading state | `TriageForm.tsx` | `boolean` |
-| Error message | `TriageForm.tsx` | `string \| null` |
-| Queue entries | `useTriageStream.ts` | `QueueEntry[]` |
+| `useLang()` | Access current language and translation strings | React Context + translations object |
+| `useTheme()` | Access theme state | React Context + localStorage + `data-theme` attribute |
+| `useTriageStream()` | Real-time queue updates | EventSource to `/api/proxy/api/v1/triage/queue` |
 
 ---
 
-## API Client (`lib/api.ts`)
+## Backend Communication
 
-```typescript
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:8000"
+### API Client
 
-export async function submitTriage(symptoms: string, patientId: string): Promise<TriageResponse>
-```
+`lib/api.ts` exports `submitTriage()` which POSTs to `/api/v1/triage`.
 
-`NEXT_PUBLIC_API_URL` is baked into the Next.js bundle at build time (injected as a Docker build arg in `Dockerfile`).
+### Backend URL Resolution
 
----
+`lib/backendResolver.ts` implements a 3-tier resolution strategy:
 
-## SSE Hook (`lib/useTriageStream.ts`)
+1. **Runtime config** — Fetch `/api/config` for `BACKEND_URL` env var (2min TTL cache)
+2. **Direct** — Use `NEXT_PUBLIC_BACKEND_URL` if set (port-forward scenarios)
+3. **Proxy** — Fall back to `/api/proxy/[...path]` (production)
 
-```typescript
-export function useTriageStream(): QueueEntry[]
-```
+### API Proxy Route
 
-- Creates `EventSource` on mount, closes on unmount
-- Validates incoming JSON with a type guard (`isQueueEntry`)
-- Deduplicates entries by composite key to prevent duplicates on reconnect
-- Returns entries in reverse-chronological order (newest first)
+`app/api/proxy/[...path]/route.ts` forwards all HTTP methods to the backend. Reads `BACKEND_URL` at runtime. Forwards headers (excluding `host`). 5-second timeout with 307 redirect fallback.
 
 ---
 
-## MTS Color Coding
+## Styling Architecture
 
-Used consistently across `TriageResult.tsx` and `TriageQueueItem.tsx`:
-
-| MTS Level | Badge Color | Meaning |
-|---|---|---|
-| 1 | `bg-red-600` | Immediate |
-| 2 | `bg-red-600` | Very Urgent |
-| 3 | `bg-orange-500` | Urgent |
-| 4 | `bg-green-600` | Less Urgent |
-| 5 | `bg-green-600` | Non-urgent |
+- **Tailwind CSS v4** via `@tailwindcss/postcss`
+- **CSS Custom Properties** in `globals.css` for theme variables
+- **Dark mode:** `[data-theme="dark"]` attribute on `<html>` element
+- **Scroll snap** on landing page sections
+- **MTS color coding:** Red (1) → Orange (2) → Yellow (3) → Green (4) → Blue (5)
+- **Responsive:** Mobile-first with Tailwind breakpoints
 
 ---
 
-## Internationalisation
+## Internationalization
 
-- All UI text is in **Greek** (hardcoded, no i18n library)
-- `<html lang="el">` set in root layout
-- Emergency number `166` (ΕΚΑΒ) shown prominently on triage page
-- Date/time formatting uses `toLocaleTimeString("el-GR")` in dashboard
+No i18n framework — translations are a TypeScript object in `lib/translations.ts` with `satisfies` assertion for type safety. The `toCaps()` utility handles Greek-aware uppercase conversion (accent handling).
 
 ---
 
-## Build and Deployment
+## Build & Output
 
-```dockerfile
-FROM node:20-alpine
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN npm ci && npm run build
-CMD ["npm", "start"]    # next start on :3000
-```
-
-The `NEXT_PUBLIC_API_URL` build arg is passed from `docker-compose.yml`:
-```yaml
-args:
-  - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-```
+- **Output mode:** `standalone` (for Docker deployment)
+- **Dockerfile:** Multi-stage build (node:20-alpine builder → standalone runner)
+- **Dev server:** `npm run dev` (port 3000)

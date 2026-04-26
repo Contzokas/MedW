@@ -1,166 +1,146 @@
 # API Contracts — Backend
 
-> Generated: 2026-04-18 | Part: `backend` | Base URL: `http://localhost:8000`
+> Generated: 2026-04-26 | Scan: Exhaustive
 
-Interactive docs available at runtime: [http://localhost:8000/docs](http://localhost:8000/docs)
+---
+
+## Base URL
+
+- **Docker/Local:** `http://localhost:8000`
+- **Kubernetes (in-cluster):** `http://backend:8000`
+
+All endpoints are prefixed with `/api/v1/`.
 
 ---
 
 ## Endpoints
 
-### GET `/api/v1/health`
+### 1. `GET /api/v1/health`
 
-Liveness probe.
+Health check / liveness probe.
 
-**Response `200`**
+**Response:** `200 OK`
+
 ```json
 { "status": "ok" }
 ```
 
 ---
 
-### POST `/api/v1/triage`
+### 2. `GET /api/v1/health/warmup`
 
-Submit patient symptoms for AI triage classification.
+Health check with LLM warmup status.
 
-**Request**
+**Response:** `200 OK`
+
 ```json
 {
-  "symptoms": "πόνος στο στήθος και δυσκολία αναπνοής",
-  "patient_id": "550e8400-e29b-41d4-a716-446655440000"
+  "status": "ok",
+  "llm_warmup": {
+    "completed": true,
+    "attempts": 1,
+    "timestamp": "2026-04-26T12:00:00Z"
+  }
 }
 ```
 
-| Field | Type | Constraints |
-|---|---|---|
-| `symptoms` | string | Required, min 1 char (whitespace stripped) |
-| `patient_id` | string | Required, min 1 char (whitespace stripped) |
+---
 
-**Response `200`**
+### 3. `POST /api/v1/triage`
+
+Submit patient symptoms for AI triage classification.
+
+**Request:**
+
 ```json
 {
-  "mts_level": 2,
-  "mts_label": "Very Urgent",
-  "specialty": "Καρδιολογία",
+  "symptoms": "Έχω πονοκέφαλο και ζαλάδες τις τελευταίες 3 μέρες",
+  "patient_id": "abc-123",
+  "language": "el"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `symptoms` | `string` | Yes | Patient symptom description (min 1 char) |
+| `patient_id` | `string` | Yes | Unique patient identifier |
+| `language` | `"el"` \| `"en"` | No | Language (default: `"el"`) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "mts_level": 3,
+  "mts_label": "Urgent",
+  "specialty": "Νευρολογία",
+  "reasoning": "Based on headache and dizziness symptoms persisting for 3 days...",
   "doctor": {
-    "name": "Δρ. Αλέξανδρος Παπαδόπουλος",
-    "specialty": "Καρδιολογία",
-    "availability": true,
+    "name": "Δρ. Μαρία Παπαδοπούλου",
+    "specialty": "Νευρολογία",
+    "available": true,
     "fallback_note": null
   },
-  "reasoning": "Τα συμπτώματα υποδηλώνουν πιθανό καρδιακό επεισόδιο...",
-  "redirect_url": "https://finddoctors.gov.gr/search?specialty=%CE%9A%CE%B1%CF%81%CE%B4%CE%B9%CE%BF%CE%BB%CE%BF%CE%B3%CE%AF%CE%B1&doctor=...",
+  "redirect_url": "https://www.finddoctors.gov.gr/?specialty=Neurology",
   "rag_used": true
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `mts_level` | integer 1–5 | Manchester Triage System urgency level |
-| `mts_label` | string | MTS label (English): `Immediate`, `Very Urgent`, `Urgent`, `Less Urgent`, `Non-urgent` |
-| `specialty` | string | Greek medical specialty name (e.g. `Καρδιολογία`) |
-| `doctor.name` | string | Matched doctor's name |
-| `doctor.specialty` | string | Doctor's specialty (Greek) |
-| `doctor.availability` | boolean | Whether the doctor is currently available |
-| `doctor.fallback_note` | string \| null | Non-null when GP fallback was used |
-| `reasoning` | string | AI-generated explanation in Greek |
-| `redirect_url` | string | URL to finddoctors.gov.gr search for this doctor/specialty |
-| `rag_used` | boolean | Whether RAG context augmented the LLM response |
-
-**Response `422`** — Validation error (missing/empty fields)
-```json
-{
-  "detail": [
-    { "type": "missing", "loc": ["body", "symptoms"], "msg": "Field required" }
-  ]
-}
-```
-
-**Response `500`** — Internal server error
-```json
-{ "detail": "Internal server error" }
-```
-
-> **Note on fail-safe:** If the AI pipeline fails entirely, the endpoint still returns `200` with a safe default response (MTS level 3, GP referral) rather than an error. This ensures patients always receive actionable guidance.
+**Error:** `422 Unprocessable Entity` — missing/invalid fields.
 
 ---
 
-### GET `/api/v1/doctors`
+### 4. `GET /api/v1/doctors`
 
-List available doctors, optionally filtered by specialty.
+List all doctors, optionally filtered by specialty.
 
-**Query parameters**
+**Query Parameters:**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `specialty` | string | No | Filter by exact Greek specialty name (e.g. `Καρδιολογία`) |
+| `specialty` | `string` | No | Filter by specialty name |
 
-**Response `200`** — Array of Doctor objects
-```json
-[
-  {
-    "name": "Δρ. Αλέξανδρος Παπαδόπουλος",
-    "specialty": "Καρδιολογία",
-    "availability": true,
-    "fallback_note": null
-  },
-  {
-    "name": "Δρ. Μαρία Νικολάου",
-    "specialty": "Καρδιολογία",
-    "availability": false,
-    "fallback_note": null
-  }
-]
-```
-
-**Example — filter by specialty:**
-```
-GET /api/v1/doctors?specialty=Καρδιολογία
-```
+**Response:** `200 OK` — array of `Doctor` objects.
 
 ---
 
-### GET `/api/v1/triage/queue`
+### 5. `GET /api/v1/triage/queue` (SSE)
 
-Real-time SSE stream of triage queue entries. Intended for the nurse dashboard.
+Real-time stream of triage results for the nurse dashboard.
 
-**Response headers**
-```
-Content-Type: text/event-stream
-Cache-Control: no-cache
-Connection: keep-alive
-X-Accel-Buffering: no
-```
+**Headers:** `Content-Type: text/event-stream`
 
-**Event stream format**
-
-On connect, all existing queue entries are replayed first, then new entries are streamed as they arrive:
+**Event Data:**
 
 ```
-event: triage_update
-data: {"patient_id":"550e8400...","mts_level":2,"specialty":"Καρδιολογία","timestamp":"2026-04-18T13:00:00+00:00"}
-
-event: triage_update
-data: {"patient_id":"660f9500...","mts_level":4,"specialty":"Γενική Ιατρική","timestamp":"2026-04-18T13:01:00+00:00"}
-
-: ping
-
+data: {"patient_id":"abc-123","mts_level":3,"mts_label":"Urgent","specialty":"Νευρολογία","timestamp":"2026-04-26T12:00:00Z"}
 ```
 
-**SSE events**
+**Ping:** `: ping` every 15 seconds.
 
-| Event | Payload | Description |
+---
+
+### 6. RAG Debug Endpoints (`/api/v1/rag/debug/*`)
+
+Gated behind `RAG_DEBUG_ENABLED=true`. Return `403` when disabled.
+
+| Method | Endpoint | Description |
 |---|---|---|
-| `triage_update` | `QueueEntry` JSON | A triage submission was completed and added to the queue |
-| _(comment)_ | `: ping` | Keepalive ping emitted every 15 s of inactivity |
+| `GET` | `/rag/debug/status` | Debug mode status |
+| `GET` | `/rag/debug/health` | Deep ChromaDB health check |
+| `GET` | `/rag/debug/corpus` | Corpus vs database analysis |
+| `GET` | `/rag/debug/embeddings` | Embedding quality metrics |
+| `POST` | `/rag/debug/retrieve` | Debug retrieval with trace |
+| `POST` | `/rag/debug/compare` | Query comparison |
+| `POST` | `/rag/debug/pipeline` | Full pipeline tracing |
+| `POST` | `/rag/debug/inspect` | Chunk inspection |
+| `GET` | `/rag/debug/traces` | Trace history (max 200) |
+| `GET` | `/rag/debug/stats` | Aggregate statistics |
+| `POST` | `/rag/debug/reseed` | Force corpus re-indexing |
 
-**QueueEntry fields**
+---
 
-| Field | Type | Description |
-|---|---|---|
-| `patient_id` | string | UUID generated by the frontend |
-| `mts_level` | integer 1–5 | MTS urgency level |
-| `specialty` | string | Recommended Greek specialty |
-| `timestamp` | string | ISO 8601 UTC timestamp (e.g. `2026-04-18T13:00:00+00:00`) |
+## Frontend API Proxy
 
-> **Queue size:** Bounded to `QUEUE_MAX_ENTRIES` (default 1000). Oldest entries are evicted when full. On reconnect, the client receives all current entries, then continues with new ones.
+The frontend proxies calls through `/api/proxy/[...path]` to avoid CORS. Reads `BACKEND_URL` at runtime. Forwards all headers (excluding `host`). Timeout: 5s with 307 redirect fallback.
+
+Interactive docs: `http://localhost:8000/docs` (Swagger UI).

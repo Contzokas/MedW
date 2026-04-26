@@ -1,164 +1,122 @@
 # Architecture — Backend (FastAPI)
 
-> Generated: 2026-04-18 | Part: `backend` | Language: Python 3.11 | Framework: FastAPI
+> Generated: 2026-04-26 | Part: `backend` | Language: Python 3.11 | Framework: FastAPI
 
 ---
 
 ## Executive Summary
 
-The MedW backend is a Python FastAPI service that exposes a REST + SSE API for AI-powered medical triage. It implements a three-tier orchestration pipeline: RAG context retrieval (ChromaDB) → LLM classification (Mistral-7B via Ollama) → doctor matching (static dataset). Results are streamed to nurse dashboards via Server-Sent Events through an in-memory async queue. The architecture follows a clean layered pattern: routers handle HTTP, services own business logic, and core provides shared infrastructure.
-
----
-
-## Technology Stack
-
-| Category | Technology | Version |
-|---|---|---|
-| Language | Python | 3.11 |
-| Framework | FastAPI | latest |
-| ASGI Server | Uvicorn | latest (standard) |
-| Data validation | Pydantic | latest |
-| LLM integration | LangChain | 1.2.15 |
-| LLM runtime | Ollama (Mistral-7B) | via HTTP |
-| Vector store | ChromaDB | 1.5.7 |
-| Embeddings | sentence-transformers (all-MiniLM-L6-v2) | ≥2.2.2 |
-| HTTP client | httpx | latest |
-| Testing | pytest + pytest-asyncio | latest |
-| Containerization | Docker (python:3.11-slim) | — |
+FastAPI REST API that orchestrates AI-powered medical triage. Combines RAG (Retrieval-Augmented Generation) via ChromaDB with LLM classification via Ollama to produce Manchester Triage System (MTS) urgency levels. Features real-time nurse dashboard updates via SSE, comprehensive debug endpoints, and graceful multi-level fallback handling.
 
 ---
 
 ## Architecture Pattern
 
-**Clean Layered Architecture** with three distinct layers:
+**Layered service architecture:**
 
 ```
-Routers (HTTP boundary)
-   └─► Services (business logic)
-           ├─► Core (shared infrastructure)
-           └─► External services (Ollama, ChromaDB)
+main.py (FastAPI app + lifespan)
+├── routers/     → HTTP endpoint handlers (thin layer)
+├── services/    → Business logic (triage, LLM, RAG, doctors)
+├── schemas/     → Pydantic request/response models
+└── core/        → Infrastructure (config, queue)
 ```
-
-No cross-layer dependencies: routers never call core directly; services never import routers.
 
 ---
 
-## Layer Breakdown
+## Startup Lifecycle (`lifespan`)
 
-### Routers (`app/routers/`)
-
-Thin HTTP handlers. Parse requests, delegate to services, return responses. No business logic.
-
-| Router | Endpoints | Responsibility |
-|---|---|---|
-| `health.py` | `GET /api/v1/health` | Liveness probe |
-| `doctors.py` | `GET /api/v1/doctors` | List/filter doctors |
-| `triage.py` | `POST /api/v1/triage` | Submit triage |
-| `triage.py` | `GET /api/v1/triage/queue` | SSE queue stream |
-
-### Services (`app/services/`)
-
-All business logic lives here. No FastAPI imports — pure async Python.
-
-| Service | Responsibility |
-|---|---|
-| `triage_service.py` | Orchestrates the full pipeline: RAG → LLM → doctor match → queue append. Implements fail-safe fallback chain. |
-| `llm_service.py` | Builds and manages the LangChain `ChatOllama` chain. Parses and validates JSON responses. Raises `LLMParseError` on malformed output. |
-| `rag_service.py` | Manages ChromaDB client (lazy singleton). Seeds corpus from `data/corpus/*.md` on startup. Retrieves top-3 similar documents for a symptom query. Raises `RAGUnavailableError` on failure. |
-| `doctor_service.py` | Loads `data/doctors.json` into an in-memory specialty index. Matches LLM specialty output to an available doctor. Falls back to General Practitioner if no match found. |
-
-### Core (`app/core/`)
-
-Shared infrastructure — no business logic.
-
-| Module | Responsibility |
-|---|---|
-| `config.py` | Reads all environment variables at import time. Provides typed constants used by services. |
-| `queue.py` | Thread-safe in-memory async deque (`asyncio.Lock`) with `asyncio.Event` signalling for SSE push notification. Max size bounded by `QUEUE_MAX_ENTRIES`. |
-
-### Schemas (`app/schemas/`)
-
-Pydantic models — single source of truth for all request/response contracts.
-
-See [data-models-backend.md](./data-models-backend.md) for full schema documentation.
+On application startup:
+1. Load `.env` variables
+2. Add CORS middleware (allow all origins)
+3. Seed ChromaDB corpus if empty (idempotent)
+4. Load doctor dataset from JSON
+5. Warm up Ollama model (configurable retries)
 
 ---
 
-## Triage Pipeline — Fail-Safe Chain
-
-```python
-async def classify(symptoms, patient_id):
-    try:
-        context = await rag_service.retrieve_context(symptoms)   # Step 1: RAG
-        result = await llm_service.classify(symptoms, context)   # Step 2: LLM (with context)
-    except RAGUnavailableError:
-        result = await llm_service.classify(symptoms, context="")  # Fallback: LLM base knowledge
-    except Exception:
-        return _SAFE_DEFAULT  # Final fallback: hardcoded safe response (MTS 3, GP referral)
-    
-    doctor = doctor_service.get_match(result["specialty"])       # Step 3: Doctor match
-    # Build response, append to SSE queue, return
-```
-
-Three safety levels:
-1. **Happy path:** RAG context + LLM inference
-2. **RAG fallback:** LLM inference without context (base knowledge only)
-3. **Hard fallback:** `_SAFE_DEFAULT` — MTS level 3 ("Urgent"), GP referral, Greek error note
-
----
-
-## SSE Queue Architecture
+## Triage Pipeline
 
 ```
 POST /api/v1/triage
-  └─► triage_service.classify()
-        └─► queue.append_entry(QueueEntry)  → asyncio.Event.set()
-
-GET /api/v1/triage/queue
-  └─► _sse_queue_generator() (infinite async generator)
-        ├── 1. Drain existing entries (replay on connect)
-        └── 2. Loop:
-              ├── wait_for_new_entry(timeout=1s)
-              ├── yield new entries as SSE events
-              └── yield `: ping\n\n` every 15 s of silence
+        │
+        ▼
+  triage_service.classify()
+        │
+        ├──► rag_service.retrieve_context(symptoms)
+        │       └──► ChromaDB query (TOP_K=3 chunks)
+        │
+        ├──► llm_service.classify(symptoms, context, language)
+        │       └──► Ollama (medgemma:27b) via LangChain
+        │       └──► JSON extraction + MTS validation
+        │
+        ├──► doctor_service.get_match(specialty)
+        │       └──► Filter by specialty → first available → GP fallback
+        │
+        └──► queue.append_entry(result)
+                └──► Signals SSE waiters
 ```
 
-The queue is a `collections.deque(maxlen=QUEUE_MAX_ENTRIES)` — oldest entries are evicted when full. **Limitation:** single-process only; not suitable for multi-instance horizontal scaling.
+### Fallback Chain
+
+1. **RAG unavailable** → Proceed with LLM base knowledge only (`rag_used: false`)
+2. **LLM parse error** → Safe default response (MTS 3, General Practice)
+3. **Unexpected exception** → GP fallback with logged error
 
 ---
 
-## Application Startup (Lifespan)
+## SSE Queue (`core/queue.py`)
 
-```python
-@asynccontextmanager
-async def lifespan(app):
-    await seed_corpus_if_empty()    # ChromaDB corpus seeding
-    doctor_service.load_doctors()   # Doctor dataset loading
-    yield
-```
-
-Startup failures in `load_doctors()` raise `RuntimeError` and abort startup. Corpus seeding failures are logged as errors but do not abort startup (graceful degradation to RAG-unavailable mode).
+- In-memory `deque(maxlen=QUEUE_MAX_ENTRIES)` — default 1000
+- `asyncio.Lock` for thread-safe appends
+- `asyncio.Event` signals new entries to waiting SSE streams
+- Generator function yields existing entries then waits for new ones
+- Ping every 15 seconds to keep connections alive
 
 ---
 
-## CORS Configuration
+## RAG Service
 
-```python
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-```
-
-**Warning:** `allow_origins=["*"]` is suitable for demo/hackathon use. Production deployments should restrict to the frontend origin.
+- **ChromaDB client:** Lazy singleton via HTTP (`chromadb:8000`)
+- **Embedding function:** `SentenceTransformerEmbeddingFunction` (`all-MiniLM-L6-v2`)
+- **Collection:** `clinical_context`
+- **Seeding:** Reads `mts_guidelines.md` + `specialty_reference.md`, splits by `\n\n`
+- **Retrieval:** `collection.query(query_texts, n_results=3)`
 
 ---
 
-## Testing Strategy
+## LLM Service
 
-| Test file | Scope | Mocking strategy |
-|---|---|---|
-| `test_triage_router.py` | Router layer | `triage_service.classify` mocked with `AsyncMock` |
-| `test_sse_queue.py` | SSE queue + generator | Queue reset via fixture; monkeypatching for timing tests |
-| `test_triage_service.py` | Service orchestration | LLM and RAG services mocked |
-| `test_rag_service.py` | RAG service | ChromaDB client mocked with dummy embedding function |
-| `test_doctor_service.py` | Doctor dataset + matching | Loaded from real fixture data |
+- **Ollama integration:** LangChain `ChatOllama` via `langchain-ollama`
+- **Model:** `medgemma:27b` (configurable via `OLLAMA_MODEL`)
+- **Warmup:** Configurable retry loop on startup (`OLLAMA_WARMUP_ENABLED`)
+- **Prompt:** System prompt with MTS guidelines + retrieved RAG context
+- **Output parsing:** Regex-based JSON extraction from prose, with MTS level/specialty validation
+- **Bilingual:** Greek/English language parameter affects output and specialty names
 
-All tests use `pytest-asyncio` with `asyncio_mode = auto`.
+---
+
+## Debug System (`rag_debug.py`)
+
+11 debug endpoints gated behind `RAG_DEBUG_ENABLED=true`. Features:
+- ChromaDB health assessment
+- Corpus vs database comparison
+- Embedding quality analysis (zero vectors, duplicates, magnitudes)
+- Full pipeline tracing with per-stage timing
+- In-memory circular buffer for traces (max 200)
+- Aggregate statistics (success rate, error rate, latency percentiles)
+
+---
+
+## Testing
+
+**Framework:** pytest + pytest-asyncio + httpx
+
+| Test File | Coverage |
+|---|---|
+| `test_triage_router.py` | API contract (request/response validation) |
+| `test_triage_service.py` | Orchestration + fallback chains |
+| `test_rag_service.py` | RAG retrieval (in-memory ChromaDB) |
+| `test_rag_debug.py` | Debug pipeline (in-memory ChromaDB) |
+| `test_doctor_service.py` | Doctor matching + GP fallback |
+| `test_sse_queue.py` | SSE queue signaling + streaming |

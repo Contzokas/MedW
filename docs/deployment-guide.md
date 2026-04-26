@@ -1,169 +1,126 @@
 # Deployment Guide — MedW
 
-> Generated: 2026-04-18 | Scan: Exhaustive
+> Generated: 2026-04-26 | Scan: Exhaustive
 
 ---
 
-## Overview
-
-MedW deploys as a 4-container Docker Compose stack. All AI inference runs on-premise (GDPR Article 9 compliance — no patient data leaves the host).
-
----
-
-## Services
-
-| Service | Image / Build | Port | Network | Persisted Volume |
-|---|---|---|---|---|
-| `ollama` | `ollama/ollama:latest` | internal only | `medw-internal` | `ollama_data` |
-| `chromadb` | `chromadb/chroma:1.5.7` | internal only | `medw-internal` | `chroma_data` |
-| `backend` | `./backend/Dockerfile` | `8000:8000` | `medw-internal` + `medw-external` | — |
-| `frontend` | `./frontend/Dockerfile` | `3000:3000` | `medw-external` | — |
-
----
-
-## Networks
-
-| Network | Purpose |
-|---|---|
-| `medw-internal` | Isolated: ollama + chromadb inaccessible from host |
-| `medw-external` | Public: backend API + frontend exposed to host ports |
-
----
-
-## Production Deployment
-
-### 1. Prepare Environment
+## Docker Compose (Local)
 
 ```bash
-# Copy and configure environment
 cp .env.example .env
-
-# Edit .env:
-NEXT_PUBLIC_API_URL=http://<your-host-or-domain>:8000
-OLLAMA_MODEL=mistral:7b
-# Other values are internal-network defaults and don't need changing
+docker compose up --build
 ```
 
-### 2. Build and Start
+### Services
+
+| Service | Image | Port | Network |
+|---|---|---|---|
+| `medw-ollama` | `ollama/ollama:latest` | Internal only | `medw-internal` |
+| `medw-chromadb` | `chromadb/chroma:1.5.7` | Internal only | `medw-internal` |
+| `medw-backend` | Build from `./backend` | `:8000` | both networks |
+| `medw-frontend` | Build from `./frontend` | `:3000` | `medw-external` |
+
+### Volumes
+
+| Volume | Purpose |
+|---|---|
+| `ollama_data` | Persist downloaded models (~4-27 GB) |
+| `chroma_data` | Persist vector embeddings |
+
+### GPU Support
+
+Docker Compose uses `deploy.resources.reservations.devices` for NVIDIA GPU passthrough. Requires `nvidia-container-toolkit`.
+
+CPU fallback works without GPU (~60-120s per triage request).
+
+### Healthchecks
+
+| Service | Check | Interval | Retries |
+|---|---|---|---|
+| Ollama | `ollama list \| grep model` | 30s | 10 (10 min start period) |
+| Backend | `curl -f http://localhost:8000/api/v1/health` | 10s | 5 |
+| Frontend | (Depends on backend healthy) | — | — |
+
+---
+
+## Kubernetes (Run:ai Cluster)
+
+### Prerequisites
+
+- `kubectl` configured against cluster
+- Run:ai project `medo` with GPU quota
+- Images pushed to GHCR
+
+### Deploy
 
 ```bash
-# Full build + start
-docker compose up --build -d
-
-# Monitor startup (model pull can take minutes on first run)
-docker compose logs -f ollama
-
-# Verify all services healthy
-docker compose ps
+kubectl apply -k k8s/
 ```
 
-### 3. Verify
+Creates `runai-medo` namespace with all 4 services.
+
+### Check Status
 
 ```bash
-# Backend health check
-curl http://localhost:8000/api/v1/health
-# Expected: {"status": "ok"}
+kubectl get pods -n runai-medo -o wide
+runai list workloads -p medo
+kubectl logs -n runai-medo deployment/medw-ollama -f
+```
 
-# Frontend
-curl -I http://localhost:3000
-# Expected: HTTP 200
+### Access
+
+```bash
+kubectl port-forward -n runai-medo svc/frontend 3000:3000
+kubectl port-forward -n runai-medo svc/backend 8000:8000
 ```
 
 ---
 
-## GPU Acceleration (NVIDIA)
+## Resource Allocation (K8s)
 
-The `ollama` service is configured for NVIDIA GPU access:
+| Service | CPU Request | CPU Limit | Memory Request | Memory Limit | GPU |
+|---|---|---|---|---|---|
+| Ollama | 8 | 16 | 32Gi | 64Gi | 1× B200 |
+| ChromaDB | 250m | 1 | 512Mi | 2Gi | — |
+| Backend | 250m | 1 | 512Mi | 1Gi | — |
+| Frontend | 100m | 500m | 256Mi | 512Mi | — |
 
-```yaml
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: all
-          capabilities: [gpu]
-```
+### Persistent Volume Claims
 
-**Requirements:**
-- NVIDIA drivers installed on host
-- `nvidia-container-toolkit` installed
-- Docker configured to use the NVIDIA runtime
-
-Without a GPU, Ollama falls back to CPU inference (significantly slower — triage response time ~60–120 s vs ~3–8 s on GPU).
-
----
-
-## Startup Order
-
-Docker Compose enforces dependency ordering:
-
-```
-ollama (healthcheck: model listed in `ollama list`)
-  → chromadb (waits for ollama healthy)
-    → backend (waits for chromadb started; runs corpus seed + doctor load on lifespan start)
-      → frontend (waits for backend /api/v1/health returns 200)
-```
-
-**Healthcheck intervals:**
-
-| Service | interval | timeout | retries | start_period |
-|---|---|---|---|---|
-| ollama | 30s | 30s | 10 | 600s |
-| backend | 10s | 5s | 5 | 60s |
-
----
-
-## Persistent Volumes
-
-| Volume | Contents | Notes |
+| PVC | Size | Purpose |
 |---|---|---|
-| `ollama_data` | Downloaded Mistral-7B model weights | ~4 GB; survives container restarts |
-| `chroma_data` | ChromaDB vector store | Seeded from `data/corpus/*.md` on first backend start |
+| `ollama-pvc` | 20Gi | Model storage |
+| `chroma-pvc` | 5Gi | Vector embeddings |
 
-### Resetting Volumes
+---
 
-```bash
-# Reset ChromaDB (force corpus re-seed on next start)
-docker volume rm medw_chroma_data
+## Manual Deploy Script (PowerShell)
 
-# Reset Ollama model cache (force model re-download)
-docker volume rm medw_ollama_data
+`deploy.ps1` automates build, push, and Run:ai submission:
 
-# Full reset
-docker compose down -v
+```powershell
+.\deploy.ps1 -Registry "ghcr.io/medw" -Tag "test" -ClientId "..." -ClientSecret "..."
 ```
 
----
-
-## Stopping and Updating
-
-```bash
-# Stop all services (keep volumes)
-docker compose down
-
-# Stop and remove all data
-docker compose down -v
-
-# Update a single service
-docker compose up --build backend -d
-
-# View logs
-docker compose logs -f backend
-docker compose logs -f ollama
-```
+**Steps:** Login → Build images → Push to GHCR → Submit workloads via `runai submit`.
 
 ---
 
-## Environment Variable Summary
+## CI/CD
 
-See [development-guide.md](./development-guide.md#environment-variables-reference) for the full variable reference.
+Push to `main` automatically builds & pushes images to `ghcr.io/contzokas/medw-*` and re-deploys.
+
+**Required GitHub Secrets:**
+
+| Secret | Purpose |
+|---|---|
+| `KUBECONFIG` | base64-encoded kubeconfig |
 
 ---
 
-## Known Constraints
+## Security Notes
 
-- **GDPR:** All inference is on-premise via Ollama. Patient symptoms never leave the host.
-- **Cold start:** First run requires Ollama to pull ~4 GB model. Set `start_period: 600s` in healthcheck is intentional.
-- **Memory:** Mistral-7B requires ~8 GB VRAM (GPU) or ~16 GB RAM (CPU).
-- **Scalability:** The in-memory SSE queue (`app/core/queue.py`) is per-process; horizontal scaling requires replacing it with a persistent broker (Redis Pub/Sub, etc.).
+- `RAG_DEBUG_ENABLED` must be `false` in production (exposes internal pipeline data)
+- No authentication on API endpoints (internal network only)
+- ChromaDB and Ollama are never exposed to the host (internal Docker network)
+- Patient data stays on-premise (GDPR Article 9)

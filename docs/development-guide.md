@@ -1,90 +1,44 @@
 # Development Guide — MedW
 
-> Generated: 2026-04-18 | Scan: Exhaustive
+> Generated: 2026-04-26 | Scan: Exhaustive
 
 ---
 
 ## Prerequisites
 
-| Tool | Version | Purpose |
+| Tool | Version | Notes |
 |---|---|---|
-| Docker + Docker Compose | v24+ | Full stack orchestration |
-| Python | 3.11+ | Backend development |
+| Docker + Docker Compose | v24+ | Required for local stack |
+| NVIDIA GPU + drivers | — | Optional; CPU fallback works (~60-120s/request) |
+| nvidia-container-toolkit | — | For GPU passthrough to Docker |
 | Node.js | 20+ | Frontend development |
-| NVIDIA GPU + drivers | (optional) | Ollama GPU acceleration |
+| Python | 3.11 | Backend development |
+| kubectl | — | K8s deployment only |
+| Run:ai CLI | v2 | Run:ai deployment only |
 
 ---
 
-## Quickstart (Docker — Recommended)
+## Local Development Setup
 
 ```bash
-# 1. Clone the repository
+# 1. Clone and configure
 git clone <repo-url> && cd MedW
-
-# 2. Copy env template and fill in values
 cp .env.example .env
 
-# 3. Start all services
+# 2. Start full stack
 docker compose up --build
 
-# Services will be available at:
-#   Frontend:  http://localhost:3000
-#   Backend:   http://localhost:8000
-#   API docs:  http://localhost:8000/docs   (FastAPI Swagger UI)
+# 3. Access
+# Patient:    http://localhost:3000
+# Dashboard:  http://localhost:3000/dashboard
+# API docs:   http://localhost:8000/docs
 ```
 
-> **Note:** On first run, Ollama will pull the Mistral-7B model (~4 GB). Allow up to 10 minutes.
-> Subsequent starts use the cached model from the `ollama_data` Docker volume.
+First run pulls the Ollama model (~4-27 GB depending on model). Allow up to 10 minutes.
 
 ---
 
-## Backend — Local Development
-
-```bash
-cd backend
-
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate        # macOS/Linux
-# .venv\Scripts\activate         # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables (point to running Docker services or local equivalents)
-export OLLAMA_HOST=http://localhost:11434
-export CHROMA_HOST=localhost
-export CHROMA_PORT=8000
-
-# Run the development server (auto-reload)
-uvicorn main:app --reload --port 8000
-```
-
-### Running Backend Tests
-
-```bash
-cd backend
-
-# Run full test suite
-pytest
-
-# Run with coverage report
-pytest --cov=app --cov-report=term-missing
-
-# Run a specific test file
-pytest tests/test_triage_router.py -v
-
-# Run a specific test
-pytest tests/test_triage_router.py::test_triage_post_returns_200_with_all_fields -v
-```
-
-> Tests use `pytest-asyncio` with `asyncio_mode = auto` (configured in `pytest.ini`).
-> Router tests mock `triage_service.classify` to avoid real LLM/RAG calls.
-> SSE queue tests (`test_sse_queue.py`) test the in-memory queue and SSE generator directly.
-
----
-
-## Frontend — Local Development
+## Frontend Development
 
 ```bash
 cd frontend
@@ -92,82 +46,124 @@ cd frontend
 # Install dependencies
 npm install
 
-# Copy env file (points API calls to local backend)
-cp .env.local .env.local   # already present; edit NEXT_PUBLIC_API_URL if needed
-
-# Start dev server (hot reload)
+# Development server (port 3000)
 npm run dev
-# Available at http://localhost:3000
-```
-
-### Frontend Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL |
-
-### Build and Type Check
-
-```bash
-cd frontend
 
 # Production build
 npm run build
+
+# Start production server
+npm start
 
 # Lint
 npm run lint
 ```
 
+**Key files for changes:**
+- Components: `app/components/`
+- Pages: `app/page.tsx`, `app/dashboard/page.tsx`
+- API client: `app/lib/api.ts`
+- Types: `app/lib/types.ts`
+- Translations: `app/lib/translations.ts`
+- Styling: `app/globals.css`
+
 ---
 
-## Environment Variables Reference
+## Backend Development
 
-| Variable | Default | Part | Description |
-|---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | frontend | Backend API URL (baked in at build time) |
-| `OLLAMA_HOST` | `http://ollama:11434` | backend | Ollama service URL |
-| `OLLAMA_MODEL` | `mistral:7b` | backend + ollama | Model to load and use |
-| `OLLAMA_TIMEOUT` | `30` | backend | LLM inference timeout (seconds) |
-| `CHROMA_HOST` | `chromadb` | backend | ChromaDB service hostname |
-| `CHROMA_PORT` | `8000` | backend | ChromaDB service port |
-| `QUEUE_MAX_ENTRIES` | `1000` | backend | Max SSE queue size (bounded deque) |
+```bash
+cd backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run server (port 8000)
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Run tests
+pytest
+
+# Run tests with coverage
+pytest --cov=app --cov-report=term-missing
+```
+
+**Key files for changes:**
+- Endpoints: `app/routers/`
+- Business logic: `app/services/`
+- Data models: `app/schemas/`
+- Config: `app/core/config.py`
+- Doctor data: `data/doctors.json`
+- RAG corpus: `data/corpus/`
+
+---
+
+## Running Tests
+
+```bash
+cd backend
+
+# All tests
+pytest
+
+# Specific test file
+pytest tests/test_triage_service.py
+
+# With verbose output
+pytest -v
+
+# With coverage
+pytest --cov=app --cov-report=term-missing
+```
+
+| Test Suite | Tests | Coverage |
+|---|---|---|
+| Triage router | API contract | Request/response validation |
+| Triage service | Orchestration | Fallback chains, error handling |
+| RAG service | Vector retrieval | In-memory ChromaDB |
+| RAG debug | Debug pipeline | Trace management, statistics |
+| Doctor service | Data matching | Specialty filter, GP fallback |
+| SSE queue | Streaming | Event signaling, connection handling |
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full list. Key variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `BACKEND_URL` | `http://localhost:8000` | Backend URL for frontend proxy |
+| `OLLAMA_HOST` | `http://ollama:11434` | Ollama service URL |
+| `OLLAMA_MODEL` | `medgemma:27b` | LLM model |
+| `OLLAMA_TIMEOUT` | `30` | LLM inference timeout (seconds) |
+| `CHROMA_HOST` | `chromadb` | ChromaDB host |
+| `CHROMA_PORT` | `8000` | ChromaDB port |
+| `QUEUE_MAX_ENTRIES` | `1000` | Max SSE queue size |
+| `RAG_DEBUG_ENABLED` | `false` | Enable debug endpoints (dev only!) |
 
 ---
 
 ## Common Development Tasks
 
 ### Add a new API endpoint
+1. Create handler in `backend/app/routers/`
+2. Create Pydantic schema in `backend/app/schemas/` (if needed)
+3. Register router in `backend/main.py`
+4. Add TypeScript types in `frontend/app/lib/types.ts`
+5. Add API call in `frontend/app/lib/api.ts`
 
-1. Create or edit a router in `backend/app/routers/`
-2. Add Pydantic schemas in `backend/app/schemas/` if new request/response shapes are needed
-3. Implement business logic in `backend/app/services/`
-4. Register the router in `backend/main.py` with `app.include_router(..., prefix="/api/v1")`
-5. Mirror new TypeScript types in `frontend/app/lib/types.ts`
-6. Write tests in `backend/tests/`
+### Add a new UI component
+1. Create component in `frontend/app/components/`
+2. Add translations in `frontend/app/lib/translations.ts`
+3. Import and use in the appropriate page
 
-### Add a new frontend page
+### Update RAG corpus
+1. Edit files in `backend/data/corpus/`
+2. Restart backend (auto-seeds on startup if collection is empty)
+3. To force re-seed: call `POST /api/v1/rag/debug/reseed` (requires `RAG_DEBUG_ENABLED=true`)
 
-1. Create `frontend/app/<route>/page.tsx` (Next.js App Router)
-2. Add client components in `frontend/app/<route>/components/` if needed
-3. Add shared UI components in `frontend/app/components/` if reusable
-
-### Update the RAG corpus
-
-1. Add or edit `.md` files in `backend/data/corpus/`
-2. Delete the `chroma_data` Docker volume to force re-seeding: `docker volume rm medw_chroma_data`
-3. Restart: `docker compose up`
-
-### Change the LLM model
-
-1. Update `OLLAMA_MODEL` in `.env` (e.g. `biomistral:7b`)
-2. Ollama will pull the new model on startup
-3. Update the `OLLAMA_MODEL` default in `docker-compose.yml` if needed
-
----
-
-## API Interactive Docs
-
-FastAPI auto-generates interactive API documentation at runtime:
-
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+### Run baseline accuracy test
+```bash
+python test_triage_baseline.py
+```
+Sends 50 synthetic symptom descriptions to the triage API and compares predicted vs expected MTS levels.
