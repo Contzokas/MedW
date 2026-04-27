@@ -446,10 +446,9 @@ jobs:
                   {name: "NIM_RERANKER_BASE_URL",    value: $nimRerankerBaseUrl},
                   {name: "NIM_RERANKER_MODEL",       value: $nimRerankerModel},
                   {name: "NIM_API_KEY",              value: $ngcApiKey},
-                  {name: "MILVUS_DB_PATH",           value: "/data/milvus.db"}
+                  {name: "MILVUS_DB_PATH",           value: "/tmp/milvus.db"}
                 ],
-                ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/data", claimName: "backend-pvc", existingPvc: false, claimInfo: { size: "5Gi" } }] }
+                ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
