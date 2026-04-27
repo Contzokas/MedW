@@ -323,7 +323,7 @@ jobs:
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: true }] }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: false, claimInfo: { size: "500Gi" } }] }
               }
             }')
           RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
@@ -356,7 +356,7 @@ jobs:
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: true }] }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
               }
             }')
           RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
