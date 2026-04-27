@@ -1,8 +1,8 @@
-# NIM Reranker — fractional GPU workload (Run:ai scheduled)
+# NIM Reranker — CPU-only workload
 #
 # Model: nvidia/nv-rerankqa-llama-3_2-1b-v2  (NeMo Retriever)
-# Shares GPU 0 (1× B200) with nim-embed via Run:ai fractional scheduling.
-# ~2 GB weights at FP8 — trivially small on a 192 GB B200.
+# Runs on CPU — 1B model is tolerable without GPU at this scale.
+# GPU 0 is fully allocated to nim-embed; GPU 1+2 to the LLM.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -12,7 +12,6 @@ metadata:
   labels:
     app: medw-nim-reranker
     app.kubernetes.io/part-of: medw
-    gpu-type: b200
 spec:
   replicas: 1
   selector:
@@ -22,21 +21,8 @@ spec:
     metadata:
       labels:
         app: medw-nim-reranker
-        gpu-type: b200
         runai/tag: test
-      annotations:
-        scheduling.run.ai/fraction: "0.2"
     spec:
-      schedulerName: runai-scheduler
-
-      nodeSelector:
-        nvidia.com/gpu.product: NVIDIA-B200
-
-      tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-
       imagePullSecrets:
         - name: dockerregistry-nvcr-io
 
@@ -59,11 +45,10 @@ spec:
           resources:
             requests:
               memory: "8Gi"
-              cpu: "2"
+              cpu: "4"
             limits:
               memory: "8Gi"
-              cpu: "2"
-              nvidia.com/gpu: 1
+              cpu: "4"
 
           readinessProbe:
             httpGet:

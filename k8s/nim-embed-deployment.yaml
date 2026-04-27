@@ -24,8 +24,7 @@ spec:
         app: medw-nim-embed
         gpu-type: b200
         runai/tag: test
-      annotations:
-        scheduling.run.ai/fraction: "0.2"
+      annotations: {}
     spec:
       schedulerName: runai-scheduler
 

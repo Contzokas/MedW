@@ -401,13 +401,12 @@ jobs:
                 image: "milvusdb/milvus:v2.5.0",
                 command: "milvus",
                 args: "run standalone",
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 4, cpuMemoryRequest: "4G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.15 },
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 4, cpuMemoryRequest: "4G", cpuMemoryLimit: "8G" },
                 environmentVariables: [
-                  {name: "ETCD_ENDPOINTS",            value: $etcd},
-                  {name: "MINIO_ADDRESS",              value: $minio},
-                  {name: "MINIO_ACCESS_KEY_ID",        value: "minioadmin"},
-                  {name: "MINIO_SECRET_ACCESS_KEY",    value: "minioadmin"},
-                  {name: "KNOWHERE_GPU_MEM_POOL_SIZE", value: "2048;4096"}
+                  {name: "ETCD_ENDPOINTS",         value: $etcd},
+                  {name: "MINIO_ADDRESS",           value: $minio},
+                  {name: "MINIO_ACCESS_KEY_ID",     value: "minioadmin"},
+                  {name: "MINIO_SECRET_ACCESS_KEY", value: "minioadmin"}
                 ],
                 ports: [{container: 19530, serviceType: "NodePort"}],
                 storage: { pvc: [{ path: "/var/lib/milvus", claimName: "milvus-data-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
@@ -470,7 +469,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.20 },
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
@@ -503,7 +502,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.20 },
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G" },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
