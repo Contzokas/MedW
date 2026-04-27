@@ -41,8 +41,9 @@ def _seed_sync() -> None:
         return
     collection = _get_collection()
     if collection.count() > 0:
-        logger.info("ChromaDB collection '%s' already seeded, skipping.", COLLECTION_NAME)
-        return
+        collection.delete()
+        logger.info("Deleted existing ChromaDB collection '%s' for reseed.", COLLECTION_NAME)
+        collection = _get_collection()
 
     documents = []
     ids = []
