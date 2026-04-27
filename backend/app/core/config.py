@@ -11,7 +11,7 @@ NIM_BASE_URL: str = os.environ.get("NIM_BASE_URL", "http://nim:8000/v1")
 NIM_MODEL: str = os.environ.get("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NIM_API_KEY: str = os.environ.get("NIM_API_KEY", "nim-local")
 NIM_EMBED_BASE_URL: str = os.environ.get("NIM_EMBED_BASE_URL", "http://nim-embed:8000/v1")
-NIM_EMBED_MODEL: str = os.environ.get("NIM_EMBED_MODEL", "nvidia/nv-embedqa-llama-3_2-1b-v2")
+NIM_EMBED_MODEL: str = os.environ.get("NIM_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5")
 NIM_RERANKER_BASE_URL: str = os.environ.get("NIM_RERANKER_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NIM_RERANKER_MODEL: str = os.environ.get("NIM_RERANKER_MODEL", "nvidia/nv-rerankqa-llama-3_2-1b-v2")
 try:

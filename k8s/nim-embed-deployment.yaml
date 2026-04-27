@@ -1,6 +1,6 @@
 # NIM Embedding — CPU workload
 #
-# Model: nvidia/nv-embedqa-llama-3_2-1b-v2  (NeMo Retriever)
+# Model: nvidia/nv-embedqa-e5-v5  (NeMo Retriever)
 # Runs on CPU to avoid requiring a third B200 during deployment.
 # 1B model remains usable on CPU for this pipeline.
 
@@ -28,7 +28,7 @@ spec:
 
       containers:
         - name: nim-embed
-          image: nvcr.io/nim/nvidia/nv-embedqa-llama-3_2-1b-v2:latest
+          image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
           ports:
             - containerPort: 8000
               name: nim-embed-api
