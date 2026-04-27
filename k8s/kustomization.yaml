@@ -9,6 +9,8 @@ resources:
   - namespace.yaml
   - pvcs.yaml
   - nim-deployment.yaml
-  - chromadb-deployment.yaml
+  - nim-embed-deployment.yaml
+  - nim-reranker-deployment.yaml
+  - milvus-deployment.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml

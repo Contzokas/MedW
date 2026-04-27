@@ -15,7 +15,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: chroma-pvc
+  name: milvus-etcd-pvc
   namespace: runai-medo
   labels:
     app.kubernetes.io/part-of: medw
@@ -24,4 +24,60 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: milvus-minio-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # segment data for vector index files
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: milvus-data-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nim-embed-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi  # NIM engine cache for 1B embedding model
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nim-reranker-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi  # NIM engine cache for 1B reranker model

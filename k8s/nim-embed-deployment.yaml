@@ -1,39 +1,30 @@
-# NIM — GPU workload (Run:ai scheduled) — 2× NVIDIA B200 (Blackwell)
+# NIM Embedding — fractional GPU workload (Run:ai scheduled)
 #
-# Cluster:  runai-kiefer
-# Project:  medo
-# Namespace: runai-medo  (Run:ai convention: runai-<project>)
-#
-# Model: nvidia/nemotron-3-super-120b-a12b
-# Image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
-# Requires: NGC_API_KEY secret (genericsecret-ngc) for model download
-# Registry auth: dockerregistry-nvcr-io
-#
-# GPU split across 3× B200 (192 GB HBM3e each = 576 GB total):
-#   GPU 0 (1× B200): nim-embed + nim-reranker (fractional, ~15 GB total)
-#   GPU 1+2 (2× B200): LLM tensor parallel (120B MoE FP8 ~120 GB + KV cache)
+# Model: nvidia/nv-embedqa-llama-3_2-1b-v2  (NeMo Retriever)
+# Shares GPU 0 (1× B200) with nim-reranker via Run:ai fractional scheduling.
+# ~2 GB weights at FP8 — trivially small on a 192 GB B200.
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: medw-nim
+  name: medw-nim-embed
   namespace: runai-medo
   labels:
-    app: medw-nim
+    app: medw-nim-embed
     app.kubernetes.io/part-of: medw
     gpu-type: b200
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: medw-nim
+      app: medw-nim-embed
   template:
     metadata:
       labels:
-        app: medw-nim
+        app: medw-nim-embed
         gpu-type: b200
       annotations:
-        scheduling.run.ai/fraction: "2"
+        scheduling.run.ai/fraction: "0.2"
     spec:
       schedulerName: runai-scheduler
 
@@ -49,11 +40,11 @@ spec:
         - name: dockerregistry-nvcr-io
 
       containers:
-        - name: nim
-          image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+        - name: nim-embed
+          image: nvcr.io/nim/nvidia/nv-embedqa-llama-3_2-1b-v2:latest
           ports:
             - containerPort: 8000
-              name: nim-api
+              name: nim-embed-api
 
           env:
             - name: NGC_API_KEY
@@ -66,12 +57,12 @@ spec:
 
           resources:
             requests:
-              memory: "96Gi"
-              cpu: "24"
+              memory: "8Gi"
+              cpu: "2"
             limits:
-              memory: "96Gi"
-              cpu: "24"
-              nvidia.com/gpu: 2
+              memory: "8Gi"
+              cpu: "2"
+              nvidia.com/gpu: 1
 
           readinessProbe:
             httpGet:
@@ -89,27 +80,27 @@ spec:
             failureThreshold: 5
 
           volumeMounts:
-            - name: nim-cache
+            - name: nim-embed-cache
               mountPath: /opt/nim/.cache
 
       volumes:
-        - name: nim-cache
+        - name: nim-embed-cache
           persistentVolumeClaim:
-            claimName: nim-pvc
+            claimName: nim-embed-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nim
+  name: nim-embed
   namespace: runai-medo
   labels:
-    app: medw-nim
+    app: medw-nim-embed
     app.kubernetes.io/part-of: medw
 spec:
   selector:
-    app: medw-nim
+    app: medw-nim-embed
   ports:
-    - name: nim-api
+    - name: nim-embed-api
       port: 8000
       targetPort: 8000
   type: ClusterIP

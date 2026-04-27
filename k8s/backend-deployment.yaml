@@ -32,10 +32,18 @@ spec:
               value: "nvidia/nemotron-3-super-120b-a12b"
             - name: NIM_TIMEOUT
               value: "120"
-            - name: CHROMA_HOST
-              value: "chromadb"
-            - name: CHROMA_PORT
-              value: "8000"
+            - name: NIM_EMBED_BASE_URL
+              value: "http://nim-embed:8000/v1"
+            - name: NIM_EMBED_MODEL
+              value: "nvidia/nv-embedqa-llama-3_2-1b-v2"
+            - name: NIM_RERANKER_BASE_URL
+              value: "http://nim-reranker:8000/v1"
+            - name: NIM_RERANKER_MODEL
+              value: "nvidia/nv-rerankqa-llama-3_2-1b-v2"
+            - name: MILVUS_HOST
+              value: "milvus"
+            - name: MILVUS_PORT
+              value: "19530"
             - name: QUEUE_MAX_ENTRIES
               value: "1000"
           resources:
