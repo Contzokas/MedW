@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - feature/nvidia-rag
   workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
 
 concurrency:
@@ -14,24 +15,24 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   ORG: contzokas
-  CHROMA_UPSTREAM_IMAGE: chromadb/chroma:1.5.7
-  NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
-  RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
-  RUNAI_PROJECT: medo
-  RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # suppress Node.js 20 deprecation on all actions
+  NIM_IMAGE:          nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+  NIM_EMBED_IMAGE:    nvcr.io/nim/nvidia/nv-embedqa-llama-3_2-1b-v2:latest
+  NIM_RERANKER_IMAGE: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
+  RUNAI_CLUSTER_URL:  https://runai.kiefersa.gr
+  RUNAI_PROJECT:      medo
+  RUNAI_CLUSTER_ID:   0403162b-5439-4561-b986-332482767449
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
   # Job 0: Resolve branch → image tag + workload suffix
-  #   main                    → tag=latest  suffix=""
-  #   dev                     → tag=dev     suffix="-dev"
-  #   feature/deploy-to-runai → tag=test    suffix="-test"
-  #   any other branch        → tag=test    suffix="-test"
+  #   main               → tag=latest  suffix=""
+  #   dev                → tag=dev     suffix="-dev"
+  #   feature/nvidia-rag → tag=test    suffix="-test"
+  #   any other branch   → tag=test    suffix="-test"
   # ─────────────────────────────────────────────────────────────────────────
   setup:
     name: Resolve deployment environment
-    if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' }}
     runs-on: ubuntu-latest
     outputs:
       tag:            ${{ steps.resolve.outputs.tag }}
@@ -63,11 +64,11 @@ jobs:
           SHA_SHORT="${GITHUB_SHA::7}"
           IMMUTABLE_TAG="${TAG}-${SHA_SHORT}"
 
-          echo "tag=$TAG"       >> $GITHUB_OUTPUT
-          echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
-          echo "env=$ENV"       >> $GITHUB_OUTPUT
-          echo "sha_short=$SHA_SHORT"         >> $GITHUB_OUTPUT
-          echo "immutable_tag=$IMMUTABLE_TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG"                         >> $GITHUB_OUTPUT
+          echo "suffix=$SUFFIX"                   >> $GITHUB_OUTPUT
+          echo "env=$ENV"                         >> $GITHUB_OUTPUT
+          echo "sha_short=$SHA_SHORT"             >> $GITHUB_OUTPUT
+          echo "immutable_tag=$IMMUTABLE_TAG"     >> $GITHUB_OUTPUT
 
           echo "──────────────────────────────────"
           echo "  Branch : $BRANCH"
@@ -79,7 +80,7 @@ jobs:
           echo "──────────────────────────────────"
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 1-4: Build/mirror images (parallel)
+  # Jobs 1-2: Build images in parallel
   # ─────────────────────────────────────────────────────────────────────────
   build-backend:
     name: Build backend → :${{ needs.setup.outputs.tag }}
@@ -145,9 +146,6 @@ jobs:
             type=raw,value=${{ needs.setup.outputs.tag }}
             type=raw,value=${{ needs.setup.outputs.immutable_tag }}
 
-      # The backend URL is now resolved at runtime via the BACKEND_URL env var
-      # and proxied through Next.js rewrites (see frontend/next.config.ts).
-      # No build-time NEXT_PUBLIC_API_URL is needed.
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -158,49 +156,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  mirror-chromadb:
-    name: Mirror chromadb → :${{ needs.setup.outputs.tag }}
-    runs-on: ubuntu-latest
-    needs: setup
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Mirror ChromaDB image to GHCR
-        env:
-          TARGET_REPO: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb
-          TAG: ${{ needs.setup.outputs.tag }}
-          IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-        run: |
-          docker pull "${{ env.CHROMA_UPSTREAM_IMAGE }}"
-          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$TAG"
-          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$IMMUTABLE_TAG"
-          docker push "$TARGET_REPO:$TAG"
-          docker push "$TARGET_REPO:$IMMUTABLE_TAG"
-
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 3: Deploy via Run:ai REST API (no CLI needed)
+  # Job 3: Deploy via Run:ai REST API
   #
   # Workload names are suffixed by branch:
-  #   feature/deploy-to-runai → medw-nim-test, medw-backend-test, ...
-  #   dev                     → medw-nim-dev,  medw-backend-dev,  ...
-  #   main                    → medw-nim,       medw-backend,       ...
+  #   feature/nvidia-rag → medw-nim-test, medw-backend-test, ...
+  #   dev                → medw-nim-dev,  medw-backend-dev,  ...
+  #   main               → medw-nim,       medw-backend,       ...
   #
-  # Required secrets (Settings → Secrets → Actions):
-  #   RUNAI_CLIENT_ID     — from Run:ai → Settings → Application
-  #   RUNAI_CLIENT_SECRET — same place
-  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD — VPN credentials
+  # GPU split across 3× B200:
+  #   GPU 0 (fraction 0.15): Milvus (cuVS)
+  #   GPU 0 (fraction 0.20): NIM embed
+  #   GPU 0 (fraction 0.20): NIM reranker
+  #   GPU 1+2 (full 2×):     NIM LLM (tensor parallel)
+  #
+  # Required secrets:
+  #   RUNAI_CLIENT_ID / RUNAI_CLIENT_SECRET — Run:ai → Settings → Application
+  #   NGC_API_KEY                           — NVIDIA NGC
+  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
     runs-on: ubuntu-latest
-    needs: [setup, build-backend, build-frontend, mirror-chromadb]
+    needs: [setup, build-backend, build-frontend]
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
@@ -210,11 +188,13 @@ jobs:
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
       SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
-      NIM_TIMEOUT: ${{ vars.NIM_TIMEOUT || '120' }}
-      NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
-      NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
-      NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_MODEL:                        ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
+      NIM_TIMEOUT:                      ${{ vars.NIM_TIMEOUT || '120' }}
+      NIM_WARMUP_ENABLED:               ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
+      NIM_WARMUP_RETRIES:               ${{ vars.NIM_WARMUP_RETRIES || '120' }}
+      NIM_WARMUP_RETRY_DELAY_SECONDS:   ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_EMBED_MODEL:    nvidia/nv-embedqa-llama-3_2-1b-v2
+      NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
     steps:
       - uses: actions/checkout@v4
 
@@ -232,11 +212,10 @@ jobs:
           username: ${{ secrets.VPN_USERNAME }}
           password: ${{ secrets.VPN_PASSWORD }}
 
-      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only)
       - name: Add Run:ai host entry
         run: echo "10.184.94.250 runai.kiefersa.gr" | sudo tee -a /etc/hosts
 
-      # ── Auth (REST API, no CLI) ──────────────────────────────────────────
+      # ── Auth ──────────────────────────────────────────────────────────────
       - name: Authenticate and resolve project
         env:
           RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
@@ -255,7 +234,6 @@ jobs:
           echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
           echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
 
-          # Resolve project UUID by name
           PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
             -H "Authorization: Bearer $TOKEN")
           echo "DEBUG projects response: $PROJECT_RESP"
@@ -278,213 +256,322 @@ jobs:
           echo "  Cluster     : ${{ env.RUNAI_CLUSTER_ID }}"
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
-          echo "    medw-chromadb${{ env.SUFFIX }}"
+          echo "    medw-milvus-etcd${{ env.SUFFIX }}    (CPU)"
+          echo "    medw-milvus-minio${{ env.SUFFIX }}   (CPU)"
+          echo "    medw-milvus${{ env.SUFFIX }}         (GPU 0 × 0.15 — cuVS)"
+          echo "    medw-nim-embed${{ env.SUFFIX }}      (GPU 0 × 0.20)"
+          echo "    medw-nim-reranker${{ env.SUFFIX }}   (GPU 0 × 0.20)"
+          echo "    medw-nim${{ env.SUFFIX }}            (GPU 1+2 × 2 — tensor parallel)"
           echo "    medw-backend${{ env.SUFFIX }}"
           echo "    medw-frontend${{ env.SUFFIX }}"
-          echo "    medw-nim${{ env.SUFFIX }}  ← 3× B200 GPU"
-          echo "  Images      :"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.NIM_IMAGE }}"
-          echo "  NIM cfg     : model=${{ env.NIM_MODEL }} timeout=${{ env.NIM_TIMEOUT }}"
-          echo "  Warmup cfg  : enabled=${{ env.NIM_WARMUP_ENABLED }} retries=${{ env.NIM_WARMUP_RETRIES }} retry_delay=${{ env.NIM_WARMUP_RETRY_DELAY_SECONDS }}s"
-          echo "  URLs resolved at runtime via Run:ai API after workloads reach Running"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── Delete stale workloads so new image + env vars always take effect ──
-      # PVCs (nim-pvc, chroma-pvc) are independent of workload lifecycle
-      # and are retained — so the cached NIM engine survives pod recreation.
+      # ── Delete stale workloads ────────────────────────────────────────────
       - name: Delete existing workloads
         run: |
           delete_workload() {
             local name="$1"
             echo "Deleting workload: $name"
-            # Find workload ID by name
             RESP=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
               -H "Authorization: Bearer $TOKEN")
             WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .id // empty")
             if [ -z "$WL_ID" ] || [ "$WL_ID" = "null" ]; then
-              echo "  $name not found — nothing to delete"
-              return 0
+              echo "  $name not found — nothing to delete"; return 0
             fi
-            DEL_RESP=$(curl -sSL -w "\n%{http_code}" -X DELETE \
+            curl -sSL -X DELETE \
               "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces/$WL_ID" \
-              -H "Authorization: Bearer $TOKEN") || true
-            DEL_STATUS=$(echo "$DEL_RESP" | tail -1)
-            echo "  $name deleted (HTTP $DEL_STATUS)"
-            # Wait for workload to fully terminate
+              -H "Authorization: Bearer $TOKEN" || true
             for i in $(seq 1 30); do
               CHECK=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
                 -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .phase // empty")
-              if [ -z "$CHECK" ]; then
-                echo "  $name fully removed"
-                return 0
-              fi
-              echo "  [$i] $name phase: $CHECK — waiting..."
-              sleep 5
+              [ -z "$CHECK" ] && echo "  $name removed" && return 0
+              echo "  [$i] $name phase: $CHECK — waiting..."; sleep 5
             done
-            echo "  WARNING: $name not fully removed after 150s — proceeding anyway"
+            echo "  WARNING: $name not removed after 150s — proceeding"
           }
 
           delete_workload "medw-nim${SUFFIX}"
+          delete_workload "medw-nim-embed${SUFFIX}"
+          delete_workload "medw-nim-reranker${SUFFIX}"
+          delete_workload "medw-milvus${SUFFIX}"
+          delete_workload "medw-milvus-etcd${SUFFIX}"
+          delete_workload "medw-milvus-minio${SUFFIX}"
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
 
-      # ── Submit workloads via REST API ────────────────────────────────────
-      # Deploy in dependency order: data services → backend → frontend.
-      # After each tier, resolve the auto-assigned NodePort URLs from the
-      # Run:ai API and pass them to downstream workloads as env vars.
-      - name: Deploy ChromaDB
+      # ── Submit data + compute services ───────────────────────────────────
+      - name: Deploy Milvus etcd
         run: |
-          CHROMA_JSON=$(jq -n \
-            --arg name "medw-chromadb${SUFFIX}" \
+          PAYLOAD=$(jq -n \
+            --arg name "medw-milvus-etcd${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${IMMUTABLE_TAG}" \
-            --arg pvc "chroma-pvc${SUFFIX}" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
-                image: $image,
-                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
-                environmentVariables: [
-                  {name: "IS_PERSISTENT", value: "TRUE"},
-                  {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
-                  {name: "CHROMA_SERVER_PORT", value: "8000"}
-                ],
-                ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: {
-                  pvc: [{
-                    path: "/chroma/chroma",
-                    claimName: $pvc,
-                    existingPvc: false,
-                    claimInfo: { size: "10Gi" }
-                  }]
-                }
+                image: "quay.io/coreos/etcd:v3.5.14",
+                command: "etcd",
+                args: "--auto-compaction-mode=revision --auto-compaction-retention=1000 --quota-backend-bytes=4294967296 --snapshot-count=50000 --data-dir=/etcd --listen-client-urls=http://0.0.0.0:2379 --advertise-client-urls=http://0.0.0.0:2379",
+                compute: { cpuCoreRequest: 0.5, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
+                ports: [{container: 2379, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/etcd", claimName: "milvus-etcd-pvc", existingPvc: false, claimInfo: { size: "10Gi" } }] }
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$CHROMA_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "ChromaDB response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "ChromaDB submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "ChromaDB already exists — skipping"
-          else
-            echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "etcd (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "etcd already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "etcd failed"; exit 1; }
 
-      - name: Deploy NIM (3× B200 GPU)
+      - name: Deploy Milvus MinIO
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg name "medw-milvus-minio${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: "minio/minio:RELEASE.2024-05-10T01-41-38Z",
+                command: "minio",
+                args: "server /data --console-address :9001",
+                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "2G" },
+                environmentVariables: [
+                  {name: "MINIO_ACCESS_KEY", value: "minioadmin"},
+                  {name: "MINIO_SECRET_KEY", value: "minioadmin"}
+                ],
+                ports: [{container: 9000, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/data", claimName: "milvus-minio-pvc", existingPvc: false, claimInfo: { size: "50Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "MinIO (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "MinIO already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "MinIO failed"; exit 1; }
+
+      - name: Resolve etcd and MinIO URLs
+        run: |
+          resolve_url() {
+            local name="$1" scheme="${2:-http}" max=60
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              echo "  [$i] $name: $phase" >&2
+              if [ "$phase" = "Running" ]; then
+                local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+                [ -n "$url" ] && [ "$url" != "null" ] && echo "${scheme}://${url}" && return 0
+              fi
+              sleep 5
+            done
+            echo "  ERROR: $name timed out" >&2; return 1
+          }
+
+          ETCD_URL=$(resolve_url "medw-milvus-etcd${SUFFIX}") || exit 1
+          MINIO_URL=$(resolve_url "medw-milvus-minio${SUFFIX}") || exit 1
+
+          ETCD_HOST=$(echo "$ETCD_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
+          ETCD_PORT=$(echo "$ETCD_URL" | sed -E 's|.*:([0-9]+)$|\1|')
+          MINIO_HOST=$(echo "$MINIO_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
+          MINIO_PORT=$(echo "$MINIO_URL" | sed -E 's|.*:([0-9]+)$|\1|')
+
+          echo "ETCD_ENDPOINT=${ETCD_HOST}:${ETCD_PORT}"  >> "$GITHUB_ENV"
+          echo "MINIO_ADDRESS=${MINIO_HOST}:${MINIO_PORT}" >> "$GITHUB_ENV"
+          echo "Resolved etcd:  ${ETCD_HOST}:${ETCD_PORT}"
+          echo "Resolved MinIO: ${MINIO_HOST}:${MINIO_PORT}"
+
+      - name: Deploy Milvus (GPU 0 × 0.15 — cuVS)
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg name "medw-milvus${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg etcd "$ETCD_ENDPOINT" \
+            --arg minio "$MINIO_ADDRESS" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: "milvusdb/milvus:v2.5.0",
+                command: "milvus",
+                args: "run standalone",
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 4, cpuMemoryRequest: "4G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.15 },
+                environmentVariables: [
+                  {name: "ETCD_ENDPOINTS",            value: $etcd},
+                  {name: "MINIO_ADDRESS",              value: $minio},
+                  {name: "MINIO_ACCESS_KEY_ID",        value: "minioadmin"},
+                  {name: "MINIO_SECRET_ACCESS_KEY",    value: "minioadmin"},
+                  {name: "KNOWHERE_GPU_MEM_POOL_SIZE", value: "2048;4096"}
+                ],
+                ports: [{container: 19530, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/var/lib/milvus", claimName: "milvus-data-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "Milvus (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "Milvus already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Milvus failed"; exit 1; }
+
+      - name: Deploy NIM LLM (GPU 1+2 × 2 — tensor parallel)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
-          NIM_JSON=$(jq -n \
+          PAYLOAD=$(jq -n \
             --arg name "medw-nim${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.NIM_IMAGE }}" \
-            --arg pvc "nim-pvc${SUFFIX}" \
             --arg ngcApiKey "$NGC_API_KEY" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: {
-                  cpuCoreRequest: 24, cpuCoreLimit: 24,
-                  cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
-                  gpuDevicesRequest: 3
-                },
+                compute: { cpuCoreRequest: 24, cpuCoreLimit: 24, cpuMemoryRequest: "96G", cpuMemoryLimit: "96G", gpuDevicesRequest: 2 },
                 environmentVariables: [
-                  {name: "NGC_API_KEY", value: $ngcApiKey},
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: {
-                  pvc: [{
-                    path: "/opt/nim/.cache",
-                    claimName: $pvc,
-                    existingPvc: false,
-                    claimInfo: { size: "500Gi" }
-                  }]
-                }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: false, claimInfo: { size: "500Gi" } }] }
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$NIM_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "NIM response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "NIM submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "NIM already exists — skipping"
-          else
-            echo "NIM failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM LLM (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "NIM LLM already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM LLM failed"; exit 1; }
 
-      # ── Resolve data-service URLs from Run:ai API ─────────────────────────
-      # Run:ai does not support fixed NodePorts — poll until Running then
-      # extract the assigned NodePort from the workload's URL field.
-      - name: Resolve ChromaDB and NIM URLs
+      - name: Deploy NIM Embed (GPU 0 × 0.20)
+        env:
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg name "medw-nim-embed${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.NIM_EMBED_IMAGE }}" \
+            --arg ngcApiKey "$NGC_API_KEY" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: $image,
+                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.20 },
+                environmentVariables: [
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
+                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
+                ],
+                ports: [{container: 8000, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM Embed (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "NIM Embed already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
+
+      - name: Deploy NIM Reranker (GPU 0 × 0.20)
+        env:
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg name "medw-nim-reranker${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.NIM_RERANKER_IMAGE }}" \
+            --arg ngcApiKey "$NGC_API_KEY" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: $image,
+                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.20 },
+                environmentVariables: [
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
+                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
+                ],
+                ports: [{container: 8000, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-reranker-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM Reranker (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "NIM Reranker already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Reranker failed"; exit 1; }
+
+      # ── Resolve all service URLs ──────────────────────────────────────────
+      - name: Resolve Milvus, NIM, Embed and Reranker URLs
         run: |
           resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                echo "  [$i] $workload_name not found yet" >&2; sleep 5; continue
-              fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
+            local name="$1" scheme="${2:-http}" max=120
+            echo "━━━ Resolving $name ━━━" >&2
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              echo "  [$i] $name: $phase" >&2
               if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name → ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"; return 0
-                fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2; return 1
+                local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+                [ -n "$url" ] && [ "$url" != "null" ] && echo "${scheme}://${url}" && return 0
+                echo "  ERROR: Running but no URL" >&2; echo "$wl" | jq '.' >&2; return 1
               fi
               sleep 5
             done
-            echo "  ERROR: $workload_name timed out" >&2; return 1
+            echo "  ERROR: $name timed out" >&2; return 1
           }
 
-          CHROMA_URL=$(resolve_url "medw-chromadb${SUFFIX}") || CHROMA_URL=""
-          NIM_URL=$(resolve_url "medw-nim${SUFFIX}") || NIM_URL=""
-          [ -z "$CHROMA_URL" ] && CHROMA_URL="${{ vars.CHROMA_URL }}"
-          [ -z "$NIM_URL" ] && NIM_URL="${{ vars.NIM_URL }}"
-          if [ -z "$CHROMA_URL" ] || [ -z "$NIM_URL" ]; then
-            echo "Failed to resolve service URLs"; exit 1
+          MILVUS_URL=$(resolve_url   "medw-milvus${SUFFIX}")       || MILVUS_URL=""
+          NIM_URL=$(resolve_url      "medw-nim${SUFFIX}")           || NIM_URL=""
+          EMBED_URL=$(resolve_url    "medw-nim-embed${SUFFIX}")     || EMBED_URL=""
+          RERANKER_URL=$(resolve_url "medw-nim-reranker${SUFFIX}")  || RERANKER_URL=""
+
+          [ -z "$MILVUS_URL" ]   && MILVUS_URL="${{ vars.MILVUS_URL }}"
+          [ -z "$NIM_URL" ]      && NIM_URL="${{ vars.NIM_URL }}"
+          [ -z "$EMBED_URL" ]    && EMBED_URL="${{ vars.NIM_EMBED_URL }}"
+          [ -z "$RERANKER_URL" ] && RERANKER_URL="${{ vars.NIM_RERANKER_URL }}"
+
+          if [ -z "$MILVUS_URL" ] || [ -z "$NIM_URL" ] || [ -z "$EMBED_URL" ] || [ -z "$RERANKER_URL" ]; then
+            echo "Failed to resolve all service URLs"; exit 1
           fi
-          echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
-          echo "NIM_BASE_URL=${NIM_URL}/v1" >> "$GITHUB_ENV"
-          echo "Resolved CHROMA_URL=$CHROMA_URL"
-          echo "Resolved NIM_BASE_URL=${NIM_URL}/v1"
+
+          MILVUS_HOST=$(echo "$MILVUS_URL"   | sed -E 's|https?://||; s|:[0-9]+$||')
+          MILVUS_PORT=$(echo "$MILVUS_URL"   | sed -E 's|.*:([0-9]+)$|\1|')
+
+          echo "MILVUS_HOST=$MILVUS_HOST"               >> "$GITHUB_ENV"
+          echo "MILVUS_PORT=$MILVUS_PORT"               >> "$GITHUB_ENV"
+          echo "NIM_BASE_URL=${NIM_URL}/v1"             >> "$GITHUB_ENV"
+          echo "NIM_EMBED_BASE_URL=${EMBED_URL}/v1"     >> "$GITHUB_ENV"
+          echo "NIM_RERANKER_BASE_URL=${RERANKER_URL}/v1" >> "$GITHUB_ENV"
+
+          echo "Milvus:   ${MILVUS_HOST}:${MILVUS_PORT}"
+          echo "NIM LLM:  ${NIM_URL}/v1"
+          echo "Embed:    ${EMBED_URL}/v1"
+          echo "Reranker: ${RERANKER_URL}/v1"
 
       - name: Deploy Backend
         run: |
-          CHROMA_HOST_VAL=$(echo "$CHROMA_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
-          CHROMA_PORT_VAL=$(echo "$CHROMA_URL" | sed -E 's|.*:([0-9]+)$|\1|')
           BACKEND_JSON=$(jq -n \
             --arg name "medw-backend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
@@ -495,85 +582,68 @@ jobs:
             --arg nimTimeout "${NIM_TIMEOUT}" \
             --arg nimWarmupEnabled "${NIM_WARMUP_ENABLED}" \
             --arg nimWarmupRetries "${NIM_WARMUP_RETRIES}" \
-            --arg nimWarmupRetryDelaySeconds "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
-            --arg chromaHost "$CHROMA_HOST_VAL" \
-            --arg chromaPort "$CHROMA_PORT_VAL" \
+            --arg nimWarmupRetryDelaySecs "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
+            --arg nimEmbedBaseUrl "$NIM_EMBED_BASE_URL" \
+            --arg nimEmbedModel "${NIM_EMBED_MODEL}" \
+            --arg nimRerankerBaseUrl "$NIM_RERANKER_BASE_URL" \
+            --arg nimRerankerModel "${NIM_RERANKER_MODEL}" \
+            --arg milvusHost "$MILVUS_HOST" \
+            --arg milvusPort "$MILVUS_PORT" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
-                  {name: "NIM_BASE_URL", value: $nimBaseUrl},
-                  {name: "NIM_MODEL", value: $nimModel},
-                  {name: "NIM_TIMEOUT", value: $nimTimeout},
-                  {name: "NIM_WARMUP_ENABLED", value: $nimWarmupEnabled},
-                  {name: "NIM_WARMUP_RETRIES", value: $nimWarmupRetries},
-                  {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySeconds},
-                  {name: "CHROMA_HOST", value: $chromaHost},
-                  {name: "CHROMA_PORT", value: $chromaPort}
+                  {name: "NIM_BASE_URL",             value: $nimBaseUrl},
+                  {name: "NIM_MODEL",                value: $nimModel},
+                  {name: "NIM_TIMEOUT",              value: $nimTimeout},
+                  {name: "NIM_WARMUP_ENABLED",       value: $nimWarmupEnabled},
+                  {name: "NIM_WARMUP_RETRIES",       value: $nimWarmupRetries},
+                  {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySecs},
+                  {name: "NIM_EMBED_BASE_URL",       value: $nimEmbedBaseUrl},
+                  {name: "NIM_EMBED_MODEL",          value: $nimEmbedModel},
+                  {name: "NIM_RERANKER_BASE_URL",    value: $nimRerankerBaseUrl},
+                  {name: "NIM_RERANKER_MODEL",       value: $nimRerankerModel},
+                  {name: "MILVUS_HOST",              value: $milvusHost},
+                  {name: "MILVUS_PORT",              value: $milvusPort}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$BACKEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Backend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Backend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Backend already exists — skipping (delete it to apply new env vars)"
-          else
-            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "Backend (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "Backend already exists — delete to apply new env vars" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Backend failed"; exit 1; }
 
       - name: Resolve Backend URL
         run: |
           resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                sleep 5; continue
-              fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
+            local name="$1" scheme="${2:-http}" max=120
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              echo "  [$i] $name: $phase" >&2
               if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name → ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"; return 0
-                fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2; return 1
+                local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+                [ -n "$url" ] && [ "$url" != "null" ] && echo "${scheme}://${url}" && return 0
               fi
               sleep 5
             done
-            echo "  ERROR: $workload_name timed out" >&2; return 1
+            echo "  ERROR: $name timed out" >&2; return 1
           }
 
           BACKEND_URL=$(resolve_url "medw-backend${SUFFIX}") || BACKEND_URL=""
           [ -z "$BACKEND_URL" ] && BACKEND_URL="${{ vars.BACKEND_URL }}"
-          if [ -z "$BACKEND_URL" ]; then
-            echo "Failed to resolve backend URL"; exit 1
-          fi
+          [ -z "$BACKEND_URL" ] && echo "Failed to resolve backend URL" && exit 1
           echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
           echo "Resolved BACKEND_URL=$BACKEND_URL"
 
-          # Persist the resolved URL back to the GitHub environment variable so
-          # future deploys always have a correct fallback (and /api/config is never stale).
           ENV_NAME="${{ needs.setup.outputs.env }}"
           REPO="${{ github.repository }}"
           GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/BACKEND_URL"
@@ -588,44 +658,33 @@ jobs:
               "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
               -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}"
           fi
-          echo "GitHub variable BACKEND_URL updated to $BACKEND_URL (HTTP $HTTP)"
+          echo "GitHub variable BACKEND_URL updated (HTTP $HTTP)"
 
       - name: Deploy Frontend
         run: |
-          FRONTEND_JSON=$(jq -n \
+          PAYLOAD=$(jq -n \
             --arg name "medw-frontend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${IMMUTABLE_TAG}" \
             --arg backendUrl "$BACKEND_URL" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
-                environmentVariables: [
-                  {name: "BACKEND_URL", value: $backendUrl}
-                ],
+                environmentVariables: [{name: "BACKEND_URL", value: $backendUrl}],
                 ports: [{container: 3000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$FRONTEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Frontend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Frontend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Frontend already exists — skipping (delete it to apply new BACKEND_URL)"
-          else
-            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "Frontend (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "Frontend already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Frontend failed"; exit 1; }
 
       # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
