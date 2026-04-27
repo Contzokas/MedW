@@ -83,7 +83,7 @@ async def test_triage_invalid_lang_returns_422(client):
 async def test_health_still_returns_ok(client):
     response = await client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
 
 
 @pytest.mark.asyncio
@@ -101,7 +101,6 @@ async def test_warmup_health_status_shape(client):
         "ready",
         "model",
         "timeout_seconds",
-        "keep_alive",
         "max_retries",
         "retry_delay_seconds",
         "in_progress",

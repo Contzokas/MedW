@@ -27,6 +27,13 @@ try:
     )
 except ValueError:
     NIM_WARMUP_RETRY_DELAY_SECONDS = 25
+RAG_SERVER_URL: str = os.environ.get("RAG_SERVER_URL", "http://rag-server:8081")
+try:
+    RAG_SERVER_TIMEOUT: int = min(600, max(1, int(os.environ.get("RAG_SERVER_TIMEOUT", "30"))))
+except ValueError:
+    import logging as _logging
+    _logging.getLogger(__name__).warning("Invalid RAG_SERVER_TIMEOUT env value; using default 30s")
+    RAG_SERVER_TIMEOUT: int = 30
 CHROMA_HOST: str = os.environ.get("CHROMA_HOST", "chromadb")
 try:
     CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))

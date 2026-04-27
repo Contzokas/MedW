@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-16
-last_updated: 2026-04-27  # Story 2-3 implementation complete, status → review
+last_updated: 2026-04-27  # Story 2-6 nim-client-httpx-wrapper implemented, status → review
 project: MedW
 project_key: NOKEY
 tracking_system: file-system
@@ -56,8 +56,8 @@ development_status:
   2-2-biomistral-llm-service-via-ollama: superseded  # Replaced by nim_client.py → Nemotron NIM
   2-3-triage-service-orchestration-and-fallback-chain: review  # Three-tier fallback, doctor lookup bug fix, Greek safe-default compliance
   2-4-mocked-doctor-dataset-and-doctor-service: done
-  2-5-post-api-v1-triage-endpoint: backlog  # Needs retest after triage_service rewrite
-  2-6-nim-client-httpx-wrapper: backlog  # NEW: backend/app/clients/nim_client.py
+  2-5-post-api-v1-triage-endpoint: review  # Verified post-NIM rewrite; stale health tests fixed
+  2-6-nim-client-httpx-wrapper: review  # NEW: backend/app/clients/nim_client.py
   epic-2-retrospective: done
 
   # Epic 3: Patient Triage Experience

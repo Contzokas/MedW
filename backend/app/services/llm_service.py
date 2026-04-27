@@ -5,12 +5,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
-
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
+from app.clients import nim_client
 from app.core.config import (
     NIM_BASE_URL,
     NIM_MODEL,
@@ -208,16 +207,11 @@ async def warmup_model() -> None:
         logger.info("NIM warmup disabled via NIM_WARMUP_ENABLED")
         return
 
-    timeout = httpx.Timeout(timeout=float(NIM_TIMEOUT))
-    endpoint = f"{NIM_BASE_URL.rstrip('/')}/health/ready"
-
     for attempt in range(1, NIM_WARMUP_RETRIES + 1):
         _warmup_state["attempts"] = attempt
         _warmup_state["last_attempt_at"] = _utc_now_iso()
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.get(endpoint)
-                response.raise_for_status()
+            await nim_client.check_nim_ready(NIM_BASE_URL, float(NIM_TIMEOUT))
             logger.info(
                 "NIM warmup succeeded for model '%s' on attempt %s",
                 NIM_MODEL,
