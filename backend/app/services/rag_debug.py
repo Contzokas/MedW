@@ -21,7 +21,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from app.core.config import MILVUS_HOST, MILVUS_PORT
+from app.core.config import MILVUS_URI
 from app.services.rag_service import (
     COLLECTION_NAME,
     CORPUS_DIR,
@@ -91,8 +91,7 @@ class PipelineTrace:
 @dataclass
 class MilvusHealthReport:
     reachable: bool
-    host: str
-    port: int
+    uri: str
     heartbeat_ms: float = 0.0
     collection_exists: bool = False
     collection_name: str = COLLECTION_NAME
@@ -158,7 +157,7 @@ async def check_milvus_health() -> dict:
     """Deep health check of Milvus connection and collection state."""
 
     def _check_sync() -> MilvusHealthReport:
-        report = MilvusHealthReport(reachable=False, host=MILVUS_HOST, port=MILVUS_PORT)
+        report = MilvusHealthReport(reachable=False, uri=MILVUS_URI)
         try:
             t0 = time.perf_counter()
             client = _get_milvus_client()

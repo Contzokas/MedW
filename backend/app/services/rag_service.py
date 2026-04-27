@@ -7,8 +7,7 @@ import httpx
 from pymilvus import DataType, MilvusClient
 
 from app.core.config import (
-    MILVUS_HOST,
-    MILVUS_PORT,
+    MILVUS_URI,
     NIM_API_KEY,
     NIM_EMBED_BASE_URL,
     NIM_EMBED_MODEL,
@@ -35,7 +34,7 @@ class RAGUnavailableError(Exception):
 def _get_milvus_client() -> MilvusClient:
     global _milvus_client
     if _milvus_client is None:
-        _milvus_client = MilvusClient(uri=f"http://{MILVUS_HOST}:{MILVUS_PORT}")
+        _milvus_client = MilvusClient(uri=MILVUS_URI)
     return _milvus_client
 
 
