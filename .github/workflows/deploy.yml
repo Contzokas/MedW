@@ -17,7 +17,6 @@ env:
   ORG: contzokas
   NIM_IMAGE:          nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
   NIM_EMBED_IMAGE:    nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
-  NIM_RERANKER_IMAGE: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
   RUNAI_CLUSTER_URL:  https://runai.kiefersa.gr
   RUNAI_PROJECT:      medo
   RUNAI_CLUSTER_ID:   0403162b-5439-4561-b986-332482767449
@@ -166,13 +165,17 @@ jobs:
   #
   # GPU strategy:
   #   GPU 1+2 (full 2×): NIM LLM (tensor parallel)
-  #   GPU 3 (1x):        NIM embed
+  #   GPU 3 (1×):        NIM Embed
   #   CPU only:          backend, frontend
   #
   # Required secrets:
   #   RUNAI_CLIENT_ID / RUNAI_CLIENT_SECRET — Run:ai → Settings → Application
   #   NGC_API_KEY                           — NVIDIA NGC
   #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD
+  #
+  # Required pre-created PVCs (created once, reused across deploys):
+  #   nim-pvc       500Gi — NIM LLM model cache
+  #   nim-embed-pvc  20Gi — NIM Embed model cache
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
@@ -181,7 +184,7 @@ jobs:
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
-      actions: write
+      actions: write        # required for cancel-in-progress and environment variable updates
     env:
       TAG:           ${{ needs.setup.outputs.tag }}
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
@@ -220,7 +223,7 @@ jobs:
           RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
           RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
-          TOKEN=$(curl -fsSL -X POST \
+          TOKEN=$(curl -fsSL --max-time 30 -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/token" \
             -H "Accept: */*" \
             -H "Content-Type: application/json" \
@@ -230,12 +233,13 @@ jobs:
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Failed to obtain access token"; exit 1
           fi
+          echo "::add-mask::$TOKEN"
           echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
           echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
 
-          PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
+          PROJECT_RESP=$(curl -fsSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
             -H "Authorization: Bearer $TOKEN")
-          echo "DEBUG projects response: $PROJECT_RESP"
           PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.projects[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
             echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
@@ -256,7 +260,7 @@ jobs:
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
           echo "    medw-nim${{ env.SUFFIX }}       (GPU 1+2 — LLM tensor parallel)"
-          echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 1 — embedding NIM)"
+          echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 3 — embedding NIM)"
           echo "    medw-backend${{ env.SUFFIX }}   (CPU — Milvus Lite embedded)"
           echo "    medw-frontend${{ env.SUFFIX }}  (CPU)"
           echo "  Reranker    : NVIDIA cloud API (integrate.api.nvidia.com)"
@@ -268,17 +272,19 @@ jobs:
           delete_workload() {
             local name="$1"
             echo "Deleting workload: $name"
-            RESP=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+            RESP=$(curl -sSL --max-time 30 \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
               -H "Authorization: Bearer $TOKEN")
             WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .id // empty")
             if [ -z "$WL_ID" ] || [ "$WL_ID" = "null" ]; then
               echo "  $name not found — nothing to delete"; return 0
             fi
-            curl -sSL -X DELETE \
+            curl -sSL --max-time 30 -X DELETE \
               "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces/$WL_ID" \
               -H "Authorization: Bearer $TOKEN" || true
             for i in $(seq 1 30); do
-              CHECK=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+              CHECK=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
                 -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .phase // empty")
               [ -z "$CHECK" ] && echo "  $name removed" && return 0
               echo "  [$i] $name phase: $CHECK — waiting..."; sleep 5
@@ -288,16 +294,15 @@ jobs:
 
           delete_workload "medw-nim${SUFFIX}"
           delete_workload "medw-nim-embed${SUFFIX}"
-          delete_workload "medw-nim-reranker${SUFFIX}"
-          delete_workload "medw-milvus${SUFFIX}"
-          delete_workload "medw-milvus-etcd${SUFFIX}"
-          delete_workload "medw-milvus-minio${SUFFIX}"
+          delete_workload "medw-nim-reranker${SUFFIX}"   # legacy cleanup from previous runs
+          delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
+          delete_workload "medw-milvus-etcd${SUFFIX}"    # legacy cleanup from previous runs
+          delete_workload "medw-milvus-minio${SUFFIX}"   # legacy cleanup from previous runs
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
-          # ↑ reranker/milvus entries clean up any stuck workloads from previous runs
 
       # ── Submit GPU workloads ─────────────────────────────────────────────
-      - name: Deploy NIM LLM (GPU 1+2 × 2 — tensor parallel)
+      - name: Deploy NIM LLM (GPU 1+2 — tensor parallel)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
@@ -318,10 +323,10 @@ jobs:
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: false, claimInfo: { size: "500Gi" } }] }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: true }] }
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$PAYLOAD") || true
@@ -330,7 +335,7 @@ jobs:
           [ "$STATUS" = "409" ] && echo "NIM LLM already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM LLM failed"; exit 1; }
 
-      - name: Deploy NIM Embed (CPU)
+      - name: Deploy NIM Embed (GPU 3 — embedding)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
@@ -351,10 +356,10 @@ jobs:
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: true }] }
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$PAYLOAD") || true
@@ -370,26 +375,24 @@ jobs:
             local name="$1" scheme="${2:-http}" max=120
             echo "━━━ Resolving $name ━━━" >&2
             for i in $(seq 1 $max); do
-              local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
                 -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
               local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
-              if [ -n "$url" ] && [ "$url" != "null" ]; then
-                if [ "$phase" != "Running" ]; then
-                  echo "  [$i] $name URL available but phase=$phase; waiting for Running..." >&2
-                else
-                  if [[ "$url" == http://* || "$url" == https://* ]]; then
-                    echo "$url"
-                  else
-                    echo "${scheme}://${url}"
-                  fi
-                  return 0
-                fi
-              fi
               if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
                 echo "  ERROR: $name entered phase $phase" >&2
                 return 1
+              fi
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
               fi
               sleep 5
             done
@@ -451,7 +454,7 @@ jobs:
                 ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$BACKEND_JSON") || true
@@ -465,26 +468,24 @@ jobs:
           resolve_url() {
             local name="$1" scheme="${2:-http}" max=120
             for i in $(seq 1 $max); do
-              local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
                 -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
               local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
-              if [ -n "$url" ] && [ "$url" != "null" ]; then
-                if [ "$phase" != "Running" ]; then
-                  echo "  [$i] $name URL available but phase=$phase; waiting for Running..." >&2
-                else
-                  if [[ "$url" == http://* || "$url" == https://* ]]; then
-                    echo "$url"
-                  else
-                    echo "${scheme}://${url}"
-                  fi
-                  return 0
-                fi
-              fi
               if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
                 echo "  ERROR: $name entered phase $phase" >&2
                 return 1
+              fi
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
               fi
               sleep 5
             done
@@ -500,12 +501,12 @@ jobs:
           ENV_NAME="${{ needs.setup.outputs.env }}"
           REPO="${{ github.repository }}"
           GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/BACKEND_URL"
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+          HTTP=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "$GH_API" -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}")
           if [ "$HTTP" = "404" ]; then
-            curl -s -X POST \
+            curl -s --max-time 30 -X POST \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
@@ -530,7 +531,7 @@ jobs:
                 ports: [{container: 3000, serviceType: "NodePort"}]
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$PAYLOAD") || true
@@ -539,10 +540,61 @@ jobs:
           [ "$STATUS" = "409" ] && echo "Frontend already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Frontend failed"; exit 1; }
 
+      - name: Resolve and save Frontend URL
+        run: |
+          resolve_url() {
+            local name="$1" scheme="${2:-http}" max=120
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+              echo "  [$i] $name: $phase" >&2
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
+              fi
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
+              fi
+              sleep 5
+            done
+            echo "  ERROR: $name timed out" >&2; return 1
+          }
+
+          FRONTEND_URL=$(resolve_url "medw-frontend${SUFFIX}") || FRONTEND_URL=""
+          [ -z "$FRONTEND_URL" ] && FRONTEND_URL="${{ vars.FRONTEND_URL }}"
+          [ -z "$FRONTEND_URL" ] && echo "WARNING: could not resolve frontend URL" && exit 0
+          echo "Resolved FRONTEND_URL=$FRONTEND_URL"
+
+          ENV_NAME="${{ needs.setup.outputs.env }}"
+          REPO="${{ github.repository }}"
+          GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/FRONTEND_URL"
+          HTTP=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "$GH_API" -d "{\"name\":\"FRONTEND_URL\",\"value\":\"${FRONTEND_URL}\"}")
+          if [ "$HTTP" = "404" ]; then
+            curl -s --max-time 30 -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
+              -d "{\"name\":\"FRONTEND_URL\",\"value\":\"${FRONTEND_URL}\"}"
+          fi
+          echo "GitHub variable FRONTEND_URL updated (HTTP $HTTP)"
+
       # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
         if: always()
         run: |
-          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
+          curl -fsSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
             -H "Authorization: Bearer $TOKEN" \
             | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'
