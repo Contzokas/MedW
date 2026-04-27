@@ -166,7 +166,8 @@ jobs:
   #
   # GPU strategy:
   #   GPU 1+2 (full 2×): NIM LLM (tensor parallel)
-  #   CPU only:          NIM embed, backend, frontend
+  #   GPU 3 (1x):        NIM embed
+  #   CPU only:          backend, frontend
   #
   # Required secrets:
   #   RUNAI_CLIENT_ID / RUNAI_CLIENT_SECRET — Run:ai → Settings → Application
@@ -255,7 +256,7 @@ jobs:
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
           echo "    medw-nim${{ env.SUFFIX }}       (GPU 1+2 — LLM tensor parallel)"
-          echo "    medw-nim-embed${{ env.SUFFIX }} (CPU — embedding NIM)"
+          echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 1 — embedding NIM)"
           echo "    medw-backend${{ env.SUFFIX }}   (CPU — Milvus Lite embedded)"
           echo "    medw-frontend${{ env.SUFFIX }}  (CPU)"
           echo "  Reranker    : NVIDIA cloud API (integrate.api.nvidia.com)"
@@ -344,7 +345,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G" },
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
