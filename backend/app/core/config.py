@@ -31,7 +31,7 @@ try:
     )
 except ValueError:
     NIM_WARMUP_RETRY_DELAY_SECONDS = 25
-MILVUS_URI: str = os.environ.get("MILVUS_URI", "./milvus.db")
+MILVUS_URI: str = os.environ.get("MILVUS_DB_PATH", "./milvus.db")
 try:
     QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))
 except ValueError:
