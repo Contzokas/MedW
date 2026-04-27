@@ -32,6 +32,7 @@ spec:
       labels:
         app: medw-nim
         gpu-type: b200
+        runai/tag: test
       annotations:
         scheduling.run.ai/fraction: "2"
     spec:
