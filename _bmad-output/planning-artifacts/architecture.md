@@ -1,8 +1,8 @@
 ---
-stepsCompleted: [step-01-init, step-02-context, step-03-starter, step-04-decisions, step-05-patterns, step-06-structure, step-07-validation, step-08-complete]
-lastStep: 8
+stepsCompleted: [step-01-init, step-02-context, step-03-starter, step-04-decisions, step-05-patterns, step-06-structure]
+lastStep: 6
 status: 'complete'
-completedAt: '2026-04-16'
+completedAt: '2026-04-27'
 inputDocuments: ['_bmad-output/planning-artifacts/prd.md']
 workflowType: 'architecture'
 project_name: 'MedW'
@@ -122,9 +122,10 @@ npx create-next-app@latest frontend \
 
 **Critical Decisions (Block Implementation):**
 - Real-time mechanism: SSE via FastAPI StreamingResponse
-- In-memory queue: asyncio-safe Python list with Lock
-- ChromaDB embedding: all-MiniLM-L6-v2 (default, built-in)
-- Docker startup ordering: healthcheck-gated ollama → backend → frontend
+- Vector DB Selection: Milvus (cuVS accelerated)
+- LLM and Embedding Selection: NVIDIA NIMs (Nemotron Super 49B and Nemotron embeddings, or Llama 3.1 8B fallback)
+- Ingestion Pipeline: NeMo Retriever OCR & Parsing NIMs
+- Deployment Strategy: Docker-in-Docker (DinD) Run:ai payload
 
 **Important Decisions (Shape Architecture):**
 - Frontend state: React hooks only, no external state library
@@ -140,74 +141,71 @@ npx create-next-app@latest frontend \
 
 ### Data Architecture
 
-- **Triage queue:** In-process Python list protected by `asyncio.Lock`. Populated on POST /api/v1/triage; read by SSE stream. No persistence — queue resets on container restart (per NFR6).
-- **ChromaDB** (v1.5.7): Single collection `clinical_context`. Embedding: `all-MiniLM-L6-v2` (default built-in). Persistent volume mounted at `/chroma/data` in Docker.
+- **Triage queue:** In-process Python list protected by `asyncio.Lock`. Populated on POST /api/v1/triage; read by SSE stream. No persistence.
+- **Vector Database:** Milvus accelerated with NVIDIA cuVS. Persistent volume mounted.
 - **Doctor fixture:** `data/doctors.json` loaded into memory dict at FastAPI startup, keyed by specialty. Filtered in-process.
 
 ### Authentication & Security
 
 - **Auth:** None. Open access — demo environment only.
 - **CORS:** `allow_origins=["*"]` — explicitly scoped to demo. Post-MVP must be locked to specific origins.
-- **Network isolation:** Ollama (:11434) and ChromaDB (:8000) bound to Docker internal network only. No host-exposed inference endpoints.
-- **Secrets:** All config via environment variables; no credentials committed to repo (per NFR8).
+- **Network isolation:** NIMs and Vector DB bound to internal network only. No host-exposed inference endpoints.
+- **Secrets:** All config via environment variables; no credentials committed to repo.
 - **Patient data logging:** Symptom text explicitly excluded from all log statements at code level.
 
 ### API & Communication Patterns
 
 - **Style:** REST. API contracts defined in PRD; implementation must not deviate.
-- **Real-time:** Server-Sent Events (SSE) via FastAPI `StreamingResponse` with `text/event-stream`. Client uses native browser `EventSource`. Chosen over WebSocket: dashboard is read-only (server→client only); SSE is simpler, HTTP-native, zero client library needed.
-- **API documentation:** FastAPI auto-generated OpenAPI/Swagger at `/docs` — zero additional tooling.
-- **Error handling:** All endpoints return structured JSON errors `{ "detail": "..." }`. AI pipeline failures fall back gracefully (FR15/NFR13) — never return 500 to patient-facing routes.
-- **CORS:** FastAPI `CORSMiddleware` with `allow_origins=["*"]` for demo.
+- **AI Integration:** Backend acts as a client communicating with OpenAI-compatible NVIDIA NIM APIs and the blueprint's RAG Server.
+- **Real-time:** Server-Sent Events (SSE) via FastAPI `StreamingResponse` with `text/event-stream`.
+- **API documentation:** FastAPI auto-generated OpenAPI/Swagger at `/docs`.
+- **Error handling:** All endpoints return structured JSON errors. AI pipeline failures fall back gracefully.
 
 ### Frontend Architecture
 
-- **State management:** React built-in hooks only (`useState`, `useEffect`, `useRef`). No Zustand, Redux, or Jotai — two simple routes with form + list patterns.
-- **Real-time client:** Native `EventSource` API. No WebSocket client library.
-- **Greek UI:** Hardcoded Greek strings in components. No i18n library for MVP.
-- **Component structure:** Page-level components (`/app/page.tsx`, `/app/dashboard/page.tsx`) with co-located sub-components. No shared design system for MVP.
-- **API calls:** Native `fetch` — no Axios or React Query. Two endpoints, simple request/response.
+- **State management:** React built-in hooks only (`useState`, `useEffect`, `useRef`). No external libraries.
+- **Real-time client:** Native `EventSource` API.
+- **Greek UI:** Hardcoded Greek strings in components.
+- **Component structure:** Page-level components with co-located sub-components.
+- **API calls:** Native `fetch`.
 
 ### Infrastructure & Deployment
 
-- **LangChain:** `langchain==1.2.15`, `langchain-core==1.2.29`, `langchain-community` (Ollama), `langchain-chroma` (ChromaDB). LCEL pipeline style.
-- **Docker service order:** `ollama` starts first → healthcheck confirms Mistral model loaded → `backend` starts → `frontend` starts. Enforces NFR4.
-- **GPU:** NVIDIA runtime with `deploy.resources.reservations.devices` in docker-compose.yml.
-- **Ports:** frontend :3000 (host), backend :8000 (host/dev), ollama :11434 (internal), chromadb :8000 (internal).
-- **CI/CD:** None for MVP — time constraint. Manual Docker Compose deploy on target hardware.
-- **Monitoring:** None for MVP. FastAPI `/api/v1/health` provides readiness signal.
+- **Deployment Mechanism:** Docker-in-Docker encapsulated in a Run:ai workload. Eliminates the need for NIM Operator installation on the host cluster.
+- **NVIDIA Services:** Llama 3.3 Nemotron Super 49B NIM, Nemotron embedding NIM, NeMo Retriever OCR & Parse NIMs.
+- **Hardware:** 2x B200 (or downscaled Llama-3.1-8B-Instruct if limited to 1x B200).
+- **CI/CD:** GitHub Actions workflow to build the DinD image and submit the Run:ai workload.
 
 ### Decision Impact Analysis
 
 **Implementation Sequence:**
-1. Monorepo scaffold + Docker Compose skeleton
-2. FastAPI base + health endpoint + SSE queue foundation
-3. ChromaDB corpus loading + RAG pipeline
-4. Mistral/Ollama integration + triage endpoint
-5. Doctor matching service
-6. Next.js patient form + results screen
-7. Next.js nurse dashboard + EventSource SSE client
-8. Docker Compose integration testing on B200
+1. Monorepo scaffold + Next.js frontend base
+2. Adapt Docker-in-Docker GitHub Action workflow for NVIDIA RAG Blueprint
+3. Scaffold Milvus and NIM services in the DinD initialization script (`rag_runner_entrypoint.sh`)
+4. Rewrite FastAPI base to integrate with Blueprint RAG server endpoints
+5. Ingest `data/corpus` using NeMo Retriever
+6. Implement Mistral/Nemotron inference logic in triage endpoint
+7. Next.js patient form + results screen + dashboard
+8. Run:ai deployment testing
 
 **Cross-Component Dependencies:**
-- SSE queue (backend) ← triage endpoint writes → EventSource client (frontend dashboard)
-- RAG pipeline depends on ChromaDB corpus being seeded at startup
-- Frontend API URL configured via `NEXT_PUBLIC_API_URL` env var
-- Ollama healthcheck must pass before backend accepts traffic
+- DinD orchestrator must start NIMs and Milvus before FastAPI backend accepts traffic
+- RAG pipeline depends on NeMo Retriever ingestion being successful
 
 ## Implementation Patterns & Consistency Rules
 
 ### Pattern Categories Defined
 
-**Critical Conflict Points Identified:** 8 areas where AI agents could make different choices
+**Critical Conflict Points Identified:** 10 areas where AI agents could make different choices
 
 ### Naming Patterns
 
 **Python (backend) — snake_case everywhere:**
-- Files: `triage_service.py`, `rag_service.py`, `doctor_service.py`
-- Functions: `classify_symptoms()`, `get_doctor_match()`
+- Files: `triage_service.py`, `rag_service.py`, `doctor_service.py`, `nim_client.py`
+- Functions: `classify_symptoms()`, `get_doctor_match()`, `query_rag_server()`
 - Variables: `mts_level`, `patient_id`, `triage_queue`
 - Pydantic schemas: class names PascalCase (`TriageRequest`, `TriageResponse`), field names snake_case
+- NVIDIA service URL env vars: `RAG_SERVER_URL`, `NIM_BASE_URL`, `MILVUS_HOST`
 
 **TypeScript (frontend) — conventions by context:**
 - Component files: PascalCase (`TriageForm.tsx`, `ResultCard.tsx`)
@@ -231,10 +229,11 @@ Frontend maps snake_case API responses to camelCase only at the API client bound
 
 **Backend (`/backend/app/`):**
 - `routers/` — FastAPI route definitions only; no business logic
-- `services/` — all business logic, AI pipeline, doctor matching
+- `services/` — all business logic, RAG orchestration, doctor matching
 - `schemas/` — Pydantic request/response models only
 - `core/` — config (env vars), SSE event management
-- `data/` — `doctors.json`, ChromaDB corpus files
+- `clients/` — `nim_client.py` (httpx async client for NIM/RAG Server calls)
+- `data/` — `doctors.json` fixture
 
 **Frontend (`/frontend/app/`):**
 - `page.tsx` — patient triage route (`/`)
@@ -242,8 +241,13 @@ Frontend maps snake_case API responses to camelCase only at the API client bound
 - `components/` — sub-components co-located with their page
 - `lib/` — API client (`api.ts`), shared types (`types.ts`)
 
+**Deployment (`/`):**
+- `Dockerfile.rag-runner` — DinD runner image for Run:ai
+- `rag_runner_entrypoint.sh` — runtime orchestration of all NVIDIA blueprint services
+- `.github/workflows/deploy-rag-blueprint.yml` — CI/CD workflow
+
 **Tests:**
-- Backend: `backend/tests/` — pytest, unit tests for services only
+- Backend: `backend/tests/` — pytest, unit tests for services only (mock httpx calls to NIMs)
 - Frontend: none for MVP (time constraint)
 
 ### Format Patterns
@@ -279,6 +283,22 @@ Always `event: triage_update`. Data is JSON-stringified. Two trailing newlines r
 - Payload: full triage summary (`patient_id`, `mts_level`, `specialty`, `timestamp`)
 - Frontend `EventSource` handles reconnect natively — no custom retry logic
 
+**NIM/RAG Server communication — `httpx.AsyncClient` only:**
+```python
+# nim_client.py — the ONLY place that calls NVIDIA services
+async with httpx.AsyncClient(base_url=settings.RAG_SERVER_URL, timeout=30.0) as client:
+    response = await client.post("/v1/generate", json={"query": query})
+    response.raise_for_status()
+```
+All NIM/RAG calls go through `backend/app/clients/nim_client.py`. No direct HTTP calls from `services/`.
+
+**Greek UTF-8 encoding — always disable ASCII escaping:**
+```python
+# In all JSON serialization of Greek text:
+json.dumps(payload, ensure_ascii=False)  # ✓
+json.dumps(payload)                       # ✗ — garbles Greek characters
+```
+
 **Loading states (frontend) — local, not global:**
 ```typescript
 const [isLoading, setIsLoading] = useState(false)
@@ -293,12 +313,15 @@ import { TriageForm } from "../../components/TriageForm"  // ✗
 
 ### Process Patterns
 
-**Error handling — never expose raw exceptions:**
+**Error handling — never expose raw exceptions, always handle httpx errors:**
 ```python
 try:
-    result = await triage_service.classify(symptoms)
+    result = await nim_client.query_rag_server(symptoms)
+except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+    logger.error("NIM/RAG call failed", exc_info=True)  # stack trace, NOT symptom text
+    result = fallback_response()
 except Exception:
-    logger.error("Triage pipeline failed", exc_info=True)  # log stack trace, NOT symptom text
+    logger.error("Triage pipeline failed", exc_info=True)
     result = fallback_response()
 ```
 
@@ -309,9 +332,9 @@ logger.info(f"Symptoms: {symptoms}")  # ✗ NEVER
 ```
 
 **Fallback chain for triage (FR15/NFR13):**
-1. RAG + Mistral → full response
-2. RAG fails → Mistral base knowledge only → response with `"rag_used": false`
-3. Mistral fails → MTS Level 3 (Urgent) safe default + generic specialty + disclaimer
+1. RAG Server (NeMo Retriever + Nemotron NIM) → full response
+2. RAG Server timeout/error → httpx fallback → MTS Level 3 (Urgent) safe default + generic specialty + disclaimer
+3. Any NIM failure → same safe default — never propagate 500 to the patient route
 
 **Greek text — hardcoded in JSX for MVP:**
 No i18n translation keys or constants files for labels.
@@ -322,15 +345,19 @@ No i18n translation keys or constants files for labels.
 - Never log patient symptom text at any log level
 - Never return HTTP 500 from `/api/v1/triage` — catch all exceptions and degrade gracefully
 - Use snake_case for all API JSON fields (match PRD contract exactly)
-- Use `@/` imports in all frontend files
+- Use `@/` imports in all frontend TypeScript files
 - Put business logic in `services/`, not in `routers/`
+- Put all NVIDIA NIM/RAG HTTP calls in `clients/nim_client.py`, not in `services/`
 - Protect triage queue reads/writes with `asyncio.Lock`
+- Use `json.dumps(..., ensure_ascii=False)` for all Greek text serialization
 
 **Anti-Patterns (explicitly forbidden):**
 - ✗ Wrapping API responses in `{ data: ..., success: ... }` envelopes
 - ✗ Logging the `symptoms` field at any log level
 - ✗ Relative imports in frontend TypeScript files
 - ✗ Business logic inside FastAPI route handlers
+- ✗ Direct `httpx` calls to NIMs from `services/` — must go through `clients/nim_client.py`
+- ✗ Using `json.dumps()` without `ensure_ascii=False` for Greek text payloads
 - ✗ Global loading state management
 - ✗ Custom SSE reconnect logic (browser handles natively)
 
@@ -341,74 +368,71 @@ No i18n translation keys or constants files for labels.
 ```
 medw/
 ├── README.md
-├── LICENSE                          ← Apache 2.0 (FR23)
-├── docker-compose.yml               ← 4-service orchestration (FR18)
-├── .env.example                     ← template, no secrets (NFR8)
+├── LICENSE                               ← Apache 2.0
+├── .env.example                          ← NIM_API_KEY, RAG_SERVER_URL, MILVUS_HOST, etc.
 ├── .gitignore
-├── docs/
-│   └── proposal.md                  ← hackathon submission (FR22)
+├── docker-compose.yml                    ← local dev: frontend + backend only
+├── Dockerfile.rag-runner                 ← DinD image for Run:ai workload
+├── rag_runner_entrypoint.sh              ← starts dockerd → NVIDIA blueprint → NIMs + Milvus
 │
-├── frontend/
-│   ├── package.json
-│   ├── next.config.ts
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
-│   ├── .env.local                   ← NEXT_PUBLIC_API_URL (gitignored)
-│   ├── .env.example
+├── .github/
+│   └── workflows/
+│       ├── deploy.yml                    ← builds frontend/backend images
+│       └── deploy-rag-blueprint.yml      ← builds DinD image + submits Run:ai workload
+│
+├── backend/
+│   ├── requirements.txt                  ← fastapi, httpx, pydantic, uvicorn
 │   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── public/
-│   │   └── favicon.ico
+│   ├── main.py                           ← FastAPI init, CORS, router registration
 │   └── app/
-│       ├── globals.css
-│       ├── layout.tsx               ← root layout, lang="el", meta
-│       ├── page.tsx                 ← / patient route (FR1, FR7, FR8)
-│       ├── components/
-│       │   ├── TriageForm.tsx       ← Greek symptom input form (FR1)
-│       │   ├── TriageResult.tsx     ← MTS + specialty + doctor + reasoning (FR7)
-│       │   ├── DoctorCard.tsx       ← doctor display + redirect link (FR4, FR8)
-│       │   └── Disclaimer.tsx       ← medical disclaimer, above fold (FR6, NFR11)
-│       ├── dashboard/
-│       │   ├── page.tsx             ← /dashboard nurse route (FR10, FR11)
-│       │   └── components/
-│       │       ├── TriageQueue.tsx       ← live SSE-fed list (FR10, FR12)
-│       │       └── TriageQueueItem.tsx   ← single entry: ID + MTS + specialty + time (FR11)
-│       └── lib/
-│           ├── api.ts               ← fetch wrappers: POST /triage, GET /doctors
-│           ├── useTriageStream.ts   ← EventSource hook for SSE dashboard (FR12)
-│           └── types.ts             ← TriageRequest, TriageResponse, Doctor, QueueEntry
+│       ├── routers/
+│       │   ├── triage.py                 ← POST /api/v1/triage + GET /api/v1/triage/queue
+│       │   ├── doctors.py                ← GET /api/v1/doctors
+│       │   └── health.py                 ← GET /api/v1/health
+│       ├── services/
+│       │   ├── triage_service.py         ← orchestrates nim_client + doctor_service; writes queue
+│       │   └── doctor_service.py         ← fixture loading, specialty filter, fallback match
+│       ├── clients/
+│       │   └── nim_client.py             ← httpx.AsyncClient for RAG Server + NIM APIs
+│       ├── schemas/
+│       │   ├── triage.py                 ← TriageRequest, TriageResponse, QueueEntry
+│       │   └── doctor.py                 ← Doctor model
+│       ├── core/
+│       │   ├── config.py                 ← env vars (RAG_SERVER_URL, NIM_BASE_URL, MILVUS_HOST)
+│       │   └── queue.py                  ← asyncio.Lock + in-memory list + SSE formatter
+│       └── data/
+│           ├── doctors.json              ← mocked doctor fixture
+│           └── corpus/                   ← MTS docs; ingested via NeMo Retriever at DinD startup
+│               ├── mts_guidelines.md
+│               └── specialty_reference.md
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_triage_service.py        ← mock nim_client, assert fallback chain
+│       └── test_doctor_service.py
 │
-└── backend/
-    ├── requirements.txt
+└── frontend/
+    ├── package.json
+    ├── next.config.ts
+    ├── tsconfig.json
     ├── Dockerfile
-    ├── .dockerignore
-    ├── main.py                      ← FastAPI init, CORS, router registration
-    ├── app/
-    │   ├── routers/
-    │   │   ├── triage.py            ← POST /api/v1/triage + GET /api/v1/triage/queue SSE (FR1–12)
-    │   │   ├── doctors.py           ← GET /api/v1/doctors (FR16)
-    │   │   └── health.py            ← GET /api/v1/health (FR19)
-    │   ├── services/
-    │   │   ├── triage_service.py    ← orchestrates LLM + RAG + doctor; writes to queue (FR2–5, FR13–15)
-    │   │   ├── rag_service.py       ← ChromaDB retrieval + fallback (FR14, FR15)
-    │   │   ├── llm_service.py       ← Ollama/Mistral via LangChain LCEL (FR13, FR5)
-    │   │   └── doctor_service.py    ← fixture loading, specialty filter, fallback match (FR9, FR16, FR17)
-    │   ├── schemas/
-    │   │   ├── triage.py            ← TriageRequest, TriageResponse, QueueEntry (Pydantic)
-    │   │   └── doctor.py            ← Doctor model (Pydantic)
-    │   └── core/
-    │       ├── config.py            ← env var loading (OLLAMA_HOST, CHROMA_HOST, CHROMA_PORT)
-    │       └── queue.py             ← asyncio.Lock + in-memory list + SSE event formatter
-    ├── data/
-    │   ├── doctors.json             ← mocked doctor fixture (FR16, FR17)
-    │   └── corpus/                  ← clinical docs for ChromaDB ingestion (FR14)
-    │       ├── mts_guidelines.md
-    │       └── specialty_reference.md
-    └── tests/
-        ├── conftest.py
-        ├── test_triage_service.py
-        ├── test_rag_service.py
-        └── test_doctor_service.py
+    └── app/
+        ├── globals.css
+        ├── layout.tsx                    ← root layout, lang="el", meta
+        ├── page.tsx                      ← / patient route
+        ├── components/
+        │   ├── TriageForm.tsx
+        │   ├── TriageResult.tsx
+        │   ├── DoctorCard.tsx
+        │   └── Disclaimer.tsx
+        ├── dashboard/
+        │   ├── page.tsx                  ← /dashboard nurse route
+        │   └── components/
+        │       ├── TriageQueue.tsx
+        │       └── TriageQueueItem.tsx
+        └── lib/
+            ├── api.ts
+            ├── useTriageStream.ts
+            └── types.ts
 ```
 
 ### Architectural Boundaries
@@ -420,52 +444,61 @@ medw/
 | Patient triage | `POST /api/v1/triage` | Frontend `page.tsx` via `api.ts` |
 | Nurse stream | `GET /api/v1/triage/queue` (SSE) | Frontend `useTriageStream.ts` |
 | Doctor list | `GET /api/v1/doctors` | Frontend `api.ts` |
-| Health check | `GET /api/v1/health` | Docker Compose healthcheck |
-| Ollama API | `http://ollama:11434` | `llm_service.py` only — internal |
-| ChromaDB API | `http://chromadb:8000` | `rag_service.py` only — internal |
+| Health check | `GET /api/v1/health` | Run:ai readiness probe |
+| RAG Server | `http://rag-server:8081` | `nim_client.py` only — internal |
+| NIM APIs | `http://nim:8000` | `nim_client.py` only — internal |
+| Milvus | `milvus:19530` | NVIDIA blueprint internally — not accessed by FastAPI |
 
 **Service Boundaries:**
 
-`triage_service.py` is the single orchestration point — no other file calls `llm_service` or `rag_service` directly.
+`triage_service.py` is the single orchestration point. All NVIDIA calls are proxied through `nim_client.py`.
 
 ```
 triage.py (router)
   └── triage_service.py
-        ├── llm_service.py      → Ollama
-        ├── rag_service.py      → ChromaDB
+        ├── nim_client.py       → NVIDIA RAG Server (NeMo Retriever + Nemotron NIM)
         └── doctor_service.py   → doctors.json (in-memory)
               └── core/queue.py → in-memory triage list
 ```
 
 **Data Boundaries:**
 
-- Patient symptom text: enters at `POST /api/v1/triage`, flows through services, stored only as queue entry summary (not raw symptoms). Never logged.
-- Triage queue: owned by `core/queue.py`. Read via SSE. Resets on container restart (NFR6).
+- Patient symptom text: enters at `POST /api/v1/triage`, proxied to RAG Server, stored only as queue summary. Never logged.
+- Triage queue: owned by `core/queue.py`. Read via SSE. Resets on container restart.
 - Doctor data: loaded once at startup in `doctor_service.py`. Read-only.
-- ChromaDB corpus: seeded at startup via FastAPI lifespan event. Read-only during runtime.
+- MTS corpus: ingested into Milvus by `rag_runner_entrypoint.sh` at DinD startup via NeMo Retriever. FastAPI does not seed it.
+
+**DinD Startup Sequence:**
+```
+rag_runner_entrypoint.sh
+  → dockerd (with nvidia runtime)
+  → docker compose up: milvus → nemo-retriever-ocr → nemo-retriever-embed
+                       → nemo-retriever-rerank → nemotron-nim (LLM)
+                       → rag-server → ingestor (loads corpus/) → backend → frontend
+```
 
 ### Requirements to Structure Mapping
 
 | FR | File(s) |
 |---|---|
 | FR1 — Greek input | `TriageForm.tsx`, `page.tsx`, `schemas/triage.py` |
-| FR2 — MTS classification | `triage_service.py`, `llm_service.py` |
+| FR2 — MTS classification | `triage_service.py`, `nim_client.py` (Nemotron NIM) |
 | FR3 — Specialty recommendation | `triage_service.py` |
 | FR4 — Doctor matching | `doctor_service.py`, `DoctorCard.tsx` |
-| FR5 — Reasoning text | `llm_service.py`, `TriageResult.tsx` |
+| FR5 — Reasoning text | `nim_client.py` (RAG Server response), `TriageResult.tsx` |
 | FR6 — Medical disclaimer | `Disclaimer.tsx` (rendered in `TriageResult.tsx`) |
 | FR7 — Results screen | `TriageResult.tsx`, `page.tsx` |
 | FR8 — Simulated redirect | `DoctorCard.tsx` → `redirect_url` from response |
 | FR9 — Fallback doctor | `doctor_service.py` fallback branch |
 | FR10–12 — Nurse dashboard | `dashboard/page.tsx`, `TriageQueue.tsx`, `useTriageStream.ts`, `core/queue.py` |
-| FR13 — Greek LLM | `llm_service.py` (Mistral via Ollama LCEL chain) |
-| FR14 — RAG augmentation | `rag_service.py`, `data/corpus/` |
-| FR15 — RAG fallback | `triage_service.py` (try/except around RAG call) |
+| FR13 — Greek LLM | `nim_client.py` (Nemotron NIM, Greek-capable) |
+| FR14 — RAG augmentation | `nim_client.py` → RAG Server, `data/corpus/` (ingested by DinD) |
+| FR15 — RAG fallback | `triage_service.py` (httpx error handling → safe default) |
 | FR16–17 — Doctor dataset | `doctor_service.py`, `data/doctors.json`, `routers/doctors.py` |
-| FR18 — Docker Compose | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` |
+| FR18 — Deployment | `Dockerfile.rag-runner`, `rag_runner_entrypoint.sh`, `deploy-rag-blueprint.yml` |
 | FR19 — Health check | `routers/health.py` |
-| FR20 — Data isolation | `docker-compose.yml` (internal network), `core/config.py` |
-| FR21 — Ollama pre-warm | `docker-compose.yml` ollama entrypoint + healthcheck |
+| FR20 — Data isolation | DinD internal Docker network, `core/config.py` |
+| FR21 — NIM pre-warm | `rag_runner_entrypoint.sh` (healthcheck before backend starts) |
 | FR22 — Proposal doc | `docs/proposal.md` |
 | FR23 — Public repo | `README.md`, `LICENSE` |
 
@@ -477,8 +510,7 @@ triage.py (router)
 Browser → POST /api/v1/triage
   → routers/triage.py
   → triage_service.py
-      → rag_service.py    → ChromaDB (context retrieval)
-      → llm_service.py    → Ollama/Mistral (inference)
+      → nim_client.py → RAG Server (NeMo Retriever + Nemotron NIM inference)
       → doctor_service.py → doctors.json (specialty match)
       → core/queue.py     (append summary entry)
   ← TriageResponse JSON
@@ -490,40 +522,26 @@ Simultaneously:
     → TriageQueue.tsx re-renders with new entry
 ```
 
-**Docker Compose Startup Sequence:**
-```
-ollama (pulls Mistral model, healthcheck: model loaded)
-  → chromadb (healthcheck: HTTP 200 on /api/v1/heartbeat)
-  → backend (lifespan: load doctors.json + seed ChromaDB corpus)
-  → frontend (serves Next.js, connects to backend via NEXT_PUBLIC_API_URL)
-```
-
 ## Architecture Validation Results
 
 ### Coherence Validation ✅
 
-All technology choices are version-compatible and conflict-free. Patterns align with the stack. The SSE + asyncio.Lock + in-memory queue forms a coherent, low-complexity real-time architecture appropriate for the demo scope. The Router/Service/Schema backend pattern and App Router frontend structure are mutually independent and do not create cross-boundary dependencies.
+All technology choices are compatible. The NVIDIA RAG Blueprint provides a production-ready, GPU-accelerated RAG microservice stack. The FastAPI backend acts as a thin orchestration client via `nim_client.py`, keeping the service boundary clean. SSE + asyncio.Lock + in-memory queue remains coherent for real-time dashboard updates.
 
 ### Requirements Coverage ✅
 
-All 23 FRs and 13 NFRs are architecturally supported. Full mapping documented in Project Structure section. No uncovered requirements identified.
+All 23 FRs and 13 NFRs are architecturally supported with the updated NVIDIA blueprint components. Full mapping documented in Requirements to Structure Mapping section above.
 
 ### Gap Analysis & Resolutions
 
-**Gap 1 — Ollama model pull (resolved):**
-The `ollama` Docker service uses a custom entrypoint script (`docker/ollama-entrypoint.sh`) that starts the server, pulls `mistral:7b`, then signals readiness. The docker-compose healthcheck verifies the model is present via `ollama list | grep mistral` before the `backend` service starts.
+**Gap 1 — NIM startup ordering (resolved):**
+`rag_runner_entrypoint.sh` waits for each NVIDIA service to pass its healthcheck before starting the next. FastAPI backend only starts after `rag-server` responds on port 8081.
 
-Add to project structure:
-```
-docker/
-└── ollama-entrypoint.sh    ← pull mistral:7b + start server
-```
+**Gap 2 — MTS corpus ingestion (resolved):**
+The `ingestor` service in the DinD compose stack ingests `data/corpus/` via NeMo Retriever at startup. This is decoupled from FastAPI — no lifespan event required in `main.py`.
 
-**Gap 2 — ChromaDB corpus seeding (resolved):**
-FastAPI `lifespan` event in `main.py` calls `rag_service.seed_corpus_if_empty()` at startup. This is idempotent — checks for existing documents before ingesting `data/corpus/` files. No manual step required.
-
-**Gap 3 — Greek language fallback (documented):**
-Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy < 80%, fallback: translate symptom input to English before LLM inference, return result in Greek. This is a `llm_service.py` implementation decision to be confirmed in sprint 1.
+**Gap 3 — Greek language quality (documented):**
+Nemotron Super 49B is multilingual and significantly stronger than Mistral-7B for Greek medical terminology. Sprint 1 must still validate MTS classification accuracy ≥ 80% on Greek input. Fallback remains: safe Level 3 default via `triage_service.py`.
 
 ### Architecture Completeness Checklist
 
@@ -535,10 +553,10 @@ Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy
 
 **✅ Architectural Decisions**
 - [x] Critical decisions documented with versions
-- [x] Technology stack fully specified (Next.js 15, FastAPI, LangChain 1.2.15, ChromaDB 1.5.7)
-- [x] Integration patterns defined (SSE, asyncio.Lock, LCEL)
-- [x] Performance considerations addressed (pre-warm, GPU, startup order)
-- [x] Security/compliance addressed (network isolation, logging rules, data isolation)
+- [x] Technology stack fully specified (Next.js 16, FastAPI, httpx, Nemotron NIMs, Milvus, DinD)
+- [x] Integration patterns defined (SSE, asyncio.Lock, httpx.AsyncClient for NIMs)
+- [x] Performance considerations addressed (DinD startup order, GPU allocation, NIM healthchecks)
+- [x] Security/compliance addressed (DinD internal network, logging rules, data isolation)
 
 **✅ Implementation Patterns**
 - [x] Naming conventions established (snake_case / camelCase / API snake_case)
@@ -560,11 +578,12 @@ Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy
 **Confidence Level: High**
 
 **Key Strengths:**
-- Stack pre-decided in PRD — no technology discovery needed in implementation
-- API contracts fully specified — backend and frontend can develop in parallel
-- Fallback chain covers all failure modes — no blank screens possible
-- Single orchestration point (`triage_service.py`) — no cross-service coupling confusion
+- NVIDIA RAG Blueprint provides production-grade retrieval (hybrid dense+sparse, reranking, cuVS-accelerated Milvus)
+- FastAPI remains a thin, testable orchestration layer — `nim_client.py` is the single NVIDIA integration point
+- Fallback chain covers all NIM failure modes — no blank screens possible
+- DinD encapsulation removes NIM Operator dependency from the cluster
 - SSE over WebSocket — eliminates client library dependency and reduces complexity
+- Nemotron Super 49B is natively multilingual — reduces Greek language risk vs Mistral-7B
 
 **Areas for Future Enhancement (Post-MVP):**
 - CORS locked to specific origin
@@ -572,6 +591,7 @@ Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy
 - Authentication and role-based access (nurse vs patient)
 - Live finddoctors.gov.gr API integration
 - Structured logging with audit trail for nurse actions
+- Enable optional VLM (image captioning) for chart/image understanding in MTS documents
 
 ### Implementation Handoff
 
@@ -579,17 +599,18 @@ Sprint 1 must validate Mistral-7B Greek medical terminology quality. If accuracy
 
 ```bash
 # Root
-git init && touch docker-compose.yml .env.example .gitignore README.md LICENSE
+git init && touch .env.example .gitignore README.md LICENSE
 
 # Frontend
 npx create-next-app@latest frontend --typescript --tailwind --eslint --app --no-src-dir --import-alias "@/*"
 
 # Backend
-mkdir -p backend/app/{routers,services,schemas,core} backend/data/corpus backend/tests
+mkdir -p backend/app/{routers,services,clients,schemas,core} backend/data/corpus backend/tests
 touch backend/main.py backend/requirements.txt backend/Dockerfile
 
-# Docker support
-mkdir docker && touch docker/ollama-entrypoint.sh
+# NVIDIA Blueprint deployment
+touch Dockerfile.rag-runner rag_runner_entrypoint.sh
+mkdir -p .github/workflows && touch .github/workflows/deploy-rag-blueprint.yml
 ```
 
-**AI Agent Prime Directive:** This architecture document is the single source of truth. All implementation decisions not covered here default to the patterns section. When in doubt: simpler is correct for MVP scope.
+**AI Agent Prime Directive:** This architecture document is the single source of truth for the NVIDIA RAG Blueprint integration. All implementation decisions not covered here default to the patterns section. The `clients/nim_client.py` is the **only** file that may call NVIDIA NIM or RAG Server endpoints. When in doubt: route through `nim_client.py`, handle errors with `httpx`, degrade gracefully.

@@ -215,6 +215,8 @@ jobs:
       NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
       NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
       NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_GPU_FRACTION: ${{ vars.NIM_GPU_FRACTION || '3' }}
+      RAG_DEBUG_ENABLED: ${{ vars.RAG_DEBUG_ENABLED || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -393,6 +395,7 @@ jobs:
             --arg image "${{ env.NIM_IMAGE }}" \
             --arg pvc "nim-pvc${SUFFIX}" \
             --arg ngcApiKey "$NGC_API_KEY" \
+            --arg gpuFraction "$NIM_GPU_FRACTION" \
             '{
               name: $name,
               projectId: $projectId,
@@ -403,7 +406,7 @@ jobs:
                 compute: {
                   cpuCoreRequest: 24, cpuCoreLimit: 24,
                   cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
-                  gpuDevicesRequest: 3
+                  gpuDevicesRequest: ($gpuFraction | tonumber)
                 },
                 environmentVariables: [
                   {name: "NGC_API_KEY", value: $ngcApiKey},
@@ -417,6 +420,9 @@ jobs:
                     existingPvc: false,
                     claimInfo: { size: "500Gi" }
                   }]
+                },
+                annotations: {
+                  "scheduling.run.ai/fraction": $gpuFraction
                 }
               }
             }')
@@ -476,6 +482,13 @@ jobs:
           if [ -z "$CHROMA_URL" ] || [ -z "$NIM_URL" ]; then
             echo "Failed to resolve service URLs"; exit 1
           fi
+          # Basic URL format validation
+          if ! echo "$CHROMA_URL" | grep -qE '^[a-z]+://[^:]+:[0-9]+$'; then
+            echo "ERROR: Invalid CHROMA_URL format: $CHROMA_URL"; exit 1
+          fi
+          if ! echo "$NIM_URL" | grep -qE '^[a-z]+://[^:]+:[0-9]+$'; then
+            echo "ERROR: Invalid NIM_URL format: $NIM_URL"; exit 1
+          fi
           echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
           echo "NIM_BASE_URL=${NIM_URL}/v1" >> "$GITHUB_ENV"
           echo "Resolved CHROMA_URL=$CHROMA_URL"
@@ -496,6 +509,7 @@ jobs:
             --arg nimWarmupEnabled "${NIM_WARMUP_ENABLED}" \
             --arg nimWarmupRetries "${NIM_WARMUP_RETRIES}" \
             --arg nimWarmupRetryDelaySeconds "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
+            --arg ragDebugEnabled "${RAG_DEBUG_ENABLED}" \
             --arg chromaHost "$CHROMA_HOST_VAL" \
             --arg chromaPort "$CHROMA_PORT_VAL" \
             '{
@@ -512,6 +526,7 @@ jobs:
                   {name: "NIM_WARMUP_ENABLED", value: $nimWarmupEnabled},
                   {name: "NIM_WARMUP_RETRIES", value: $nimWarmupRetries},
                   {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySeconds},
+                  {name: "RAG_DEBUG_ENABLED", value: $ragDebugEnabled},
                   {name: "CHROMA_HOST", value: $chromaHost},
                   {name: "CHROMA_PORT", value: $chromaPort}
                 ],

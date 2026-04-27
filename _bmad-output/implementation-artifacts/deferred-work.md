@@ -48,3 +48,18 @@
 - Theme value validation before storage — User decision: validation not required. Theme will only be light/dark.
 - localStorage quota exceeded handling — User decision: validation/error handling not a concern for this implementation.
 - Theme value validation in localStorage — User decision: validation not required for light/dark only themes.
+
+## Deferred from: code review of 1-4-dind-rag-blueprint-deployment (2026-04-27)
+
+- No timeout handling for warmup model initialization [backend/app/services/llm_service.py] — `_get_chain()` is called without timeout during warmup, could block startup indefinitely
+- Race condition in warmup state management [backend/app/services/llm_service.py] — Warmup state is shared module-level dict without locking, potential corruption with concurrent access
+- Missing CHROMA_HOST/PORT extraction validation [.github/workflows/deploy.yml:489-490] — Simple sed regex extracts host/port without validating URL format, invalid URLs cause backend failures
+- No validation of NIM_TIMEOUT vs warmup retry relationship [backend/app/core/config.py] — No check that NIM_TIMEOUT < NIM_WARMUP_RETRY_DELAY_SECONDS, could cause confusing errors
+- Missing error handling for URL resolution fallback [.github/workflows/deploy.yml:477-478] — If both URL resolution and GitHub variables fail, deployment proceeds with empty URLs causing cascading failures
+- Missing validation for boolean env var parsing [backend/app/core/config.py] — `_get_bool_env()` only handles specific values, unexpected values treated as False without warning
+- No validation for annotation format [.github/workflows/deploy.yml:420] — Annotation is hardcoded but no validation that format is correct for Run:ai version
+- Missing validation for PVC size compatibility [.github/workflows/deploy.yml:418] — No validation that 500Gi PVC is available or within quotas, could remain Pending indefinitely
+- No verification NIM image supports requested model [.github/workflows/deploy.yml] — No validation that NIM_IMAGE actually supports NIM_MODEL, container may start but fail to load model
+- Missing validation for concurrent workload deletion [.github/workflows/deploy.yml:300-328] — Two deployments running simultaneously could race on workload deletion/URL resolution
+- No validation for Kubernetes env var names [.github/workflows/deploy.yml:508-516] — No validation that env var names follow Kubernetes naming conventions
+- Missing documentation for config parameters [.env.example] — New parameters added but no explanation of valid ranges or performance impacts

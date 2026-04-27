@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-16
-last_updated: 2026-04-19  # Epics 3-4 retrospective done
+last_updated: 2026-04-27  # Story 1-4 code review findings addressed, remaining patch deferred
 project: MedW
 project_key: NOKEY
 tracking_system: file-system
@@ -43,19 +43,21 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # Epic 1: Project Foundation & Deployable Stack
-  epic-1: done
+  epic-1: in-progress  # Reopened: DinD deployment supersedes story 1-3
   1-1-monorepo-scaffold-and-project-structure: done
   1-2-fastapi-base-application-and-health-endpoint: done
-  1-3-docker-compose-full-stack-with-ordered-startup: done
+  1-3-docker-compose-full-stack-with-ordered-startup: superseded  # Replaced by DinD + rag_runner_entrypoint.sh
+  1-4-dind-rag-blueprint-deployment: in-progress  # NEW: Dockerfile.rag-runner + rag_runner_entrypoint.sh + deploy-rag-blueprint.yml
   epic-1-retrospective: done
 
-  # Epic 2: AI Triage Pipeline
-  epic-2: done
-  2-1-chromadb-corpus-seeding-and-rag-service: done
-  2-2-biomistral-llm-service-via-ollama: done
-  2-3-triage-service-orchestration-and-fallback-chain: done
+  # Epic 2: AI Triage Pipeline (Pivot to NVIDIA RAG Blueprint)
+  epic-2: in-progress  # Reopened: Ollama + ChromaDB replaced by NVIDIA NIMs + Milvus
+  2-1-chromadb-corpus-seeding-and-rag-service: superseded  # Replaced by NeMo Retriever + Milvus in DinD
+  2-2-biomistral-llm-service-via-ollama: superseded  # Replaced by nim_client.py → Nemotron NIM
+  2-3-triage-service-orchestration-and-fallback-chain: ready-for-dev  # Rewrite: httpx fallback via nim_client.py
   2-4-mocked-doctor-dataset-and-doctor-service: done
-  2-5-post-api-v1-triage-endpoint: done
+  2-5-post-api-v1-triage-endpoint: ready-for-dev  # Needs retest after triage_service rewrite
+  2-6-nim-client-httpx-wrapper: ready-for-dev  # NEW: backend/app/clients/nim_client.py
   epic-2-retrospective: done
 
   # Epic 3: Patient Triage Experience
@@ -66,7 +68,7 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: Nurse Real-Time Dashboard
-  epic-4: in-progress
+  epic-4: done  # SSE + frontend unchanged — no impact from blueprint pivot
   4-1-sse-triage-queue-stream-endpoint: done
   4-2-nurse-dashboard-ui-with-live-queue: done
   epic-4-retrospective: done

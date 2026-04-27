@@ -11,7 +11,7 @@ NIM_BASE_URL: str = os.environ.get("NIM_BASE_URL", "http://nim:8000/v1")
 NIM_MODEL: str = os.environ.get("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NIM_API_KEY: str = os.environ.get("NIM_API_KEY", "nim-local")
 try:
-    NIM_TIMEOUT: int = max(1, int(os.environ.get("NIM_TIMEOUT", "120")))
+    NIM_TIMEOUT: int = min(600, max(1, int(os.environ.get("NIM_TIMEOUT", "120"))))
 except ValueError:
     import logging as _logging
     _logging.getLogger(__name__).warning("Invalid NIM_TIMEOUT env value; using default 120s")
@@ -22,8 +22,8 @@ try:
 except ValueError:
     NIM_WARMUP_RETRIES = 120
 try:
-    NIM_WARMUP_RETRY_DELAY_SECONDS: int = max(
-        1, int(os.environ.get("NIM_WARMUP_RETRY_DELAY_SECONDS", "25"))
+    NIM_WARMUP_RETRY_DELAY_SECONDS: int = min(
+        300, max(1, int(os.environ.get("NIM_WARMUP_RETRY_DELAY_SECONDS", "25")))
     )
 except ValueError:
     NIM_WARMUP_RETRY_DELAY_SECONDS = 25
