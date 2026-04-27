@@ -30,15 +30,15 @@ _SAFE_REDIRECT = (
 
 _SAFE_DEFAULT = TriageResponse(
     mts_level=3,
-    mts_label="Urgent",
+    mts_label="Επείγον",
     specialty=_GP_SPECIALTY,
     doctor=Doctor(
         name=_GP_NAME,
         specialty=_GP_SPECIALTY,
         availability=True,
-        fallback_note="Processing failed — please consult a doctor.",
+        fallback_note="Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό.",
     ),
-    reasoning="Processing failed — please consult a doctor.",
+    reasoning="Αδυναμία επεξεργασίας — παρακαλώ επικοινωνήστε με ιατρό.",
     redirect_url=_SAFE_REDIRECT,
     rag_used=False,
 )
@@ -76,9 +76,10 @@ def _resolve_lang(lang: str) -> str:
 
 
 def _specialty_for_doctor_lookup(specialty: str, lang: str) -> str:
-    if lang != "en":
+    # doctors.json uses English specialty names; translate Greek→English when needed
+    if lang == "en":
         return specialty
-    return _SPECIALTY_EN_TO_EL_NORMALIZED.get(_normalize_specialty(specialty), specialty)
+    return _SPECIALTY_EL_TO_EN_NORMALIZED.get(_normalize_specialty(specialty), specialty)
 
 
 def _specialty_for_response(specialty: str, lang: str) -> str:

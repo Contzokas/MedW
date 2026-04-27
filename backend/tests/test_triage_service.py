@@ -173,6 +173,15 @@ def reset_queue():
     queue_module._queue.clear()
 
 
+@pytest.fixture(autouse=True)
+def load_real_doctors():
+    from app.services import doctor_service as _ds
+    _ds.load_doctors()
+    yield
+    _ds._doctors_by_specialty.clear()
+    _ds._all_doctors.clear()
+
+
 async def test_triage_tier1_rag_and_llm_success(monkeypatch):
     monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="context"))
     monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(return_value=_VALID_LLM_RESULT))
@@ -197,7 +206,9 @@ async def test_triage_tier3_llm_parse_error_returns_safe_default(monkeypatch):
     monkeypatch.setattr("app.services.triage_service.llm_classify", AsyncMock(side_effect=_LLMParseError("bad")))
     result = await triage_classify("πόνος", "patient-003")
     assert result.mts_level == 3
-    assert result.specialty == "General Practice"
+    assert result.mts_label == "Επείγον"
+    assert result.specialty == "Γενική Ιατρική"
+    assert "Αδυναμία επεξεργασίας" in result.reasoning
     assert result.rag_used is False
 
 
@@ -205,7 +216,9 @@ async def test_triage_tier3_unexpected_exception_returns_safe_default(monkeypatc
     monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(side_effect=RuntimeError("boom")))
     result = await triage_classify("πόνος", "patient-004")
     assert result.mts_level == 3
-    assert result.specialty == "General Practice"
+    assert result.mts_label == "Επείγον"
+    assert result.specialty == "Γενική Ιατρική"
+    assert "Αδυναμία επεξεργασίας" in result.reasoning
 
 
 async def test_triage_en_passes_lang_to_llm_and_returns_english_default_on_failure(monkeypatch):
