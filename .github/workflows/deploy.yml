@@ -273,9 +273,9 @@ jobs:
             local name="$1"
             echo "Deleting workload: $name"
             RESP=$(curl -sSL --max-time 30 \
-              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
               -H "Authorization: Bearer $TOKEN")
-            WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .id // empty")
+            WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"$name\") | .id // empty")
             if [ -z "$WL_ID" ] || [ "$WL_ID" = "null" ]; then
               echo "  $name not found — nothing to delete"; return 0
             fi
@@ -284,8 +284,8 @@ jobs:
               -H "Authorization: Bearer $TOKEN" || true
             for i in $(seq 1 30); do
               CHECK=$(curl -sSL --max-time 30 \
-                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
-                -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .phase // empty")
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"$name\") | .phase // empty")
               [ -z "$CHECK" ] && echo "  $name removed" && return 0
               echo "  [$i] $name phase: $CHECK — waiting..."; sleep 5
             done
@@ -376,8 +376,8 @@ jobs:
             echo "━━━ Resolving $name ━━━" >&2
             for i in $(seq 1 $max); do
               local wl=$(curl -sSL --max-time 30 \
-                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
-                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
               local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
@@ -469,8 +469,8 @@ jobs:
             local name="$1" scheme="${2:-http}" max=120
             for i in $(seq 1 $max); do
               local wl=$(curl -sSL --max-time 30 \
-                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
-                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
               local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
@@ -546,8 +546,8 @@ jobs:
             local name="$1" scheme="${2:-http}" max=120
             for i in $(seq 1 $max); do
               local wl=$(curl -sSL --max-time 30 \
-                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
-                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
               local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
@@ -595,6 +595,6 @@ jobs:
         if: always()
         run: |
           curl -fsSL --max-time 30 \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=1000" \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
             -H "Authorization: Bearer $TOKEN" \
             | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'
