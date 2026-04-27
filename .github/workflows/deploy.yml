@@ -164,11 +164,9 @@ jobs:
   #   dev                → medw-nim-dev,  medw-backend-dev,  ...
   #   main               → medw-nim,       medw-backend,       ...
   #
-  # GPU split across 3× B200:
-  #   GPU 0 (fraction 0.15): Milvus (cuVS)
-  #   GPU 0 (fraction 0.20): NIM embed
-  #   GPU 0 (fraction 0.20): NIM reranker
-  #   GPU 1+2 (full 2×):     NIM LLM (tensor parallel)
+  # GPU strategy:
+  #   GPU 1+2 (full 2×): NIM LLM (tensor parallel)
+  #   CPU only:          NIM embed, backend, frontend
   #
   # Required secrets:
   #   RUNAI_CLIENT_ID / RUNAI_CLIENT_SECRET — Run:ai → Settings → Application
@@ -257,7 +255,7 @@ jobs:
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
           echo "    medw-nim${{ env.SUFFIX }}       (GPU 1+2 — LLM tensor parallel)"
-          echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 0 — embedding NIM)"
+          echo "    medw-nim-embed${{ env.SUFFIX }} (CPU — embedding NIM)"
           echo "    medw-backend${{ env.SUFFIX }}   (CPU — Milvus Lite embedded)"
           echo "    medw-frontend${{ env.SUFFIX }}  (CPU)"
           echo "  Reranker    : NVIDIA cloud API (integrate.api.nvidia.com)"
@@ -331,7 +329,7 @@ jobs:
           [ "$STATUS" = "409" ] && echo "NIM LLM already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM LLM failed"; exit 1; }
 
-      - name: Deploy NIM Embed (GPU 0 × 0.20)
+      - name: Deploy NIM Embed (CPU)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
@@ -346,7 +344,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G" },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
@@ -364,7 +362,7 @@ jobs:
           [ "$STATUS" = "409" ] && echo "NIM Embed already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
 
-      # ── Resolve GPU service URLs ──────────────────────────────────────────
+      # ── Resolve NIM service URLs ──────────────────────────────────────────
       - name: Resolve NIM and Embed URLs
         run: |
           resolve_url() {
@@ -374,11 +372,22 @@ jobs:
               local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
                 -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                [ -n "$url" ] && [ "$url" != "null" ] && echo "${scheme}://${url}" && return 0
-                echo "  ERROR: Running but no URL" >&2; echo "$wl" | jq '.' >&2; return 1
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                if [ "$phase" != "Running" ]; then
+                  echo "  [$i] $name URL available while phase=$phase; proceeding" >&2
+                fi
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
+              fi
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
               fi
               sleep 5
             done
@@ -458,10 +467,22 @@ jobs:
               local wl=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
                 -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[] | select(.name == \"$name\")")
               local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
               echo "  [$i] $name: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                [ -n "$url" ] && [ "$url" != "null" ] && echo "${scheme}://${url}" && return 0
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                if [ "$phase" != "Running" ]; then
+                  echo "  [$i] $name URL available while phase=$phase; proceeding" >&2
+                fi
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
+              fi
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
               fi
               sleep 5
             done

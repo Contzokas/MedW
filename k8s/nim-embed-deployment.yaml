@@ -1,8 +1,8 @@
-# NIM Embedding — fractional GPU workload (Run:ai scheduled)
+# NIM Embedding — CPU workload
 #
 # Model: nvidia/nv-embedqa-llama-3_2-1b-v2  (NeMo Retriever)
-# Shares GPU 0 (1× B200) with nim-reranker via Run:ai fractional scheduling.
-# ~2 GB weights at FP8 — trivially small on a 192 GB B200.
+# Runs on CPU to avoid requiring a third B200 during deployment.
+# 1B model remains usable on CPU for this pipeline.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -12,7 +12,6 @@ metadata:
   labels:
     app: medw-nim-embed
     app.kubernetes.io/part-of: medw
-    gpu-type: b200
 spec:
   replicas: 1
   selector:
@@ -22,20 +21,8 @@ spec:
     metadata:
       labels:
         app: medw-nim-embed
-        gpu-type: b200
         runai/tag: test
-      annotations: {}
     spec:
-      schedulerName: runai-scheduler
-
-      nodeSelector:
-        nvidia.com/gpu.product: NVIDIA-B200
-
-      tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-
       imagePullSecrets:
         - name: dockerregistry-nvcr-io
 
@@ -58,11 +45,10 @@ spec:
           resources:
             requests:
               memory: "8Gi"
-              cpu: "2"
+              cpu: "4"
             limits:
               memory: "8Gi"
-              cpu: "2"
-              nvidia.com/gpu: 1
+              cpu: "4"
 
           readinessProbe:
             httpGet:

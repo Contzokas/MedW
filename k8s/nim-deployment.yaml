@@ -9,9 +9,9 @@
 # Requires: NGC_API_KEY secret (genericsecret-ngc) for model download
 # Registry auth: dockerregistry-nvcr-io
 #
-# GPU split across 3× B200 (192 GB HBM3e each = 576 GB total):
-#   GPU 0 (1× B200): nim-embed + nim-reranker (fractional, ~15 GB total)
-#   GPU 1+2 (2× B200): LLM tensor parallel (120B MoE FP8 ~120 GB + KV cache)
+# GPU allocation:
+#   2× B200: LLM tensor parallel (120B MoE FP8 ~120 GB + KV cache)
+#   1× B200 remains available for other workloads if needed
 
 apiVersion: apps/v1
 kind: Deployment
