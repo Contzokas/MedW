@@ -55,7 +55,18 @@ def _ensure_collection(client: MilvusClient) -> None:
         return
 
     # Probe actual embedding dimension from NIM rather than hardcoding it
-    dim = len(_embed_texts(["probe"])[0])
+    import time
+    dim = None
+    for attempt in range(120):
+        try:
+            dim = len(_embed_texts(["probe"])[0])
+            break
+        except Exception as exc:
+            logger.info("Waiting for NIM Embed to become ready (attempt %d/120)...", attempt + 1)
+            time.sleep(15)
+            
+    if dim is None:
+        raise Exception("NIM Embed service did not become ready in time")
 
     schema = client.create_schema(auto_id=False, enable_dynamic_field=False)
     schema.add_field("id", DataType.VARCHAR, max_length=256, is_primary=True)
