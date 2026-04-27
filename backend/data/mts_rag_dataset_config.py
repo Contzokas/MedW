@@ -81,7 +81,7 @@ def load_config_builder() -> dd.DataDesignerConfigBuilder:
     config_builder.add_column(
         column_config=dd.LLMStructuredColumnConfig(
             name="triage_scenario",
-            model_alias="openrouter-text",
+            model_alias="nvidia-text",
             output_format=TriageScenario,
             system_prompt=f"You are an expert clinical triage nurse and medical educator. You create realistic, challenging but unambiguous patient vignettes to test a RAG system's knowledge of the Manchester Triage System (MTS). Use the following guidelines to inform the cases:\n{MTS_GUIDELINES}",
             prompt="Generate a unique, realistic triage scenario for a {{ patient_demographics }} presenting with an issue in the {{ symptom_category }} category. Ensure it clearly maps to exactly one MTS level (between 1 and 5)."
