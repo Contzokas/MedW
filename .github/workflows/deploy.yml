@@ -377,14 +377,15 @@ jobs:
               echo "  [$i] $name: $phase" >&2
               if [ -n "$url" ] && [ "$url" != "null" ]; then
                 if [ "$phase" != "Running" ]; then
-                  echo "  [$i] $name URL available while phase=$phase; proceeding" >&2
-                fi
-                if [[ "$url" == http://* || "$url" == https://* ]]; then
-                  echo "$url"
+                  echo "  [$i] $name URL available but phase=$phase; waiting for Running..." >&2
                 else
-                  echo "${scheme}://${url}"
+                  if [[ "$url" == http://* || "$url" == https://* ]]; then
+                    echo "$url"
+                  else
+                    echo "${scheme}://${url}"
+                  fi
+                  return 0
                 fi
-                return 0
               fi
               if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
                 echo "  ERROR: $name entered phase $phase" >&2
@@ -472,14 +473,15 @@ jobs:
               echo "  [$i] $name: $phase" >&2
               if [ -n "$url" ] && [ "$url" != "null" ]; then
                 if [ "$phase" != "Running" ]; then
-                  echo "  [$i] $name URL available while phase=$phase; proceeding" >&2
-                fi
-                if [[ "$url" == http://* || "$url" == https://* ]]; then
-                  echo "$url"
+                  echo "  [$i] $name URL available but phase=$phase; waiting for Running..." >&2
                 else
-                  echo "${scheme}://${url}"
+                  if [[ "$url" == http://* || "$url" == https://* ]]; then
+                    echo "$url"
+                  else
+                    echo "${scheme}://${url}"
+                  fi
+                  return 0
                 fi
-                return 0
               fi
               if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
                 echo "  ERROR: $name entered phase $phase" >&2
