@@ -401,7 +401,7 @@ jobs:
                 image: "milvusdb/milvus:v2.5.0",
                 command: "milvus",
                 args: "run standalone",
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 4, cpuMemoryRequest: "4G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.15 },
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 4, cpuMemoryRequest: "4G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.15 },
                 environmentVariables: [
                   {name: "ETCD_ENDPOINTS",            value: $etcd},
                   {name: "MINIO_ADDRESS",              value: $minio},
@@ -470,7 +470,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.20 },
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.20 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
@@ -503,7 +503,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.20 },
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1, gpuPortionRequest: 0.20 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
