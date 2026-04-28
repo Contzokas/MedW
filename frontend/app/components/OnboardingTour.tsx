@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLang } from "@/app/lib/lang-context"
 
 interface OnboardingTourProps {
@@ -58,7 +58,68 @@ const STEPS: StepConfig[] = [
   },
 ]
 
-const PADDING = 12 // spotlight padding around target element
+const PADDING = 12
+
+interface SpotlightRect {
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
+/** Measure the target element's viewport position for the spotlight box. */
+function computeSpotlight(targetId: string): SpotlightRect | null {
+  const el = document.getElementById(targetId)
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  return {
+    top: r.top - PADDING,
+    left: r.left - PADDING,
+    width: r.width + PADDING * 2,
+    height: r.height + PADDING * 2,
+  }
+}
+
+/** Compute card position relative to target element, clamped to viewport. */
+function computeCardStyle(targetId: string | undefined): React.CSSProperties {
+  if (!targetId) {
+    return {
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "min(90vw, 400px)",
+    }
+  }
+  const el = document.getElementById(targetId)
+  if (!el) {
+    return {
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "min(90vw, 400px)",
+    }
+  }
+
+  const rect = el.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const cardWidth = Math.min(vw * 0.9, 380)
+  const cardHeight = 220 // conservative estimate
+
+  let left = rect.left + rect.width / 2 - cardWidth / 2
+  left = Math.max(12, Math.min(left, vw - cardWidth - 12))
+
+  const spaceBelow = vh - (rect.bottom + PADDING)
+  let top: number
+  if (spaceBelow >= cardHeight + 16) {
+    top = rect.bottom + PADDING + 16
+  } else {
+    top = rect.top - PADDING - cardHeight - 16
+  }
+  top = Math.max(12, Math.min(top, vh - cardHeight - 12))
+
+  return { top, left, width: cardWidth, transform: "none" }
+}
 
 export default function OnboardingTour({
   isOpen,
@@ -72,9 +133,19 @@ export default function OnboardingTour({
   const cardRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  // Positions are stored in state and computed after scroll settles in useEffect
+  const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null)
+  const [cardStyle, setCardStyle] = useState<React.CSSProperties>({
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    width: "min(90vw, 400px)",
+  })
+
+  const cfg = STEPS[step]
   const isLast = step === totalSteps - 1
 
-  // Keyboard navigation
+  // ── Keyboard navigation ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return
     const handler = (e: KeyboardEvent) => {
@@ -86,88 +157,57 @@ export default function OnboardingTour({
     return () => window.removeEventListener("keydown", handler)
   }, [isOpen, onNext, onPrev, onSkip])
 
-  // Trap focus inside the card while tour is open
+  // ── Auto-focus first button on each step ────────────────────────────────
   useEffect(() => {
     if (isOpen && cardRef.current) {
-      const firstFocusable = cardRef.current.querySelector<HTMLElement>(
-        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
-      )
-      firstFocusable?.focus()
+      const firstBtn = cardRef.current.querySelector<HTMLElement>("button")
+      firstBtn?.focus()
     }
   }, [isOpen, step])
 
-  // Scroll target into view
+  // ── Scroll target into view, then measure positions after scroll settles ─
   useEffect(() => {
-    const cfg = STEPS[step]
-    if (cfg?.targetId) {
-      const el = document.getElementById(cfg.targetId)
-      el?.scrollIntoView({ behavior: "smooth", block: "center" })
-    }
-  }, [step])
+    if (!isOpen) return
 
-  const getSpotlightStyle = useCallback((): React.CSSProperties => {
-    const cfg = STEPS[step]
-    if (!cfg?.targetId) return {}
-    const el = document.getElementById(cfg.targetId)
-    if (!el) return {}
-    const rect = el.getBoundingClientRect()
-    return {
-      top: rect.top - PADDING,
-      left: rect.left - PADDING,
-      width: rect.width + PADDING * 2,
-      height: rect.height + PADDING * 2,
-    }
-  }, [step])
+    const targetId = cfg?.targetId
 
-  const getCardPosition = useCallback((): React.CSSProperties => {
-    const cfg = STEPS[step]
-    if (!cfg?.targetId) {
-      // Welcome / centered
-      return {
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "min(90vw, 400px)",
+    // Clear spotlight immediately on step change to avoid stale flash
+    setSpotlightRect(null)
+
+    if (targetId) {
+      const el = document.getElementById(targetId)
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" })
       }
     }
-    const el = document.getElementById(cfg.targetId)
-    if (!el) {
-      return {
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "min(90vw, 400px)",
+
+    // Wait for smooth-scroll to finish (~300ms), then measure
+    const timerId = setTimeout(() => {
+      if (targetId) {
+        setSpotlightRect(computeSpotlight(targetId))
       }
+      setCardStyle(computeCardStyle(targetId))
+    }, 350)
+
+    return () => clearTimeout(timerId)
+  }, [isOpen, step, cfg?.targetId])
+
+  // ── Recompute on viewport resize ─────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen) return
+    const targetId = cfg?.targetId
+    const handler = () => {
+      setSpotlightRect(targetId ? computeSpotlight(targetId) : null)
+      setCardStyle(computeCardStyle(targetId))
     }
-    const rect = el.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const cardWidth = Math.min(vw * 0.9, 380)
+    window.addEventListener("resize", handler)
+    return () => window.removeEventListener("resize", handler)
+  }, [isOpen, cfg?.targetId])
 
-    let left = rect.left + rect.width / 2 - cardWidth / 2
-    // Clamp horizontally
-    left = Math.max(12, Math.min(left, vw - cardWidth - 12))
+  if (!isOpen || !cfg) return null
 
-    let top: number
-    const spaceBelow = vh - (rect.bottom + PADDING)
-    const cardHeight = 200 // approximate
-    if (spaceBelow >= cardHeight + 16) {
-      top = rect.bottom + PADDING + 16
-    } else {
-      top = rect.top - PADDING - cardHeight - 16
-    }
-    top = Math.max(12, Math.min(top, vh - cardHeight - 12))
-
-    return { top, left, width: cardWidth, transform: "none" }
-  }, [step])
-
-  if (!isOpen) return null
-
-  const cfg = STEPS[step]
   const title = lang === "el" ? cfg.titleEl : cfg.titleEn
   const body = lang === "el" ? cfg.bodyEl : cfg.bodyEn
-  const spotlightStyle = getSpotlightStyle()
-  const cardStyle = getCardPosition()
   const hasTarget = !!cfg.targetId
 
   return (
@@ -177,13 +217,15 @@ export default function OnboardingTour({
       role="dialog"
       aria-modal="true"
       aria-label={lang === "el" ? "Ξενάγηση εφαρμογής" : "Application tour"}
-      onClick={(e) => { if (e.target === overlayRef.current) onSkip() }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onSkip()
+      }}
     >
-      {/* Spotlight cutout */}
-      {hasTarget && (
+      {/* Spotlight — rendered only once rect is measured */}
+      {hasTarget && spotlightRect && (
         <div
           className="tour-spotlight"
-          style={spotlightStyle}
+          style={spotlightRect}
           aria-hidden="true"
         />
       )}
