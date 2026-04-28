@@ -292,7 +292,8 @@ jobs:
             echo "  WARNING: $name not removed after 150s — proceeding"
           }
 
-          delete_workload "medw-nim${SUFFIX}"
+          # medw-nim (LLM) is intentionally NOT deleted — model download takes too long.
+          # It will be reused if already running; the deploy step handles 409 gracefully.
           delete_workload "medw-nim-embed${SUFFIX}"
           delete_workload "medw-nim-reranker${SUFFIX}"   # legacy cleanup from previous runs
           delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
