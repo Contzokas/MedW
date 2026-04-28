@@ -36,3 +36,7 @@ try:
     QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))
 except ValueError:
     QUEUE_MAX_ENTRIES: int = 1000
+try:
+    MAX_FOLLOW_UP_QUESTIONS: int = max(0, int(os.environ.get("MAX_FOLLOW_UP_QUESTIONS", "2")))
+except ValueError:
+    MAX_FOLLOW_UP_QUESTIONS: int = 2

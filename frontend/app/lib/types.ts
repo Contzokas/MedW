@@ -2,6 +2,14 @@ export interface TriageRequest {
   symptoms: string
   patient_id: string
   lang: "en" | "el"
+  follow_up_count?: number
+  conversation_context?: string
+}
+
+export interface FollowUpResponse {
+  type: "follow_up"
+  question: string
+  follow_up_count: number
 }
 
 export interface Doctor {

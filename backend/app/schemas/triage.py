@@ -9,6 +9,14 @@ class TriageRequest(BaseModel):
     symptoms: constr(strip_whitespace=True, min_length=1)
     patient_id: constr(strip_whitespace=True, min_length=1)
     lang: Literal["en", "el"] = "el"
+    follow_up_count: int = 0
+    conversation_context: str = ""
+
+
+class FollowUpResponse(BaseModel):
+    type: Literal["follow_up"] = "follow_up"
+    question: str
+    follow_up_count: int
 
 
 class TriageResponse(BaseModel):

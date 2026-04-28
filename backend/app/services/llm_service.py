@@ -120,6 +120,15 @@ _HUMAN_TEMPLATE = (
     "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage."
 )
 
+_HUMAN_TEMPLATE_WITH_FOLLOWUP = (
+    _HUMAN_TEMPLATE
+    + "\n\nIf the symptoms are too vague to confidently triage, you may instead return:\n"
+    '{{"follow_up_question": "<one concise clarifying question in {output_language}>"}}\n'
+    "Only do this if a single targeted question would meaningfully improve your confidence.\n"
+    "Do not ask follow-up questions if follow_up_count >= {max_follow_ups}.\n"
+    "Current follow_up_count: {follow_up_count}"
+)
+
 
 class LLMParseError(Exception):
     pass
@@ -154,7 +163,7 @@ def _extract_json_object(raw: str) -> str:
     return ""
 
 
-def _build_chain():
+def _build_chain(human_template: str = _HUMAN_TEMPLATE):
     llm = ChatNVIDIA(
         base_url=NIM_BASE_URL,
         model=NIM_MODEL,
@@ -168,13 +177,14 @@ def _build_chain():
         },
     )
     prompt = ChatPromptTemplate.from_messages(
-        [("system", _SYSTEM_PROMPT), ("human", _HUMAN_TEMPLATE)]
+        [("system", _SYSTEM_PROMPT), ("human", human_template)]
     )
     return prompt | llm | StrOutputParser()
 
 
-# Module-level lazy singleton — chain is built once and reused across requests.
+# Module-level lazy singletons — chains are built once and reused across requests.
 _chain = None
+_chain_followup = None
 
 
 def _get_chain():
@@ -184,9 +194,33 @@ def _get_chain():
     return _chain
 
 
-def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el") -> str:
+def _get_followup_chain():
+    global _chain_followup
+    if _chain_followup is None:
+        _chain_followup = _build_chain(_HUMAN_TEMPLATE_WITH_FOLLOWUP)
+    return _chain_followup
+
+
+def _invoke_chain_sync(
+    symptoms: str,
+    context: str,
+    lang: str = "el",
+    follow_up_count: int = 0,
+    max_follow_ups: int = 2,
+) -> str:
     output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
     input_language = output_language
+    if follow_up_count < max_follow_ups:
+        return _get_followup_chain().invoke(
+            {
+                "symptoms": symptoms,
+                "context": context,
+                "output_language": output_language,
+                "input_language": input_language,
+                "follow_up_count": follow_up_count,
+                "max_follow_ups": max_follow_ups,
+            }
+        )
     return _get_chain().invoke(
         {
             "symptoms": symptoms,
@@ -342,6 +376,11 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
         logger.warning("LLM response JSON decode failed: %s", type(exc).__name__)
         raise LLMParseError("JSON decode failed") from exc
 
+    if "follow_up_question" in data:
+        if not isinstance(data["follow_up_question"], str) or not data["follow_up_question"].strip():
+            raise LLMParseError("follow_up_question must be a non-empty string")
+        return {"follow_up_question": data["follow_up_question"]}
+
     required = {"mts_level", "mts_label", "specialty", "reasoning"}
     missing = required - set(data.keys())
     if missing:
@@ -379,9 +418,17 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     return _enforce_output_language(data, lang)
 
 
-async def classify(symptoms: str, context: str, lang: str = "el") -> dict:
+async def classify(
+    symptoms: str,
+    context: str,
+    lang: str = "el",
+    follow_up_count: int = 0,
+    max_follow_ups: int = 2,
+) -> dict:
     try:
-        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
+        raw = await asyncio.to_thread(
+            _invoke_chain_sync, symptoms, context, lang, follow_up_count, max_follow_ups
+        )
         return _parse_response(raw, lang)
     except LLMParseError:
         raise
