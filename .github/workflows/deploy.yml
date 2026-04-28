@@ -351,7 +351,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.5 },
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}

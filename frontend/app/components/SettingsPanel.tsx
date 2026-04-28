@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { useLang } from "@/app/lib/lang-context"
 import { useTheme } from "@/app/lib/theme-context"
-import { useOnboarding } from "@/app/lib/useOnboarding"
 
 export default function SettingsPanel() {
   const { lang, t, toggleLang } = useLang()
   const { theme, setTheme } = useTheme()
-  const { restart: restartTour } = useOnboarding(4)
+
+  const handleReplayTour = () => {
+    try { localStorage.removeItem("medw_onboarding_done") } catch { /* noop */ }
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -145,7 +147,7 @@ export default function SettingsPanel() {
           </p>
           <Link
             href="/"
-            onClick={restartTour}
+            onClick={handleReplayTour}
             id="settings-replay-tour"
             className="flex items-center gap-3 rounded-xl border-2 border-border/50 bg-card/60 px-4 py-3 text-sm font-semibold text-muted-foreground hover:border-border hover:text-foreground transition-colors"
           >
