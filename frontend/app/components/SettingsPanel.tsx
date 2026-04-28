@@ -3,14 +3,25 @@
 import Link from "next/link"
 import { useLang } from "@/app/lib/lang-context"
 import { useTheme } from "@/app/lib/theme-context"
+import { usePWA } from "@/app/lib/usePWA"
 
 export default function SettingsPanel() {
   const { lang, t, toggleLang } = useLang()
   const { theme, setTheme } = useTheme()
+  const { canInstall, isInstalled, isIOS, install } = usePWA()
 
   const handleReplayTour = () => {
     try { localStorage.removeItem("medw_onboarding_done") } catch { /* noop */ }
   }
+
+  const installLabel = lang === "el" ? "Εγκατάσταση Εφαρμογής" : "Install App"
+  const installHintBrave = lang === "el"
+    ? "Κάντε κλικ στο εικονίδιο εγκατάστασης στη γραμμή διευθύνσεων του Brave."
+    : "Click the install icon (⊕) in Brave's address bar to add MEDΩ to your desktop."
+  const installHintIOS = lang === "el"
+    ? 'Πατήστε "Κοινοποίηση" και μετά "Προσθήκη στην οθόνη Αρχικής".'
+    : 'Tap the Share button then "Add to Home Screen".'
+  const installedLabel = lang === "el" ? "Η εφαρμογή είναι εγκατεστημένη ✓" : "App already installed ✓"
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -140,6 +151,41 @@ export default function SettingsPanel() {
             </button>
           </div>
         </section>
+        {/* Install App Section */}
+        <section>
+          <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground mb-3">
+            {installLabel}
+          </p>
+          {isInstalled ? (
+            <div className="flex items-center gap-3 rounded-xl border-2 border-primary/30 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+              </svg>
+              {installedLabel}
+            </div>
+          ) : canInstall ? (
+            <button
+              id="settings-install-btn"
+              type="button"
+              onClick={install}
+              className="w-full flex items-center gap-3 rounded-xl border-2 border-primary/40 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/10 hover:border-primary/60 transition-colors"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              {installLabel}
+            </button>
+          ) : isIOS ? (
+            <div className="rounded-xl border-2 border-border/50 bg-card/60 px-4 py-3 text-sm text-muted-foreground">
+              <p>{installHintIOS}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border-2 border-border/50 bg-card/60 px-4 py-3 text-sm text-muted-foreground">
+              <p>{installHintBrave}</p>
+            </div>
+          )}
+        </section>
+
         {/* Tour Section */}
         <section>
           <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground mb-3">
