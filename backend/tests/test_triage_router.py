@@ -40,7 +40,7 @@ async def test_triage_post_returns_200_with_all_fields(client):
     assert "redirect_url" in data
     assert "reasoning" in data
     assert "rag_used" in data
-    mock_classify.assert_called_once_with("πόνος στο στήθος", "test-001", "el")
+    mock_classify.assert_called_once_with("πόνος στο στήθος", "test-001", "el", 0, "")
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_triage_post_forwards_lang_to_service(client):
         )
 
     assert response.status_code == 200
-    mock_classify.assert_called_once_with("chest pain", "test-english", "en")
+    mock_classify.assert_called_once_with("chest pain", "test-english", "en", 0, "")
 
 
 @pytest.mark.asyncio

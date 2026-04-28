@@ -26,6 +26,12 @@ export const translations = {
       label: "Recommended Doctor",
       link: "Find the doctor at finddoctors.gov.gr",
     },
+    followUp: {
+      questionLabel: "The assistant needs more information:",
+      answerPlaceholder: "Your answer...",
+      submit: "Continue",
+      back: "Start over",
+    },
     disclaimer: {
       ariaLabel: "Important medical notice",
       title: "⚠️ Important Notice",
@@ -90,6 +96,12 @@ export const translations = {
     doctor: {
       label: "Συνιστώμενος Ιατρός",
       link: "Βρείτε τον γιατρό στο finddoctors.gov.gr",
+    },
+    followUp: {
+      questionLabel: "Ο βοηθός χρειάζεται περισσότερες πληροφορίες:",
+      answerPlaceholder: "Η απάντησή σας...",
+      submit: "Συνέχεια",
+      back: "Ξεκινήστε από την αρχή",
     },
     disclaimer: {
       ariaLabel: "Σημαντική ιατρική ειδοποίηση",
