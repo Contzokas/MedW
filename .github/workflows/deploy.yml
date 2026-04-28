@@ -6,7 +6,7 @@ on:
       - main
       - dev
       - feature/nvidia-rag
-  workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
+  workflow_dispatch: # allow manual trigger from any branch in GitHub UI
 
 concurrency:
   group: deploy-${{ github.ref_name }}
@@ -15,11 +15,11 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   ORG: contzokas
-  NIM_IMAGE:          nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
-  NIM_EMBED_IMAGE:    nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
-  RUNAI_CLUSTER_URL:  https://runai.kiefersa.gr
-  RUNAI_PROJECT:      medo
-  RUNAI_CLUSTER_ID:   0403162b-5439-4561-b986-332482767449
+  NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+  NIM_EMBED_IMAGE: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
+  RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
+  RUNAI_PROJECT: medo
+  RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -34,11 +34,11 @@ jobs:
     name: Resolve deployment environment
     runs-on: ubuntu-latest
     outputs:
-      tag:            ${{ steps.resolve.outputs.tag }}
-      suffix:         ${{ steps.resolve.outputs.suffix }}
-      env:            ${{ steps.resolve.outputs.env }}
-      sha_short:      ${{ steps.resolve.outputs.sha_short }}
-      immutable_tag:  ${{ steps.resolve.outputs.immutable_tag }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      suffix: ${{ steps.resolve.outputs.suffix }}
+      env: ${{ steps.resolve.outputs.env }}
+      sha_short: ${{ steps.resolve.outputs.sha_short }}
+      immutable_tag: ${{ steps.resolve.outputs.immutable_tag }}
     steps:
       - name: Resolve tag and suffix from branch
         id: resolve
@@ -184,18 +184,18 @@ jobs:
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
-      actions: write        # required for cancel-in-progress and environment variable updates
+      actions: write # required for cancel-in-progress and environment variable updates
     env:
-      TAG:           ${{ needs.setup.outputs.tag }}
-      SUFFIX:        ${{ needs.setup.outputs.suffix }}
-      SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
+      TAG: ${{ needs.setup.outputs.tag }}
+      SUFFIX: ${{ needs.setup.outputs.suffix }}
+      SHA_SHORT: ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-      NIM_MODEL:                        ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
-      NIM_TIMEOUT:                      ${{ vars.NIM_TIMEOUT || '120' }}
-      NIM_WARMUP_ENABLED:               ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
-      NIM_WARMUP_RETRIES:               ${{ vars.NIM_WARMUP_RETRIES || '120' }}
-      NIM_WARMUP_RETRY_DELAY_SECONDS:   ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
-      NIM_EMBED_MODEL:    nvidia/nv-embedqa-e5-v5
+      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
+      NIM_TIMEOUT: ${{ vars.NIM_TIMEOUT || '120' }}
+      NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
+      NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
+      NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_EMBED_MODEL: nvidia/nv-embedqa-e5-v5
       NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
     steps:
       - uses: actions/checkout@v4
@@ -220,7 +220,7 @@ jobs:
       # ── Auth ──────────────────────────────────────────────────────────────
       - name: Authenticate and resolve project
         env:
-          RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
+          RUNAI_CLIENT_ID: ${{ secrets.RUNAI_CLIENT_ID }}
           RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
           TOKEN=$(curl -fsSL --max-time 30 -X POST \
@@ -350,7 +350,7 @@ jobs:
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 0.5 },
                 environmentVariables: [
                   {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}

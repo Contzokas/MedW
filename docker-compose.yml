@@ -71,6 +71,8 @@ services:
       chromadb:
         condition: service_started
     restart: unless-stopped
+    volumes:
+      - backend_data:/app/data
 
   frontend:
     build:
@@ -92,3 +94,4 @@ services:
 volumes:
   nim_cache:
   chroma_data:
+  backend_data:

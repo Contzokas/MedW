@@ -176,4 +176,10 @@ async def classify(
     except Exception as exc:
         logger.error("Queue append failure: %s", type(exc).__name__)
 
+    try:
+        from app.services.history_service import save_triage_result
+        await save_triage_result(patient_id, enriched_symptoms, result, resolved_lang)
+    except Exception as exc:
+        logger.error("History save failure: %s", type(exc).__name__)
+
     return result
