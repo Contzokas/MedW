@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - feature/nvidia-rag
   workflow_dispatch:   # allow manual trigger from any branch in GitHub UI
 
 concurrency:
@@ -14,24 +15,23 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   ORG: contzokas
-  CHROMA_UPSTREAM_IMAGE: chromadb/chroma:1.5.7
-  NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
-  RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
-  RUNAI_PROJECT: medo
-  RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # suppress Node.js 20 deprecation on all actions
+  NIM_IMAGE:          nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+  NIM_EMBED_IMAGE:    nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
+  RUNAI_CLUSTER_URL:  https://runai.kiefersa.gr
+  RUNAI_PROJECT:      medo
+  RUNAI_CLUSTER_ID:   0403162b-5439-4561-b986-332482767449
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
   # Job 0: Resolve branch → image tag + workload suffix
-  #   main                    → tag=latest  suffix=""
-  #   dev                     → tag=dev     suffix="-dev"
-  #   feature/deploy-to-runai → tag=test    suffix="-test"
-  #   any other branch        → tag=test    suffix="-test"
+  #   main               → tag=latest  suffix=""
+  #   dev                → tag=dev     suffix="-dev"
+  #   feature/nvidia-rag → tag=test    suffix="-test"
+  #   any other branch   → tag=test    suffix="-test"
   # ─────────────────────────────────────────────────────────────────────────
   setup:
     name: Resolve deployment environment
-    if: ${{ github.ref_name == 'main' || github.ref_name == 'dev' }}
     runs-on: ubuntu-latest
     outputs:
       tag:            ${{ steps.resolve.outputs.tag }}
@@ -63,11 +63,11 @@ jobs:
           SHA_SHORT="${GITHUB_SHA::7}"
           IMMUTABLE_TAG="${TAG}-${SHA_SHORT}"
 
-          echo "tag=$TAG"       >> $GITHUB_OUTPUT
-          echo "suffix=$SUFFIX" >> $GITHUB_OUTPUT
-          echo "env=$ENV"       >> $GITHUB_OUTPUT
-          echo "sha_short=$SHA_SHORT"         >> $GITHUB_OUTPUT
-          echo "immutable_tag=$IMMUTABLE_TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG"                         >> $GITHUB_OUTPUT
+          echo "suffix=$SUFFIX"                   >> $GITHUB_OUTPUT
+          echo "env=$ENV"                         >> $GITHUB_OUTPUT
+          echo "sha_short=$SHA_SHORT"             >> $GITHUB_OUTPUT
+          echo "immutable_tag=$IMMUTABLE_TAG"     >> $GITHUB_OUTPUT
 
           echo "──────────────────────────────────"
           echo "  Branch : $BRANCH"
@@ -79,7 +79,7 @@ jobs:
           echo "──────────────────────────────────"
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 1-4: Build/mirror images (parallel)
+  # Jobs 1-2: Build images in parallel
   # ─────────────────────────────────────────────────────────────────────────
   build-backend:
     name: Build backend → :${{ needs.setup.outputs.tag }}
@@ -145,9 +145,6 @@ jobs:
             type=raw,value=${{ needs.setup.outputs.tag }}
             type=raw,value=${{ needs.setup.outputs.immutable_tag }}
 
-      # The backend URL is now resolved at runtime via the BACKEND_URL env var
-      # and proxied through Next.js rewrites (see frontend/next.config.ts).
-      # No build-time NEXT_PUBLIC_API_URL is needed.
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -158,63 +155,48 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  mirror-chromadb:
-    name: Mirror chromadb → :${{ needs.setup.outputs.tag }}
-    runs-on: ubuntu-latest
-    needs: setup
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Mirror ChromaDB image to GHCR
-        env:
-          TARGET_REPO: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb
-          TAG: ${{ needs.setup.outputs.tag }}
-          IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-        run: |
-          docker pull "${{ env.CHROMA_UPSTREAM_IMAGE }}"
-          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$TAG"
-          docker tag "${{ env.CHROMA_UPSTREAM_IMAGE }}" "$TARGET_REPO:$IMMUTABLE_TAG"
-          docker push "$TARGET_REPO:$TAG"
-          docker push "$TARGET_REPO:$IMMUTABLE_TAG"
-
   # ─────────────────────────────────────────────────────────────────────────
-  # Job 3: Deploy via Run:ai REST API (no CLI needed)
+  # Job 3: Deploy via Run:ai REST API
   #
   # Workload names are suffixed by branch:
-  #   feature/deploy-to-runai → medw-nim-test, medw-backend-test, ...
-  #   dev                     → medw-nim-dev,  medw-backend-dev,  ...
-  #   main                    → medw-nim,       medw-backend,       ...
+  #   feature/nvidia-rag → medw-nim-test, medw-backend-test, ...
+  #   dev                → medw-nim-dev,  medw-backend-dev,  ...
+  #   main               → medw-nim,       medw-backend,       ...
   #
-  # Required secrets (Settings → Secrets → Actions):
-  #   RUNAI_CLIENT_ID     — from Run:ai → Settings → Application
-  #   RUNAI_CLIENT_SECRET — same place
-  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD — VPN credentials
+  # GPU strategy:
+  #   GPU 1+2 (full 2×): NIM LLM (tensor parallel)
+  #   GPU 3 (1×):        NIM Embed
+  #   CPU only:          backend, frontend
+  #
+  # Required secrets:
+  #   RUNAI_CLIENT_ID / RUNAI_CLIENT_SECRET — Run:ai → Settings → Application
+  #   NGC_API_KEY                           — NVIDIA NGC
+  #   VPN_CONFIG / VPN_USERNAME / VPN_PASSWORD
+  #
+  # Required pre-created PVCs (created once, reused across deploys):
+  #   nim-pvc       500Gi — NIM LLM model cache
+  #   nim-embed-pvc  20Gi — NIM Embed model cache
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
     runs-on: ubuntu-latest
-    needs: [setup, build-backend, build-frontend, mirror-chromadb]
+    needs: [setup, build-backend, build-frontend]
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
-      actions: write
+      actions: write        # required for cancel-in-progress and environment variable updates
     env:
       TAG:           ${{ needs.setup.outputs.tag }}
       SUFFIX:        ${{ needs.setup.outputs.suffix }}
       SHA_SHORT:     ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
-      NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
-      NIM_TIMEOUT: ${{ vars.NIM_TIMEOUT || '120' }}
-      NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
-      NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
-      NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_MODEL:                        ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
+      NIM_TIMEOUT:                      ${{ vars.NIM_TIMEOUT || '120' }}
+      NIM_WARMUP_ENABLED:               ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
+      NIM_WARMUP_RETRIES:               ${{ vars.NIM_WARMUP_RETRIES || '120' }}
+      NIM_WARMUP_RETRY_DELAY_SECONDS:   ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
+      NIM_EMBED_MODEL:    nvidia/nv-embedqa-e5-v5
+      NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
     steps:
       - uses: actions/checkout@v4
 
@@ -232,17 +214,16 @@ jobs:
           username: ${{ secrets.VPN_USERNAME }}
           password: ${{ secrets.VPN_PASSWORD }}
 
-      # runai.kiefersa.gr = 10.184.94.250 (private, VPN-only)
       - name: Add Run:ai host entry
         run: echo "10.184.94.250 runai.kiefersa.gr" | sudo tee -a /etc/hosts
 
-      # ── Auth (REST API, no CLI) ──────────────────────────────────────────
+      # ── Auth ──────────────────────────────────────────────────────────────
       - name: Authenticate and resolve project
         env:
           RUNAI_CLIENT_ID:     ${{ secrets.RUNAI_CLIENT_ID }}
           RUNAI_CLIENT_SECRET: ${{ secrets.RUNAI_CLIENT_SECRET }}
         run: |
-          TOKEN=$(curl -fsSL -X POST \
+          TOKEN=$(curl -fsSL --max-time 30 -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/token" \
             -H "Accept: */*" \
             -H "Content-Type: application/json" \
@@ -252,13 +233,13 @@ jobs:
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "Failed to obtain access token"; exit 1
           fi
+          echo "::add-mask::$TOKEN"
           echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
           echo "Token obtained ($(echo -n "$TOKEN" | wc -c) chars)"
 
-          # Resolve project UUID by name
-          PROJECT_RESP=$(curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
+          PROJECT_RESP=$(curl -fsSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/org-unit/projects" \
             -H "Authorization: Bearer $TOKEN")
-          echo "DEBUG projects response: $PROJECT_RESP"
           PROJECT_ID=$(echo "$PROJECT_RESP" | jq -r '.projects[] | select(.name == "${{ env.RUNAI_PROJECT }}") | .id')
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
             echo "Failed to find project ${{ env.RUNAI_PROJECT }}"; exit 1
@@ -278,213 +259,163 @@ jobs:
           echo "  Cluster     : ${{ env.RUNAI_CLUSTER_ID }}"
           echo "  Project     : ${{ env.RUNAI_PROJECT }} ($PROJECT_ID)"
           echo "  Workloads   :"
-          echo "    medw-chromadb${{ env.SUFFIX }}"
-          echo "    medw-backend${{ env.SUFFIX }}"
-          echo "    medw-frontend${{ env.SUFFIX }}"
-          echo "    medw-nim${{ env.SUFFIX }}  ← 3× B200 GPU"
-          echo "  Images      :"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-backend:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${{ env.IMMUTABLE_TAG }}"
-          echo "    ${{ env.NIM_IMAGE }}"
-          echo "  NIM cfg     : model=${{ env.NIM_MODEL }} timeout=${{ env.NIM_TIMEOUT }}"
-          echo "  Warmup cfg  : enabled=${{ env.NIM_WARMUP_ENABLED }} retries=${{ env.NIM_WARMUP_RETRIES }} retry_delay=${{ env.NIM_WARMUP_RETRY_DELAY_SECONDS }}s"
-          echo "  URLs resolved at runtime via Run:ai API after workloads reach Running"
+          echo "    medw-nim${{ env.SUFFIX }}       (GPU 1+2 — LLM tensor parallel)"
+          echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 3 — embedding NIM)"
+          echo "    medw-backend${{ env.SUFFIX }}   (CPU — Milvus Lite embedded)"
+          echo "    medw-frontend${{ env.SUFFIX }}  (CPU)"
+          echo "  Reranker    : NVIDIA cloud API (integrate.api.nvidia.com)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── Delete stale workloads so new image + env vars always take effect ──
-      # PVCs (nim-pvc, chroma-pvc) are independent of workload lifecycle
-      # and are retained — so the cached NIM engine survives pod recreation.
+      # ── Delete stale workloads ────────────────────────────────────────────
       - name: Delete existing workloads
         run: |
           delete_workload() {
             local name="$1"
             echo "Deleting workload: $name"
-            # Find workload ID by name
-            RESP=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+            RESP=$(curl -sSL --max-time 30 \
+              "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
               -H "Authorization: Bearer $TOKEN")
-            WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .id // empty")
+            WL_ID=$(echo "$RESP" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"$name\") | .id // empty")
             if [ -z "$WL_ID" ] || [ "$WL_ID" = "null" ]; then
-              echo "  $name not found — nothing to delete"
-              return 0
+              echo "  $name not found — nothing to delete"; return 0
             fi
-            DEL_RESP=$(curl -sSL -w "\n%{http_code}" -X DELETE \
+            curl -sSL --max-time 30 -X DELETE \
               "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces/$WL_ID" \
-              -H "Authorization: Bearer $TOKEN") || true
-            DEL_STATUS=$(echo "$DEL_RESP" | tail -1)
-            echo "  $name deleted (HTTP $DEL_STATUS)"
-            # Wait for workload to fully terminate
+              -H "Authorization: Bearer $TOKEN" || true
             for i in $(seq 1 30); do
-              CHECK=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[] | select(.name == \"$name\") | .phase // empty")
-              if [ -z "$CHECK" ]; then
-                echo "  $name fully removed"
-                return 0
-              fi
-              echo "  [$i] $name phase: $CHECK — waiting..."
-              sleep 5
+              CHECK=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"$name\") | .phase // empty")
+              [ -z "$CHECK" ] && echo "  $name removed" && return 0
+              echo "  [$i] $name phase: $CHECK — waiting..."; sleep 5
             done
-            echo "  WARNING: $name not fully removed after 150s — proceeding anyway"
+            echo "  WARNING: $name not removed after 150s — proceeding"
           }
 
           delete_workload "medw-nim${SUFFIX}"
+          delete_workload "medw-nim-embed${SUFFIX}"
+          delete_workload "medw-nim-reranker${SUFFIX}"   # legacy cleanup from previous runs
+          delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
+          delete_workload "medw-milvus-etcd${SUFFIX}"    # legacy cleanup from previous runs
+          delete_workload "medw-milvus-minio${SUFFIX}"   # legacy cleanup from previous runs
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
 
-      # ── Submit workloads via REST API ────────────────────────────────────
-      # Deploy in dependency order: data services → backend → frontend.
-      # After each tier, resolve the auto-assigned NodePort URLs from the
-      # Run:ai API and pass them to downstream workloads as env vars.
-      - name: Deploy ChromaDB
-        run: |
-          CHROMA_JSON=$(jq -n \
-            --arg name "medw-chromadb${SUFFIX}" \
-            --arg projectId "$PROJECT_ID" \
-            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-chromadb:${IMMUTABLE_TAG}" \
-            --arg pvc "chroma-pvc${SUFFIX}" \
-            '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
-              spec: {
-                image: $image,
-                compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
-                environmentVariables: [
-                  {name: "IS_PERSISTENT", value: "TRUE"},
-                  {name: "ANONYMIZED_TELEMETRY", value: "FALSE"},
-                  {name: "CHROMA_SERVER_PORT", value: "8000"}
-                ],
-                ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: {
-                  pvc: [{
-                    path: "/chroma/chroma",
-                    claimName: $pvc,
-                    existingPvc: false,
-                    claimInfo: { size: "10Gi" }
-                  }]
-                }
-              }
-            }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
-            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$CHROMA_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "ChromaDB response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "ChromaDB submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "ChromaDB already exists — skipping"
-          else
-            echo "ChromaDB failed (HTTP $STATUS): $BODY" && exit 1
-          fi
-
-      - name: Deploy NIM (3× B200 GPU)
+      # ── Submit GPU workloads ─────────────────────────────────────────────
+      - name: Deploy NIM LLM (GPU 1+2 — tensor parallel)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
-          NIM_JSON=$(jq -n \
+          PAYLOAD=$(jq -n \
             --arg name "medw-nim${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.NIM_IMAGE }}" \
-            --arg pvc "nim-pvc${SUFFIX}" \
             --arg ngcApiKey "$NGC_API_KEY" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: {
-                  cpuCoreRequest: 24, cpuCoreLimit: 24,
-                  cpuMemoryRequest: "96G", cpuMemoryLimit: "96G",
-                  gpuDevicesRequest: 3
-                },
+                compute: { cpuCoreRequest: 24, cpuCoreLimit: 24, cpuMemoryRequest: "96G", cpuMemoryLimit: "96G", gpuDevicesRequest: 2 },
                 environmentVariables: [
-                  {name: "NGC_API_KEY", value: $ngcApiKey},
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
                   {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: {
-                  pvc: [{
-                    path: "/opt/nim/.cache",
-                    claimName: $pvc,
-                    existingPvc: false,
-                    claimInfo: { size: "500Gi" }
-                  }]
-                }
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-pvc", existingPvc: false, claimInfo: { size: "500Gi" } }] }
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$NIM_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "NIM response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "NIM submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "NIM already exists — skipping"
-          else
-            echo "NIM failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM LLM (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "NIM LLM already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM LLM failed"; exit 1; }
 
-      # ── Resolve data-service URLs from Run:ai API ─────────────────────────
-      # Run:ai does not support fixed NodePorts — poll until Running then
-      # extract the assigned NodePort from the workload's URL field.
-      - name: Resolve ChromaDB and NIM URLs
+      - name: Deploy NIM Embed (GPU 3 — embedding)
+        env:
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg name "medw-nim-embed${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.NIM_EMBED_IMAGE }}" \
+            --arg ngcApiKey "$NGC_API_KEY" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: $image,
+                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
+                environmentVariables: [
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
+                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
+                ],
+                ports: [{container: 8000, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-embed-pvc", existingPvc: false, claimInfo: { size: "20Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM Embed (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "NIM Embed already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
+
+      # ── Resolve NIM service URLs ──────────────────────────────────────────
+      - name: Resolve NIM and Embed URLs
         run: |
           resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                echo "  [$i] $workload_name not found yet" >&2; sleep 5; continue
+            local name="$1" scheme="${2:-http}" max=120
+            echo "━━━ Resolving $name ━━━" >&2
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+              echo "  [$i] $name: $phase" >&2
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
               fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name → ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"; return 0
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
                 fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2; return 1
+                return 0
               fi
               sleep 5
             done
-            echo "  ERROR: $workload_name timed out" >&2; return 1
+            echo "  ERROR: $name timed out" >&2; return 1
           }
 
-          CHROMA_URL=$(resolve_url "medw-chromadb${SUFFIX}") || CHROMA_URL=""
-          NIM_URL=$(resolve_url "medw-nim${SUFFIX}") || NIM_URL=""
-          [ -z "$CHROMA_URL" ] && CHROMA_URL="${{ vars.CHROMA_URL }}"
-          [ -z "$NIM_URL" ] && NIM_URL="${{ vars.NIM_URL }}"
-          if [ -z "$CHROMA_URL" ] || [ -z "$NIM_URL" ]; then
-            echo "Failed to resolve service URLs"; exit 1
+          NIM_URL=$(resolve_url   "medw-nim${SUFFIX}")       || NIM_URL=""
+          EMBED_URL=$(resolve_url "medw-nim-embed${SUFFIX}") || EMBED_URL=""
+
+          [ -z "$NIM_URL" ]   && NIM_URL="${{ vars.NIM_URL }}"
+          [ -z "$EMBED_URL" ] && EMBED_URL="${{ vars.NIM_EMBED_URL }}"
+
+          if [ -z "$NIM_URL" ] || [ -z "$EMBED_URL" ]; then
+            echo "Failed to resolve NIM/Embed URLs"; exit 1
           fi
-          echo "CHROMA_URL=$CHROMA_URL" >> "$GITHUB_ENV"
-          echo "NIM_BASE_URL=${NIM_URL}/v1" >> "$GITHUB_ENV"
-          echo "Resolved CHROMA_URL=$CHROMA_URL"
-          echo "Resolved NIM_BASE_URL=${NIM_URL}/v1"
+
+          echo "NIM_BASE_URL=${NIM_URL}/v1"         >> "$GITHUB_ENV"
+          echo "NIM_EMBED_BASE_URL=${EMBED_URL}/v1" >> "$GITHUB_ENV"
+          echo "NIM LLM: ${NIM_URL}/v1"
+          echo "Embed:   ${EMBED_URL}/v1"
 
       - name: Deploy Backend
         run: |
-          CHROMA_HOST_VAL=$(echo "$CHROMA_URL" | sed -E 's|https?://||; s|:[0-9]+$||')
-          CHROMA_PORT_VAL=$(echo "$CHROMA_URL" | sed -E 's|.*:([0-9]+)$|\1|')
           BACKEND_JSON=$(jq -n \
             --arg name "medw-backend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
@@ -495,142 +426,175 @@ jobs:
             --arg nimTimeout "${NIM_TIMEOUT}" \
             --arg nimWarmupEnabled "${NIM_WARMUP_ENABLED}" \
             --arg nimWarmupRetries "${NIM_WARMUP_RETRIES}" \
-            --arg nimWarmupRetryDelaySeconds "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
-            --arg chromaHost "$CHROMA_HOST_VAL" \
-            --arg chromaPort "$CHROMA_PORT_VAL" \
+            --arg nimWarmupRetryDelaySecs "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
+            --arg nimEmbedBaseUrl "$NIM_EMBED_BASE_URL" \
+            --arg nimEmbedModel "${NIM_EMBED_MODEL}" \
+            --arg nimRerankerBaseUrl "https://integrate.api.nvidia.com/v1" \
+            --arg nimRerankerModel "${NIM_RERANKER_MODEL}" \
+            --arg ngcApiKey "${{ secrets.NGC_API_KEY }}" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "1G", cpuMemoryLimit: "1G" },
                 environmentVariables: [
-                  {name: "NIM_BASE_URL", value: $nimBaseUrl},
-                  {name: "NIM_MODEL", value: $nimModel},
-                  {name: "NIM_TIMEOUT", value: $nimTimeout},
-                  {name: "NIM_WARMUP_ENABLED", value: $nimWarmupEnabled},
-                  {name: "NIM_WARMUP_RETRIES", value: $nimWarmupRetries},
-                  {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySeconds},
-                  {name: "CHROMA_HOST", value: $chromaHost},
-                  {name: "CHROMA_PORT", value: $chromaPort}
+                  {name: "NIM_BASE_URL",             value: $nimBaseUrl},
+                  {name: "NIM_MODEL",                value: $nimModel},
+                  {name: "NIM_TIMEOUT",              value: $nimTimeout},
+                  {name: "NIM_WARMUP_ENABLED",       value: $nimWarmupEnabled},
+                  {name: "NIM_WARMUP_RETRIES",       value: $nimWarmupRetries},
+                  {name: "NIM_WARMUP_RETRY_DELAY_SECONDS", value: $nimWarmupRetryDelaySecs},
+                  {name: "NIM_EMBED_BASE_URL",       value: $nimEmbedBaseUrl},
+                  {name: "NIM_EMBED_MODEL",          value: $nimEmbedModel},
+                  {name: "NIM_RERANKER_BASE_URL",    value: $nimRerankerBaseUrl},
+                  {name: "NIM_RERANKER_MODEL",       value: $nimRerankerModel},
+                  {name: "NIM_API_KEY",              value: $ngcApiKey},
+                  {name: "MILVUS_DB_PATH",           value: "/tmp/milvus.db"}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$BACKEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Backend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Backend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Backend already exists — skipping (delete it to apply new env vars)"
-          else
-            echo "Backend failed (HTTP $STATUS): $BODY" && exit 1
-          fi
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "Backend (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "Backend already exists — delete to apply new env vars" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Backend failed"; exit 1; }
 
       - name: Resolve Backend URL
         run: |
           resolve_url() {
-            local workload_name="$1"
-            local scheme="${2:-http}"
-            local max_attempts=120
-            echo "━━━ Resolving URL for $workload_name ━━━" >&2
-            for i in $(seq 1 $max_attempts); do
-              local resp=$(curl -sSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
-                -H "Authorization: Bearer $TOKEN")
-              local workload=$(echo "$resp" | jq ".workloads // . | .[] | select(.name == \"$workload_name\")")
-              if [ -z "$workload" ] || [ "$workload" = "null" ]; then
-                sleep 5; continue
+            local name="$1" scheme="${2:-http}" max=120
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+              echo "  [$i] $name: $phase" >&2
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
               fi
-              local phase=$(echo "$workload" | jq -r '.phase // "Unknown"')
-              echo "  [$i] $workload_name phase: $phase" >&2
-              if [ "$phase" = "Running" ]; then
-                local ip_port=$(echo "$workload" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
-                if [ -n "$ip_port" ] && [ "$ip_port" != "null" ]; then
-                  echo "  Resolved $workload_name → ${scheme}://${ip_port}" >&2
-                  echo "${scheme}://${ip_port}"; return 0
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
                 fi
-                echo "  ERROR: Running but no URL in workload JSON" >&2
-                echo "$workload" | jq '.' >&2; return 1
+                return 0
               fi
               sleep 5
             done
-            echo "  ERROR: $workload_name timed out" >&2; return 1
+            echo "  ERROR: $name timed out" >&2; return 1
           }
 
           BACKEND_URL=$(resolve_url "medw-backend${SUFFIX}") || BACKEND_URL=""
           [ -z "$BACKEND_URL" ] && BACKEND_URL="${{ vars.BACKEND_URL }}"
-          if [ -z "$BACKEND_URL" ]; then
-            echo "Failed to resolve backend URL"; exit 1
-          fi
+          [ -z "$BACKEND_URL" ] && echo "Failed to resolve backend URL" && exit 1
           echo "BACKEND_URL=$BACKEND_URL" >> "$GITHUB_ENV"
           echo "Resolved BACKEND_URL=$BACKEND_URL"
 
-          # Persist the resolved URL back to the GitHub environment variable so
-          # future deploys always have a correct fallback (and /api/config is never stale).
           ENV_NAME="${{ needs.setup.outputs.env }}"
           REPO="${{ github.repository }}"
           GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/BACKEND_URL"
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+          HTTP=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "$GH_API" -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}")
           if [ "$HTTP" = "404" ]; then
-            curl -s -X POST \
+            curl -s --max-time 30 -X POST \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
               -d "{\"name\":\"BACKEND_URL\",\"value\":\"${BACKEND_URL}\"}"
           fi
-          echo "GitHub variable BACKEND_URL updated to $BACKEND_URL (HTTP $HTTP)"
+          echo "GitHub variable BACKEND_URL updated (HTTP $HTTP)"
 
       - name: Deploy Frontend
         run: |
-          FRONTEND_JSON=$(jq -n \
+          PAYLOAD=$(jq -n \
             --arg name "medw-frontend${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
             --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-frontend:${IMMUTABLE_TAG}" \
             --arg backendUrl "$BACKEND_URL" \
             '{
-              name: $name,
-              projectId: $projectId,
-              clusterId: $clusterId,
+              name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
-                environmentVariables: [
-                  {name: "BACKEND_URL", value: $backendUrl}
-                ],
+                environmentVariables: [{name: "BACKEND_URL", value: $backendUrl}],
                 ports: [{container: 3000, serviceType: "NodePort"}]
               }
             }')
-          RESP=$(curl -sSL -w "\n%{http_code}" -X POST \
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d "$FRONTEND_JSON") || true
-          STATUS=$(echo "$RESP" | tail -1)
-          BODY=$(echo "$RESP" | head -n -1)
-          echo "Frontend response (HTTP $STATUS): $BODY"
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; then
-            echo "Frontend submitted"
-          elif [ "$STATUS" = "409" ]; then
-            echo "Frontend already exists — skipping (delete it to apply new BACKEND_URL)"
-          else
-            echo "Frontend failed (HTTP $STATUS): $BODY" && exit 1
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "Frontend (HTTP $STATUS): $BODY"
+          [ "$STATUS" = "409" ] && echo "Frontend already exists" && exit 0
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Frontend failed"; exit 1; }
+
+      - name: Resolve and save Frontend URL
+        run: |
+          resolve_url() {
+            local name="$1" scheme="${2:-http}" max=120
+            for i in $(seq 1 $max); do
+              local wl=$(curl -sSL --max-time 30 \
+                "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+                -H "Authorization: Bearer $TOKEN" | jq ".workloads // . | .[]? | objects | select(.name ==\"$name\")")
+              local phase=$(echo "$wl" | jq -r '.phase // "Unknown"')
+              local url=$(echo "$wl" | jq -r '.urls[0] // .environments[0].connections[0].url // empty')
+              echo "  [$i] $name: $phase" >&2
+              if [ "$phase" = "Failed" ] || [ "$phase" = "Error" ]; then
+                echo "  ERROR: $name entered phase $phase" >&2
+                return 1
+              fi
+              if [ -n "$url" ] && [ "$url" != "null" ]; then
+                echo "  [$i] $name URL available (phase=$phase) — proceeding" >&2
+                if [[ "$url" == http://* || "$url" == https://* ]]; then
+                  echo "$url"
+                else
+                  echo "${scheme}://${url}"
+                fi
+                return 0
+              fi
+              sleep 5
+            done
+            echo "  ERROR: $name timed out" >&2; return 1
+          }
+
+          FRONTEND_URL=$(resolve_url "medw-frontend${SUFFIX}") || FRONTEND_URL=""
+          [ -z "$FRONTEND_URL" ] && FRONTEND_URL="${{ vars.FRONTEND_URL }}"
+          [ -z "$FRONTEND_URL" ] && echo "WARNING: could not resolve frontend URL" && exit 0
+          echo "Resolved FRONTEND_URL=$FRONTEND_URL"
+
+          ENV_NAME="${{ needs.setup.outputs.env }}"
+          REPO="${{ github.repository }}"
+          GH_API="https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables/FRONTEND_URL"
+          HTTP=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "$GH_API" -d "{\"name\":\"FRONTEND_URL\",\"value\":\"${FRONTEND_URL}\"}")
+          if [ "$HTTP" = "404" ]; then
+            curl -s --max-time 30 -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/environments/${ENV_NAME}/variables" \
+              -d "{\"name\":\"FRONTEND_URL\",\"value\":\"${FRONTEND_URL}\"}"
           fi
+          echo "GitHub variable FRONTEND_URL updated (HTTP $HTTP)"
 
       # ── Status ────────────────────────────────────────────────────────────
       - name: Show workload status
         if: always()
         run: |
-          curl -fsSL "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=50" \
+          curl -fsSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
             -H "Authorization: Bearer $TOKEN" \
             | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'

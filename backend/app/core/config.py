@@ -10,6 +10,10 @@ def _get_bool_env(name: str, default: bool) -> bool:
 NIM_BASE_URL: str = os.environ.get("NIM_BASE_URL", "http://nim:8000/v1")
 NIM_MODEL: str = os.environ.get("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 NIM_API_KEY: str = os.environ.get("NIM_API_KEY", "nim-local")
+NIM_EMBED_BASE_URL: str = os.environ.get("NIM_EMBED_BASE_URL", "http://nim-embed:8000/v1")
+NIM_EMBED_MODEL: str = os.environ.get("NIM_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5")
+NIM_RERANKER_BASE_URL: str = os.environ.get("NIM_RERANKER_BASE_URL", "https://integrate.api.nvidia.com/v1")
+NIM_RERANKER_MODEL: str = os.environ.get("NIM_RERANKER_MODEL", "nvidia/nv-rerankqa-llama-3_2-1b-v2")
 try:
     NIM_TIMEOUT: int = max(1, int(os.environ.get("NIM_TIMEOUT", "120")))
 except ValueError:
@@ -27,11 +31,7 @@ try:
     )
 except ValueError:
     NIM_WARMUP_RETRY_DELAY_SECONDS = 25
-CHROMA_HOST: str = os.environ.get("CHROMA_HOST", "chromadb")
-try:
-    CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))
-except ValueError:
-    CHROMA_PORT: int = 8000
+MILVUS_URI: str = os.environ.get("MILVUS_DB_PATH", "./milvus.db")
 try:
     QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))
 except ValueError:

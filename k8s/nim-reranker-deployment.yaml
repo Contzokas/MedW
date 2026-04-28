@@ -1,60 +1,37 @@
-# NIM — GPU workload (Run:ai scheduled) — 2× NVIDIA B200 (Blackwell)
+# NIM Reranker — CPU-only workload
 #
-# Cluster:  runai-kiefer
-# Project:  medo
-# Namespace: runai-medo  (Run:ai convention: runai-<project>)
-#
-# Model: nvidia/nemotron-3-super-120b-a12b
-# Image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
-# Requires: NGC_API_KEY secret (genericsecret-ngc) for model download
-# Registry auth: dockerregistry-nvcr-io
-#
-# GPU allocation:
-#   2× B200: LLM tensor parallel (120B MoE FP8 ~120 GB + KV cache)
-#   1× B200 remains available for other workloads if needed
+# Model: nvidia/nv-rerankqa-llama-3_2-1b-v2  (NeMo Retriever)
+# Runs on CPU — 1B model is tolerable without GPU at this scale.
+# GPU 0 is fully allocated to nim-embed; GPU 1+2 to the LLM.
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: medw-nim
+  name: medw-nim-reranker
   namespace: runai-medo
   labels:
-    app: medw-nim
+    app: medw-nim-reranker
     app.kubernetes.io/part-of: medw
-    gpu-type: b200
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: medw-nim
+      app: medw-nim-reranker
   template:
     metadata:
       labels:
-        app: medw-nim
-        gpu-type: b200
+        app: medw-nim-reranker
         runai/tag: test
-      annotations:
-        scheduling.run.ai/fraction: "2"
     spec:
-      schedulerName: runai-scheduler
-
-      nodeSelector:
-        nvidia.com/gpu.product: NVIDIA-B200
-
-      tolerations:
-        - key: "nvidia.com/gpu"
-          operator: "Exists"
-          effect: "NoSchedule"
-
       imagePullSecrets:
         - name: dockerregistry-nvcr-io
 
       containers:
-        - name: nim
-          image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
+        - name: nim-reranker
+          image: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
           ports:
             - containerPort: 8000
-              name: nim-api
+              name: nim-rerank-api
 
           env:
             - name: NGC_API_KEY
@@ -67,12 +44,11 @@ spec:
 
           resources:
             requests:
-              memory: "96Gi"
-              cpu: "24"
+              memory: "8Gi"
+              cpu: "4"
             limits:
-              memory: "96Gi"
-              cpu: "24"
-              nvidia.com/gpu: 2
+              memory: "8Gi"
+              cpu: "4"
 
           readinessProbe:
             httpGet:
@@ -90,27 +66,27 @@ spec:
             failureThreshold: 5
 
           volumeMounts:
-            - name: nim-cache
+            - name: nim-reranker-cache
               mountPath: /opt/nim/.cache
 
       volumes:
-        - name: nim-cache
+        - name: nim-reranker-cache
           persistentVolumeClaim:
-            claimName: nim-pvc
+            claimName: nim-reranker-pvc
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nim
+  name: nim-reranker
   namespace: runai-medo
   labels:
-    app: medw-nim
+    app: medw-nim-reranker
     app.kubernetes.io/part-of: medw
 spec:
   selector:
-    app: medw-nim
+    app: medw-nim-reranker
   ports:
-    - name: nim-api
+    - name: nim-rerank-api
       port: 8000
       targetPort: 8000
   type: ClusterIP
