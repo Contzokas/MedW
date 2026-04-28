@@ -20,6 +20,7 @@ export interface Doctor {
 }
 
 export interface TriageResponse {
+  type?: "triage"
   mts_level: number
   mts_label: string
   specialty: string
