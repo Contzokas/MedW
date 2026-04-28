@@ -6,7 +6,8 @@ export async function submitTriage(
   patientId: string,
   lang: "en" | "el",
   followUpCount: number = 0,
-  conversationContext: string = ""
+  conversationContext: string = "",
+  allowFollowUp: boolean = true
 ): Promise<TriageResponse | FollowUpResponse> {
   const apiBase = await resolveApiBase()
 
@@ -19,6 +20,7 @@ export async function submitTriage(
       lang,
       ...(followUpCount > 0 && { follow_up_count: followUpCount }),
       ...(conversationContext && { conversation_context: conversationContext }),
+      ...(allowFollowUp === false && { allow_follow_up: false }),
     }),
   })
 

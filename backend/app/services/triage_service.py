@@ -113,6 +113,7 @@ async def classify(
     lang: str = "el",
     follow_up_count: int = 0,
     conversation_context: str = "",
+    allow_follow_up: bool = True,
 ) -> TriageResponse | FollowUpResponse:
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
@@ -138,7 +139,7 @@ async def classify(
             )
             rag_used = False
 
-        if "follow_up_question" in llm_result and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:
+        if allow_follow_up and "follow_up_question" in llm_result and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:
             return FollowUpResponse(
                 question=llm_result["follow_up_question"],
                 follow_up_count=follow_up_count + 1,

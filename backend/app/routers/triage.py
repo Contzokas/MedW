@@ -18,6 +18,7 @@ async def perform_triage(request: TriageRequest) -> TriageResponse | FollowUpRes
         request.lang,
         request.follow_up_count,
         request.conversation_context,
+        request.allow_follow_up,
     )
 
 

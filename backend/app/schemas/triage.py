@@ -11,6 +11,7 @@ class TriageRequest(BaseModel):
     lang: Literal["en", "el"] = "el"
     follow_up_count: int = 0
     conversation_context: str = ""
+    allow_follow_up: bool = True
 
 
 class FollowUpResponse(BaseModel):
