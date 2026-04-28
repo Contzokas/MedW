@@ -10,3 +10,4 @@ pymilvus>=2.5.0
 pytest
 pytest-asyncio
 httpx
+aiosqlite

@@ -5,18 +5,10 @@ import { submitTriage } from "@/app/lib/api"
 import { FollowUpResponse, TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 
-function generatePatientId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try { return crypto.randomUUID() } catch { /* insecure context */ }
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16)
-  })
-}
-
 interface TriageFormProps {
   onResult: (result: TriageResponse) => void
+  onStartLoading?: () => void
+  patientId: string
 }
 
 interface FollowUpState {
@@ -25,9 +17,8 @@ interface FollowUpState {
   conversationContext: string
 }
 
-export default function TriageForm({ onResult }: TriageFormProps) {
+export default function TriageForm({ onResult, onStartLoading, patientId }: TriageFormProps) {
   const [symptoms, setSymptoms] = useState("")
-  const [patientId] = useState(() => generatePatientId())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpState | null>(null)
@@ -45,6 +36,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
     e.preventDefault()
     if (isLoading) return
     setIsLoading(true)
+    onStartLoading?.()
     setError(null)
 
     try {
@@ -68,6 +60,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
     e.preventDefault()
     if (isLoading || !followUp) return
     setIsLoading(true)
+    onStartLoading?.()
     setError(null)
 
     const newContext = followUp.conversationContext

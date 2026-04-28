@@ -40,3 +40,4 @@ try:
     MAX_FOLLOW_UP_QUESTIONS: int = max(0, int(os.environ.get("MAX_FOLLOW_UP_QUESTIONS", "2")))
 except ValueError:
     MAX_FOLLOW_UP_QUESTIONS: int = 2
+DB_PATH: str = os.environ.get("DB_PATH", "./data/medw.db")
