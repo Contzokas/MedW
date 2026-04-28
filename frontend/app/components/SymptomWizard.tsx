@@ -132,7 +132,7 @@ export default function SymptomWizard({ patientId, onResult, onStartLoading }: S
     try {
       const symptoms = buildSymptomsString()
       const result = await submitTriage(symptoms, patientId ?? generatePatientId(), lang)
-      onResult(result)
+      onResult(result as TriageResponse)
     } catch (err) {
       console.error("[SymptomWizard] submit error:", err)
       setError(t.form.error)

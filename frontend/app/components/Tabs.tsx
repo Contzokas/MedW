@@ -3,6 +3,8 @@
 interface Tab {
   id: string
   label: string
+  /** Optional DOM id for spotlight targeting */
+  tabId?: string
 }
 
 interface TabsProps {
@@ -19,6 +21,7 @@ export default function Tabs({ tabs, activeTab, onChange }: TabsProps) {
         return (
           <button
             key={tab.id}
+            id={tab.tabId}
             role="tab"
             type="button"
             aria-selected={isActive}

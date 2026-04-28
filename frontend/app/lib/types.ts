@@ -19,6 +19,13 @@ export interface TriageResponse {
   reasoning: string
   redirect_url: string
   rag_used: boolean
+  type?: "triage"
+}
+
+export interface FollowUpResponse {
+  type: "follow_up"
+  question: string
+  follow_up_count: number
 }
 
 export interface TriageHistoryEntry {

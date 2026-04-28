@@ -27,7 +27,7 @@ export default function ExportButton({ entries }: ExportButtonProps) {
       const parsedDate = new Date(entry.timestamp);
       return {
         "Time": Number.isNaN(parsedDate.getTime()) ? "Invalid Time" : parsedDate.toLocaleTimeString("el-GR"),
-        "Date": Number.isNaN(parsedDate.getTime()) ? "Invalid Date" : parsedDate.toLocaleDateDateString("el-GR"),
+        "Date": Number.isNaN(parsedDate.getTime()) ? "Invalid Date" : parsedDate.toLocaleDateString("el-GR"),
         "Patient ID": entry.patient_id,
         "MTS Level": entry.mts_level,
         "Specialty": entry.specialty

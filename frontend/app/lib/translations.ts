@@ -80,6 +80,7 @@ export const translations = {
       system: "System",
       back: "Back",
       ariaSettings: "Open settings",
+      replayTour: "Replay app tour",
     },
     team: {
       about: "About the Project",
@@ -191,6 +192,7 @@ export const translations = {
       system: "Σύστημα",
       back: "Επιστροφή",
       ariaSettings: "Άνοιγμα ρυθμίσεων",
+      replayTour: "Επανεκκίνηση ξενάγησης",
     },
     team: {
       about: "Για το Έργο",

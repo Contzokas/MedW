@@ -10,9 +10,11 @@ import Tabs from "@/app/components/Tabs"
 import HistoryList from "@/app/components/HistoryList"
 import Disclaimer from "@/app/components/Disclaimer"
 import TeamSection from "@/app/components/TeamSection"
+import OnboardingTour from "@/app/components/OnboardingTour"
 import { TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 import { toCaps } from "@/app/lib/casing"
+import { useOnboarding } from "@/app/lib/useOnboarding"
 
 function generatePatientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -32,6 +34,7 @@ export default function Home() {
   const [useWizard, setUseWizard] = useState(false)
   const heroRef = useRef<HTMLElement>(null)
   const { t, lang } = useLang()
+  const onboarding = useOnboarding(4)
 
   const [patientId] = useState(() => {
     try {
@@ -60,7 +63,7 @@ export default function Home() {
   const tabs = useMemo(
     () => [
       { id: "form", label: t.history.newAssessment },
-      { id: "history", label: t.history.title },
+      { id: "history", label: t.history.title, tabId: "tab-history" },
     ],
     [t.history.newAssessment, t.history.title]
   )
@@ -144,6 +147,7 @@ export default function Home() {
               {/* Wizard / free-text toggle */}
               {activeTab === "form" && result === null && !loading && (
                 <button
+                  id="wizard-toggle"
                   type="button"
                   onClick={() => setUseWizard(!useWizard)}
                   className="mt-4 block mx-auto text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
@@ -216,6 +220,16 @@ export default function Home() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
         </svg>
       </button>
+
+      {/* Onboarding tour */}
+      <OnboardingTour
+        isOpen={onboarding.isOpen}
+        step={onboarding.step}
+        totalSteps={onboarding.totalSteps}
+        onNext={onboarding.next}
+        onPrev={onboarding.prev}
+        onSkip={onboarding.skip}
+      />
     </>
   )
 }

@@ -3,10 +3,12 @@
 import Link from "next/link"
 import { useLang } from "@/app/lib/lang-context"
 import { useTheme } from "@/app/lib/theme-context"
+import { useOnboarding } from "@/app/lib/useOnboarding"
 
 export default function SettingsPanel() {
   const { lang, t, toggleLang } = useLang()
   const { theme, setTheme } = useTheme()
+  const { restart: restartTour } = useOnboarding(4)
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -135,6 +137,24 @@ export default function SettingsPanel() {
               {t.settings.system}
             </button>
           </div>
+        </section>
+        {/* Tour Section */}
+        <section>
+          <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground mb-3">
+            {lang === "el" ? "Ξενάγηση" : "Tour"}
+          </p>
+          <Link
+            href="/"
+            onClick={restartTour}
+            id="settings-replay-tour"
+            className="flex items-center gap-3 rounded-xl border-2 border-border/50 bg-card/60 px-4 py-3 text-sm font-semibold text-muted-foreground hover:border-border hover:text-foreground transition-colors"
+          >
+            <svg className="w-5 h-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v5h5" />
+            </svg>
+            {t.settings.replayTour}
+          </Link>
         </section>
       </div>
     </div>

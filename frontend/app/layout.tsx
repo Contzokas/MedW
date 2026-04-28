@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/lib/theme-context";
@@ -9,6 +9,7 @@ import SettingsLink from "@/app/components/SettingsLink";
 import AnalyticsLink from "@/app/components/AnalyticsLink";
 import EmergencyBar from "@/app/components/EmergencyBar";
 import ErrorBoundary from "@/app/components/ErrorBoundary";
+import InstallPrompt from "@/app/components/InstallPrompt";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
@@ -24,6 +25,29 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MEDΩ - AI Triage System",
   description: "Intelligent AI system for symptom assessment and triage",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MEDΩ",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/icons/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#2563eb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0b18" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -61,6 +85,7 @@ export default function RootLayout({
             </ErrorBoundary>
 
             <EmergencyBar />
+            <InstallPrompt />
           </LangProvider>
         </ThemeProvider>
       </body>
