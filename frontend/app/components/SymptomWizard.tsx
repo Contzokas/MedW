@@ -53,9 +53,11 @@ interface SymptomWizardProps {
   patientId?: string
   onResult: (result: TriageResponse) => void
   onStartLoading?: () => void
+  latitude: number | null
+  longitude: number | null
 }
 
-export default function SymptomWizard({ patientId, onResult, onStartLoading }: SymptomWizardProps) {
+export default function SymptomWizard({ patientId, onResult, onStartLoading, latitude, longitude }: SymptomWizardProps) {
   const { t, lang } = useLang()
 
   const [state, setState] = useState<WizardState>({
@@ -131,7 +133,7 @@ export default function SymptomWizard({ patientId, onResult, onStartLoading }: S
 
     try {
       const symptoms = buildSymptomsString()
-      const result = await submitTriage(symptoms, patientId ?? generatePatientId(), lang, 0, "", false)
+      const result = await submitTriage(symptoms, patientId ?? generatePatientId(), lang, 0, "", false, latitude, longitude)
       onResult(result as TriageResponse)
     } catch (err) {
       console.error("[SymptomWizard] submit error:", err)

@@ -9,6 +9,8 @@ interface TriageFormProps {
   onResult: (result: TriageResponse) => void
   onStartLoading?: () => void
   patientId: string
+  latitude: number | null
+  longitude: number | null
 }
 
 interface FollowUpState {
@@ -17,7 +19,7 @@ interface FollowUpState {
   conversationContext: string
 }
 
-export default function TriageForm({ onResult, onStartLoading, patientId }: TriageFormProps) {
+export default function TriageForm({ onResult, onStartLoading, patientId, latitude, longitude }: TriageFormProps) {
   const [symptoms, setSymptoms] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export default function TriageForm({ onResult, onStartLoading, patientId }: Tria
     setError(null)
 
     try {
-      const result = await submitTriage(symptoms, patientId, lang, 0, "")
+      const result = await submitTriage(symptoms, patientId, lang, 0, "", true, latitude, longitude)
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "" })
@@ -68,7 +70,7 @@ export default function TriageForm({ onResult, onStartLoading, patientId }: Tria
       : `Q: ${followUp.question}\nA: ${followUpAnswer}`
 
     try {
-      const result = await submitTriage(symptoms, patientId, lang, followUp.followUpCount, newContext)
+      const result = await submitTriage(symptoms, patientId, lang, followUp.followUpCount, newContext, true, latitude, longitude)
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: newContext })

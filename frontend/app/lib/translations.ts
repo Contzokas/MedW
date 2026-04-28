@@ -25,6 +25,11 @@ export const translations = {
     doctor: {
       label: "Recommended Doctor",
       link: "Find the doctor at finddoctors.gov.gr",
+      distance: "{km} km away",
+      locationBanner: "Enable location to find the nearest available doctor",
+      enableLocation: "Enable",
+      skipLocation: "Skip",
+      locationDenied: "Location access denied. Doctors are not sorted by proximity.",
     },
     disclaimer: {
       ariaLabel: "Important medical notice",
@@ -137,6 +142,11 @@ export const translations = {
     doctor: {
       label: "Συνιστώμενος Ιατρός",
       link: "Βρείτε τον γιατρό στο finddoctors.gov.gr",
+      distance: "{km} χλμ απόσταση",
+      locationBanner: "Ενεργοποιήστε την τοποθεσία για να βρείτε τον κοντινότερο διαθέσιμο γιατρό",
+      enableLocation: "Ενεργοποίηση",
+      skipLocation: "Παράλειψη",
+      locationDenied: "Η πρόσβαση στην τοποθεσία απορρίφθηκε. Οι γιατροί δεν ταξινομούνται κατά απόσταση.",
     },
     disclaimer: {
       ariaLabel: "Σημαντική ιατρική ειδοποίηση",

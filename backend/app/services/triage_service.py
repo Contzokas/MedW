@@ -98,6 +98,9 @@ def _localize_doctor(doctor: Doctor, lang: str) -> Doctor:
         specialty=_specialty_for_response(doctor.specialty, lang),
         availability=doctor.availability,
         fallback_note=fallback_note,
+        city=doctor.city,
+        lat=doctor.lat,
+        lon=doctor.lon,
     )
 
 
@@ -114,6 +117,8 @@ async def classify(
     follow_up_count: int = 0,
     conversation_context: str = "",
     allow_follow_up: bool = True,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> TriageResponse | FollowUpResponse:
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
@@ -146,7 +151,7 @@ async def classify(
             )
 
         lookup_specialty = _specialty_for_doctor_lookup(llm_result["specialty"], resolved_lang)
-        doctor = doctor_service.get_match(lookup_specialty)
+        doctor = doctor_service.get_match(lookup_specialty, latitude, longitude)
         localized_doctor = _localize_doctor(doctor, resolved_lang)
         redirect_url = (
             f"https://finddoctors.gov.gr/search"

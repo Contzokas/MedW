@@ -9,6 +9,9 @@ export interface Doctor {
   specialty: string
   availability: boolean
   fallback_note: string | null
+  city: string | null
+  lat: number | null
+  lon: number | null
 }
 
 export interface TriageResponse {

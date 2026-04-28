@@ -12,6 +12,8 @@ class TriageRequest(BaseModel):
     follow_up_count: int = 0
     conversation_context: str = ""
     allow_follow_up: bool = True
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class FollowUpResponse(BaseModel):

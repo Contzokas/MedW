@@ -19,6 +19,8 @@ async def perform_triage(request: TriageRequest) -> TriageResponse | FollowUpRes
         request.follow_up_count,
         request.conversation_context,
         request.allow_follow_up,
+        request.latitude,
+        request.longitude,
     )
 
 

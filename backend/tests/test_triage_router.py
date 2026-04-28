@@ -40,7 +40,7 @@ async def test_triage_post_returns_200_with_all_fields(client):
     assert "redirect_url" in data
     assert "reasoning" in data
     assert "rag_used" in data
-    mock_classify.assert_called_once_with("πόνος στο στήθος", "test-001", "el", 0, "")
+    mock_classify.assert_called_once_with("πόνος στο στήθος", "test-001", "el", 0, "", True, None, None)
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,27 @@ async def test_triage_post_forwards_lang_to_service(client):
         )
 
     assert response.status_code == 200
-    mock_classify.assert_called_once_with("chest pain", "test-english", "en", 0, "")
+    mock_classify.assert_called_once_with("chest pain", "test-english", "en", 0, "", True, None, None)
+
+
+@pytest.mark.asyncio
+async def test_triage_post_forwards_coordinates_to_service(client):
+    with patch("app.services.triage_service.classify", new_callable=AsyncMock) as mock_classify:
+        mock_classify.return_value = _MOCK_RESPONSE
+        response = await client.post(
+            "/api/v1/triage",
+            json={
+                "symptoms": "πόνος στο στήθος",
+                "patient_id": "test-geo",
+                "latitude": 37.9838,
+                "longitude": 23.7275,
+            },
+        )
+
+    assert response.status_code == 200
+    mock_classify.assert_called_once_with(
+        "πόνος στο στήθος", "test-geo", "el", 0, "", True, 37.9838, 23.7275
+    )
 
 
 @pytest.mark.asyncio

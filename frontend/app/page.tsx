@@ -15,6 +15,7 @@ import { TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 import { toCaps } from "@/app/lib/casing"
 import { useOnboarding } from "@/app/lib/useOnboarding"
+import { useGeolocation } from "@/app/lib/useGeolocation"
 
 function generatePatientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -35,6 +36,7 @@ export default function Home() {
   const heroRef = useRef<HTMLElement>(null)
   const { t, lang } = useLang()
   const onboarding = useOnboarding(4)
+  const geo = useGeolocation()
 
   const [patientId] = useState(() => {
     try {
@@ -133,15 +135,45 @@ export default function Home() {
                 <SkeletonTriageResult />
               ) : result === null ? (
                 useWizard ? (
-                  <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} />
+                  <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
-                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} patientId={patientId} />
+                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} />
                 )
               ) : (
                 <>
-                  <TriageResult result={result} />
+                  <TriageResult result={result} userLat={geo.latitude} userLon={geo.longitude} />
                   <FollowUpGuidance mtsLevel={result.mts_level} />
                 </>
+              )}
+
+              {/* Location permission banner */}
+              {activeTab === "form" && geo.latitude === null && !geo.denied && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
+                  <span className="flex-1">{t.doctor.locationBanner}</span>
+                  {geo.loading ? (
+                    <span className="text-muted-foreground animate-pulse">...</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={geo.request}
+                      className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                    >
+                      {t.doctor.enableLocation}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => geo.denied || true}
+                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ visibility: geo.loading ? "hidden" : "visible" }}
+                  >
+                    {t.doctor.skipLocation}
+                  </button>
+                </div>
+              )}
+
+              {activeTab === "form" && geo.denied && (
+                <p className="text-xs text-muted-foreground text-center">{t.doctor.locationDenied}</p>
               )}
 
               {/* Wizard / free-text toggle */}

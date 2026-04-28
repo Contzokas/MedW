@@ -7,7 +7,9 @@ export async function submitTriage(
   lang: "en" | "el",
   followUpCount: number = 0,
   conversationContext: string = "",
-  allowFollowUp: boolean = true
+  allowFollowUp: boolean = true,
+  latitude: number | null = null,
+  longitude: number | null = null,
 ): Promise<TriageResponse | FollowUpResponse> {
   const apiBase = await resolveApiBase()
 
@@ -21,6 +23,8 @@ export async function submitTriage(
       ...(followUpCount > 0 && { follow_up_count: followUpCount }),
       ...(conversationContext && { conversation_context: conversationContext }),
       ...(allowFollowUp === false && { allow_follow_up: false }),
+      ...(latitude !== null && { latitude }),
+      ...(longitude !== null && { longitude }),
     }),
   })
 
