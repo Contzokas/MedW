@@ -58,6 +58,8 @@ function HomeContent() {
 
   const handleStartLoading = () => setLoading(true)
 
+  const handleLoadingDone = () => setLoading(false)
+
   const handleResult = (r: TriageResponse) => {
     setResult(r)
     setLoading(false)
@@ -133,7 +135,7 @@ function HomeContent() {
                 {useWizard ? (
                   <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
-                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onSwitchToWizard={() => setUseWizard(true)} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
+                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onLoadingDone={handleLoadingDone} onSwitchToWizard={() => setUseWizard(true)} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
                 )}
                 </div>
               ) : (

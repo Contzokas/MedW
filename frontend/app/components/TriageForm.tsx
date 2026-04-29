@@ -9,6 +9,7 @@ import { QUICK_SYMPTOMS } from "@/app/lib/wizard-data"
 interface TriageFormProps {
   onResult: (result: TriageResponse) => void
   onStartLoading?: () => void
+  onLoadingDone?: () => void
   onSwitchToWizard?: () => void
   patientId: string
   latitude: number | null
@@ -38,6 +39,7 @@ const PROMPTS = [
 export default function TriageForm({
   onResult,
   onStartLoading,
+  onLoadingDone,
   onSwitchToWizard,
   patientId,
   latitude,
@@ -95,6 +97,7 @@ export default function TriageForm({
       setError(t.form.error)
     } finally {
       setIsLoading(false)
+      onLoadingDone?.()
     }
   }
 
@@ -129,6 +132,7 @@ export default function TriageForm({
       setError(t.form.error)
     } finally {
       setIsLoading(false)
+      onLoadingDone?.()
     }
   }
 
