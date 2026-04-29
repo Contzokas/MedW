@@ -3,10 +3,9 @@ import logging
 from datetime import datetime, timezone
 from urllib.parse import quote
 
-from app.core.config import MAX_FOLLOW_UP_QUESTIONS
 from app.core.queue import append_entry
 from app.schemas.doctor import Doctor
-from app.schemas.triage import FollowUpResponse, QueueEntry, TriageResponse
+from app.schemas.triage import QueueEntry, TriageResponse
 from app.services import doctor_service
 from app.services.llm_service import (
     SPECIALTY_TRANSLATIONS_EL_TO_EN,
@@ -98,9 +97,6 @@ def _localize_doctor(doctor: Doctor, lang: str) -> Doctor:
         specialty=_specialty_for_response(doctor.specialty, lang),
         availability=doctor.availability,
         fallback_note=fallback_note,
-        city=doctor.city,
-        lat=doctor.lat,
-        lon=doctor.lon,
     )
 
 
@@ -110,48 +106,20 @@ def _safe_default_for_lang(lang: str) -> TriageResponse:
     return _SAFE_DEFAULT.model_copy()
 
 
-async def classify(
-    symptoms: str,
-    patient_id: str,
-    lang: str = "el",
-    follow_up_count: int = 0,
-    conversation_context: str = "",
-    allow_follow_up: bool = True,
-    latitude: float | None = None,
-    longitude: float | None = None,
-) -> TriageResponse | FollowUpResponse:
+async def classify(symptoms: str, patient_id: str, lang: str = "el") -> TriageResponse:
     resolved_lang = _resolve_lang(lang)
-    enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
     try:
         try:
-            context = await retrieve_context(enriched_symptoms)
-            llm_result = await llm_classify(
-                symptoms=enriched_symptoms,
-                context=context,
-                lang=resolved_lang,
-                follow_up_count=follow_up_count,
-                max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
-            )
+            context = await retrieve_context(symptoms)
+            llm_result = await llm_classify(symptoms=symptoms, context=context, lang=resolved_lang)
             rag_used = True
         except RAGUnavailableError as exc:
             logger.warning("RAG unavailable — falling back to LLM base knowledge", exc_info=exc)
-            llm_result = await llm_classify(
-                symptoms=enriched_symptoms,
-                context="",
-                lang=resolved_lang,
-                follow_up_count=follow_up_count,
-                max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
-            )
+            llm_result = await llm_classify(symptoms=symptoms, context="", lang=resolved_lang)
             rag_used = False
 
-        if allow_follow_up and "follow_up_question" in llm_result and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:
-            return FollowUpResponse(
-                question=llm_result["follow_up_question"],
-                follow_up_count=follow_up_count + 1,
-            )
-
         lookup_specialty = _specialty_for_doctor_lookup(llm_result["specialty"], resolved_lang)
-        doctor = doctor_service.get_match(lookup_specialty, latitude, longitude)
+        doctor = doctor_service.get_match(lookup_specialty)
         localized_doctor = _localize_doctor(doctor, resolved_lang)
         redirect_url = (
             f"https://finddoctors.gov.gr/search"
@@ -181,11 +149,5 @@ async def classify(
         ))
     except Exception as exc:
         logger.error("Queue append failure: %s", type(exc).__name__)
-
-    try:
-        from app.services.history_service import save_triage_result
-        await save_triage_result(patient_id, enriched_symptoms, result, resolved_lang)
-    except Exception as exc:
-        logger.error("History save failure: %s", type(exc).__name__)
 
     return result

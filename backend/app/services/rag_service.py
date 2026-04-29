@@ -1,194 +1,84 @@
 import asyncio
 import logging
-from functools import lru_cache
 from pathlib import Path
 
-import httpx
-from pymilvus import DataType, MilvusClient
+import chromadb
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
-from app.core.config import (
-    MILVUS_URI,
-    NIM_API_KEY,
-    NIM_EMBED_BASE_URL,
-    NIM_EMBED_MODEL,
-    NIM_RERANKER_BASE_URL,
-    NIM_RERANKER_MODEL,
-)
+from app.core.config import CHROMA_HOST, CHROMA_PORT
 
 logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "clinical_context"
 CORPUS_DIR = Path(__file__).parent.parent.parent / "data" / "corpus"
 TOP_K = 3
-RETRIEVAL_CANDIDATES = TOP_K * 3
-CACHE_MAX_SIZE = 1024
-_EMBED_BATCH_SIZE = 32
 
-_milvus_client: MilvusClient | None = None
+# Module-level lazy singletons — initialised once on first use to avoid
+# per-request overhead (SentenceTransformer load is hundreds of ms+).
+_chroma_client = None
+_embedding_fn = None
 
 
 class RAGUnavailableError(Exception):
     pass
 
 
-def _get_milvus_client() -> MilvusClient:
-    global _milvus_client
-    if _milvus_client is None:
-        _milvus_client = MilvusClient(uri=MILVUS_URI)
-    return _milvus_client
-
-
-def _embed_texts(texts: list[str]) -> list[list[float]]:
-    response = httpx.post(
-        f"{NIM_EMBED_BASE_URL.rstrip('/')}/embeddings",
-        headers={"Authorization": f"Bearer {NIM_API_KEY}"},
-        json={"model": NIM_EMBED_MODEL, "input": texts},
-        timeout=30.0,
+def _get_collection():
+    global _chroma_client, _embedding_fn
+    if _chroma_client is None:
+        _chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    if _embedding_fn is None:
+        _embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    return _chroma_client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        embedding_function=_embedding_fn,
     )
-    response.raise_for_status()
-    data = response.json()["data"]
-    return [item["embedding"] for item in sorted(data, key=lambda x: x["index"])]
-
-
-def _ensure_collection(client: MilvusClient) -> None:
-    if client.has_collection(COLLECTION_NAME):
-        return
-
-    # Probe actual embedding dimension from NIM rather than hardcoding it
-    import time
-    dim = None
-    for attempt in range(120):
-        try:
-            dim = len(_embed_texts(["probe"])[0])
-            break
-        except Exception as exc:
-            logger.info("Waiting for NIM Embed to become ready (attempt %d/120)...", attempt + 1)
-            time.sleep(15)
-            
-    if dim is None:
-        raise Exception("NIM Embed service did not become ready in time")
-
-    schema = client.create_schema(auto_id=False, enable_dynamic_field=False)
-    schema.add_field("id", DataType.VARCHAR, max_length=256, is_primary=True)
-    schema.add_field("text", DataType.VARCHAR, max_length=65535)
-    schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=dim)
-
-    index_params = client.prepare_index_params()
-    index_params.add_index(
-        field_name="embedding",
-        index_type="HNSW",
-        metric_type="COSINE",
-        params={"M": 16, "efConstruction": 200},
-    )
-
-    client.create_collection(
-        collection_name=COLLECTION_NAME,
-        schema=schema,
-        index_params=index_params,
-    )
-    logger.info("Created Milvus collection '%s' (dim=%d).", COLLECTION_NAME, dim)
-
-
-def _rerank_sync(query: str, docs: list[str]) -> list[str]:
-    try:
-        response = httpx.post(
-            f"{NIM_RERANKER_BASE_URL.rstrip('/')}/ranking",
-            headers={"Authorization": f"Bearer {NIM_API_KEY}"},
-            json={
-                "model": NIM_RERANKER_MODEL,
-                "query": {"text": query},
-                "passages": [{"text": d} for d in docs],
-            },
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        rankings = response.json()["rankings"]
-        ranked = sorted(rankings, key=lambda r: r["logit"], reverse=True)
-        return [docs[r["index"]] for r in ranked[:TOP_K]]
-    except Exception as exc:
-        logger.warning("Reranker unavailable, falling back to retrieval order: %s", exc)
-        return docs[:TOP_K]
 
 
 def _seed_sync() -> None:
     if not CORPUS_DIR.exists():
         logger.warning("Corpus directory '%s' not found — skipping seeding.", CORPUS_DIR)
         return
-
-    client = _get_milvus_client()
-    _ensure_collection(client)
-
-    stats = client.get_collection_stats(COLLECTION_NAME)
-    if int(stats.get("row_count", 0)) > 0:
-        logger.info("Milvus collection '%s' already seeded, skipping.", COLLECTION_NAME)
+    collection = _get_collection()
+    if collection.count() > 0:
+        logger.info("ChromaDB collection '%s' already seeded, skipping.", COLLECTION_NAME)
         return
 
-    documents: list[str] = []
-    ids: list[str] = []
+    documents = []
+    ids = []
     for corpus_file in sorted(CORPUS_DIR.glob("*.md")):
         text = corpus_file.read_text(encoding="utf-8")
         chunks = [c.strip() for c in text.split("\n\n") if c.strip()]
         for i, chunk in enumerate(chunks):
-            ids.append(f"{corpus_file.stem}_{i}")
+            doc_id = f"{corpus_file.stem}_{i}"
             documents.append(chunk)
+            ids.append(doc_id)
 
-    if not documents:
-        return
-
-    embeddings: list[list[float]] = []
-    for i in range(0, len(documents), _EMBED_BATCH_SIZE):
-        embeddings.extend(_embed_texts(documents[i : i + _EMBED_BATCH_SIZE]))
-
-    data = [
-        {"id": ids[i], "text": documents[i], "embedding": embeddings[i]}
-        for i in range(len(documents))
-    ]
-    client.insert(collection_name=COLLECTION_NAME, data=data)
-    logger.info("Seeded Milvus collection '%s' with %d chunks.", COLLECTION_NAME, len(documents))
-    _cached_retrieve.cache_clear()
-
-
-@lru_cache(maxsize=CACHE_MAX_SIZE)
-def _cached_retrieve(symptoms: str) -> str:
-    client = _get_milvus_client()
-    stats = client.get_collection_stats(COLLECTION_NAME)
-    row_count = int(stats.get("row_count", 0))
-    if row_count == 0:
-        return ""
-
-    query_emb = _embed_texts([symptoms])[0]
-    n = min(RETRIEVAL_CANDIDATES, row_count)
-    results = client.search(
-        collection_name=COLLECTION_NAME,
-        data=[query_emb],
-        limit=n,
-        output_fields=["text"],
-    )
-    docs = [hit["entity"]["text"] for hit in results[0]]
-    if not docs:
-        return ""
-    reranked = _rerank_sync(symptoms, docs)
-    return "\n\n".join(reranked)
+    if documents:
+        collection.add(documents=documents, ids=ids)
+        logger.info("Seeded ChromaDB collection '%s' with %d chunks.", COLLECTION_NAME, len(documents))
 
 
 def _retrieve_sync(symptoms: str) -> str:
-    return _cached_retrieve(symptoms)
-
-
-def clear_retrieval_cache() -> None:
-    _cached_retrieve.cache_clear()
+    collection = _get_collection()
+    n = min(TOP_K, collection.count())
+    if n == 0:
+        return ""
+    results = collection.query(query_texts=[symptoms], n_results=n)
+    docs = results.get("documents", [[]])[0]
+    return "\n\n".join(docs) if docs else ""
 
 
 async def seed_corpus_if_empty() -> None:
     try:
         await asyncio.to_thread(_seed_sync)
     except Exception as exc:
-        logger.error("Milvus corpus seeding failed: %s", exc, exc_info=True)
+        logger.error("ChromaDB corpus seeding failed: %s", exc, exc_info=True)
 
 
 async def retrieve_context(symptoms: str) -> str:
     try:
         return await asyncio.to_thread(_retrieve_sync, symptoms)
     except Exception as exc:
-        logger.error("Milvus retrieval failed: %s", exc, exc_info=True)
-        raise RAGUnavailableError("Milvus unavailable") from exc
+        logger.error("ChromaDB retrieval failed: %s", exc, exc_info=True)
+        raise RAGUnavailableError("ChromaDB unavailable") from exc

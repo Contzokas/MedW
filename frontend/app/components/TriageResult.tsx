@@ -7,8 +7,6 @@ import { toCaps } from "@/app/lib/casing"
 
 interface TriageResultProps {
   result: TriageResponse
-  userLat: number | null
-  userLon: number | null
 }
 
 const MTS_COLORS: Record<number, { bg: string; text: string }> = {
@@ -19,7 +17,7 @@ const MTS_COLORS: Record<number, { bg: string; text: string }> = {
   5: { bg: "bg-emerald-500",  text: "text-white" },
 }
 
-export default function TriageResult({ result, userLat, userLon }: TriageResultProps) {
+export default function TriageResult({ result }: TriageResultProps) {
   const { t, lang } = useLang()
   const { bg, text } = MTS_COLORS[result.mts_level] ?? { bg: "bg-muted", text: "text-foreground" }
 
@@ -52,7 +50,7 @@ export default function TriageResult({ result, userLat, userLon }: TriageResultP
         </div>
 
         {/* Right col: doctor card */}
-        <DoctorCard doctor={result.doctor} redirectUrl={result.redirect_url} userLat={userLat} userLon={userLon} />
+        <DoctorCard doctor={result.doctor} redirectUrl={result.redirect_url} />
       </div>
 
       {/* Reasoning */}

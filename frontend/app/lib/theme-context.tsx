@@ -6,63 +6,77 @@ type Theme = "light" | "dark"
 
 interface ThemeContextType {
   theme: Theme
-  setTheme: (theme: Theme) => void
   toggleTheme: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light")
+  const [theme, setTheme] = useState<Theme>("light")
   const [mounted, setMounted] = useState(false)
 
+  // Initialize theme from localStorage or system preference
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("theme")
-      if (stored === "light" || stored === "dark") {
-        setThemeState(stored)
+      const stored = localStorage.getItem("theme") as Theme | null
+      if (stored) {
+        setTheme(stored)
+      } else {
+        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+        setTheme(systemPrefersDark ? "dark" : "light")
       }
-    } catch {
-      console.warn("localStorage unavailable")
+    } catch (error) {
+      // localStorage unavailable (private browsing, iframe restrictions, etc.)
+      console.warn("localStorage unavailable, using system preference")
+      const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+      setTheme(systemPrefersDark ? "dark" : "light")
     }
     setMounted(true)
   }, [])
 
+  // Apply theme to document and localStorage
   useEffect(() => {
-    if (!mounted) return
-
-    try {
-      if (theme === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark")
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.setAttribute("data-theme", "light")
-        document.documentElement.classList.remove("dark")
+    if (mounted) {
+      try {
+        if (theme === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark")
+          document.documentElement.classList.add("dark")
+        } else {
+          // Explicitly set light to override system dark preference via media query
+          document.documentElement.setAttribute("data-theme", "light")
+          document.documentElement.classList.remove("dark")
+        }
+        localStorage.setItem("theme", theme)
+      } catch (error) {
+        // localStorage unavailable (private browsing, iframe restrictions, etc.)
+        console.warn("localStorage unavailable, theme not persisted")
       }
-      localStorage.setItem("theme", theme)
-    } catch {
-      console.warn("localStorage unavailable, theme not persisted")
     }
   }, [theme, mounted])
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme)
-  }
+  // Listen for system preference changes (only when no manual selection)
+  useEffect(() => {
+    if (mounted && !localStorage.getItem("theme")) {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+      const handleChange = (e: MediaQueryListEvent) => {
+        setTheme(e.matches ? "dark" : "light")
+      }
+      mediaQuery.addEventListener("change", handleChange)
+      return () => mediaQuery.removeEventListener("change", handleChange)
+    }
+  }, [mounted])
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === "light" ? "dark" : "light"))
+    setTheme((prev) => (prev === "light" ? "dark" : "light"))
   }
 
+  // Prevent flash of unstyled content
   if (!mounted) {
-    return (
-      <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-        {children}
-      </ThemeContext.Provider>
-    )
+    return <>{children}</>
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   )

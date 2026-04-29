@@ -7,37 +7,32 @@ def _get_bool_env(name: str, default: bool) -> bool:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
-NIM_BASE_URL: str = os.environ.get("NIM_BASE_URL", "http://nim:8000/v1")
-NIM_MODEL: str = os.environ.get("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
-NIM_API_KEY: str = os.environ.get("NIM_API_KEY", "nim-local")
-NIM_EMBED_BASE_URL: str = os.environ.get("NIM_EMBED_BASE_URL", "http://nim-embed:8000/v1")
-NIM_EMBED_MODEL: str = os.environ.get("NIM_EMBED_MODEL", "nvidia/nv-embedqa-e5-v5")
-NIM_RERANKER_BASE_URL: str = os.environ.get("NIM_RERANKER_BASE_URL", "https://integrate.api.nvidia.com/v1")
-NIM_RERANKER_MODEL: str = os.environ.get("NIM_RERANKER_MODEL", "nvidia/nv-rerankqa-llama-3_2-1b-v2")
+OLLAMA_HOST: str = os.environ.get("OLLAMA_HOST", "http://ollama:11434")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "medgemma:27b")
 try:
-    NIM_TIMEOUT: int = max(1, int(os.environ.get("NIM_TIMEOUT", "120")))
+    OLLAMA_TIMEOUT: int = max(1, int(os.environ.get("OLLAMA_TIMEOUT", "30")))
 except ValueError:
     import logging as _logging
-    _logging.getLogger(__name__).warning("Invalid NIM_TIMEOUT env value; using default 120s")
-    NIM_TIMEOUT: int = 120
-NIM_WARMUP_ENABLED: bool = _get_bool_env("NIM_WARMUP_ENABLED", True)
+    _logging.getLogger(__name__).warning("Invalid OLLAMA_TIMEOUT env value; using default 30s")
+    OLLAMA_TIMEOUT: int = 30
+OLLAMA_WARMUP_ENABLED: bool = _get_bool_env("OLLAMA_WARMUP_ENABLED", True)
+OLLAMA_WARMUP_KEEP_ALIVE: str = os.environ.get("OLLAMA_WARMUP_KEEP_ALIVE", "30m")
 try:
-    NIM_WARMUP_RETRIES: int = max(1, int(os.environ.get("NIM_WARMUP_RETRIES", "120")))
+    OLLAMA_WARMUP_RETRIES: int = max(1, int(os.environ.get("OLLAMA_WARMUP_RETRIES", "24")))
 except ValueError:
-    NIM_WARMUP_RETRIES = 120
+    OLLAMA_WARMUP_RETRIES = 24
 try:
-    NIM_WARMUP_RETRY_DELAY_SECONDS: int = max(
-        1, int(os.environ.get("NIM_WARMUP_RETRY_DELAY_SECONDS", "25"))
+    OLLAMA_WARMUP_RETRY_DELAY_SECONDS: int = max(
+        1, int(os.environ.get("OLLAMA_WARMUP_RETRY_DELAY_SECONDS", "5"))
     )
 except ValueError:
-    NIM_WARMUP_RETRY_DELAY_SECONDS = 25
-MILVUS_URI: str = os.environ.get("MILVUS_DB_PATH", "./milvus.db")
+    OLLAMA_WARMUP_RETRY_DELAY_SECONDS = 5
+CHROMA_HOST: str = os.environ.get("CHROMA_HOST", "chromadb")
+try:
+    CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))
+except ValueError:
+    CHROMA_PORT: int = 8000
 try:
     QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))
 except ValueError:
     QUEUE_MAX_ENTRIES: int = 1000
-try:
-    MAX_FOLLOW_UP_QUESTIONS: int = max(0, int(os.environ.get("MAX_FOLLOW_UP_QUESTIONS", "2")))
-except ValueError:
-    MAX_FOLLOW_UP_QUESTIONS: int = 2
-DB_PATH: str = os.environ.get("DB_PATH", "./data/medw.db")

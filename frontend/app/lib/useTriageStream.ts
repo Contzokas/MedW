@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { QueueEntry } from "@/app/lib/types"
 import { buildApiUrl, resolveApiBase } from "@/app/lib/backendResolver"
-import toast from "react-hot-toast"
 
 function isQueueEntry(value: unknown): value is QueueEntry {
   if (typeof value !== "object" || value === null) {
@@ -28,7 +27,6 @@ function toQueueEntry(raw: string): QueueEntry | null {
 
 export function useTriageStream(): QueueEntry[] {
   const [entries, setEntries] = useState<QueueEntry[]>([])
-  const isFirstLoad = useRef(true)
 
   useEffect(() => {
     let es: EventSource | null = null
@@ -58,26 +56,6 @@ export function useTriageStream(): QueueEntry[] {
               existing.specialty === entry.specialty,
           )
 
-          if (!exists && !isFirstLoad.current) {
-            // New entry arrived (not during initial mount hydrate)
-            if (entry.mts_level <= 2) {
-              const audio = new Audio('/emergency.mp3');
-              audio.play().catch(e => console.error("Audio playback failed", e));
-              toast.error(`EMERGENCY: ${entry.specialty} Level ${entry.mts_level}\nPatient: ${entry.patient_id.slice(0, 8)}`, {
-                duration: 10000,
-                style: { background: '#ef4444', color: '#fff' }
-              })
-              
-              if ("Notification" in window && Notification.permission === "granted") {
-                new Notification(`Emergency Level ${entry.mts_level}`, {
-                  body: `Specialty: ${entry.specialty}\nPatient: ${entry.patient_id.slice(0, 8)}`,
-                });
-              }
-            } else {
-              toast.success(`New Patient: ${entry.specialty} - Level ${entry.mts_level}\nPatient: ${entry.patient_id.slice(0, 8)}`)
-            }
-          }
-
           if (exists) {
             return prev
           }
@@ -85,16 +63,6 @@ export function useTriageStream(): QueueEntry[] {
           return [entry, ...prev]
         })
       })
-      
-      // Request notification permissions
-      if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission();
-      }
-      
-      // Mark first load done after a slight delay
-      setTimeout(() => {
-        isFirstLoad.current = false;
-      }, 1000);
     }
 
     void setup()
