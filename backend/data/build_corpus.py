@@ -14,6 +14,8 @@ Writes:
   - backend/data/corpus/triage_reference_cases.md
 """
 from pathlib import Path
+import glob
+import os
 
 import pyarrow.parquet as pq
 
@@ -44,9 +46,29 @@ def _flatten(text: str) -> str:
     """Collapse internal newlines so the record becomes one paragraph block."""
     return " ".join(text.split())
 
+def get_latest_parquet_path(prefix: str) -> Path:
+    """Find the most recently generated data-designer dataset matching the prefix."""
+    dirs = glob.glob(str(ARTIFACTS_DIR / f"{prefix}*"))
+    if not dirs:
+        raise FileNotFoundError(f"No artifact directories found starting with '{prefix}'")
+    latest_dir = max(dirs, key=os.path.getmtime)
+    
+    parquet_path = Path(latest_dir) / "parquet-files"
+    if parquet_path.exists():
+        files = list(parquet_path.glob("*.parquet"))
+        if files:
+            return files[0]
+            
+    # Fallback to direct parquet file if Data Designer output format changes
+    files = list(Path(latest_dir).glob("*.parquet"))
+    if files:
+        return files[0]
+        
+    raise FileNotFoundError(f"No parquet files found in {latest_dir}")
 
 def build_symptom_examples() -> str:
-    path = ARTIFACTS_DIR / "symptom_combinations" / "parquet-files" / "batch_00000.parquet"
+    path = get_latest_parquet_path("symptom_combinations")
+    print(f"Reading symptom_combinations from: {path}")
     table = pq.read_table(str(path))
     df = table.to_pandas()
 
@@ -74,6 +96,14 @@ def build_symptom_examples() -> str:
         desc = _flatten(str(row["description"]))
         primary = _flatten(str(profile.get("primary_symptom", "")))
 
+        queries_str = ""
+        if "query_variations" in df.columns and isinstance(row["query_variations"], dict):
+            variations = row["query_variations"].get("variations", [])
+            if hasattr(variations, "tolist"):
+                variations = variations.tolist()
+            if variations:
+                queries_str = " Query Variations: " + ", ".join(f'"{v}"' for v in variations) + "."
+
         chunk = (
             f"Patient: {int(row['patient_age'])}-year-old {row['patient_sex']}. "
             f"Region: {row['body_region']}. "
@@ -82,7 +112,7 @@ def build_symptom_examples() -> str:
             f"{desc} "
             f"Primary symptom: {primary}. "
             f"Additional symptoms: {additional_str}. "
-            f"MTS Level: {mts_level} ({mts_label}). Specialty: {specialty}."
+            f"MTS Level: {mts_level} ({mts_label}). Specialty: {specialty}.{queries_str}"
         )
 
         if len(chunk) > MAX_CHUNK_CHARS:
@@ -96,7 +126,7 @@ def build_symptom_examples() -> str:
                 f"{desc} "
                 f"Primary symptom: {primary}. "
                 f"Additional symptoms: {additional_str}. "
-                f"MTS Level: {mts_level} ({mts_label}). Specialty: {specialty}."
+                f"MTS Level: {mts_level} ({mts_label}). Specialty: {specialty}.{queries_str}"
             )
 
         chunks.append(chunk)
@@ -106,12 +136,21 @@ def build_symptom_examples() -> str:
 
 
 def build_triage_reference_cases() -> str:
-    path = ARTIFACTS_DIR / "preview_results_20260427_141936" / "dataset.parquet"
+    path = get_latest_parquet_path("triage_reference_cases")
+    print(f"Reading triage_reference_cases from: {path}")
     table = pq.read_table(str(path))
     df = table.to_pandas()
 
     chunks = []
+    discarded = 0
     for idx, row in df.iterrows():
+        if "triage_accuracy_eval" in df.columns and isinstance(row["triage_accuracy_eval"], dict):
+            score_data = row["triage_accuracy_eval"].get("clinical_accuracy", {})
+            score = score_data.get("score", 1)
+            if score < 1:
+                discarded += 1
+                continue
+
         level = int(row["expected_triage_level"])
         label = MTS_LABELS.get(level, "Urgent")
         category = row["symptom_category"]
@@ -138,7 +177,7 @@ def build_triage_reference_cases() -> str:
         rationale_chunk = rat_prefix + rationale
         chunks.append(rationale_chunk)
 
-    print(f"triage_reference_cases: {len(chunks)} chunks generated from {len(df)} records")
+    print(f"triage_reference_cases: {len(chunks)} chunks generated from {len(df)} records, {discarded} discarded due to QA filter")
     return "\n\n".join(chunks)
 
 

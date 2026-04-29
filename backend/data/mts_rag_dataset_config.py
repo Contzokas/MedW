@@ -114,6 +114,27 @@ def load_config_builder() -> dd.DataDesignerConfigBuilder:
         )
     )
 
+    # Evaluate the generated triage scenario against MTS guidelines
+    config_builder.add_column(
+        column_config=dd.LLMJudgeColumnConfig(
+            name="triage_accuracy_eval",
+            model_alias="nvidia-text",
+            scores=[
+                dd.Score(
+                    name="clinical_accuracy",
+                    description="Evaluate whether the expected_triage_level correctly follows the MTS Guidelines based on the patient_presentation.",
+                    options={
+                        0: "The triage level is incorrect or the rationale contradicts the MTS guidelines.",
+                        1: "The triage level is correct according to the MTS guidelines and the rationale supports it."
+                    }
+                )
+            ],
+            system_prompt=f"You are an expert clinical auditor reviewing triage cases against the Manchester Triage System (MTS) guidelines:\n{MTS_GUIDELINES}",
+            prompt="Review this triage scenario:\nPatient Presentation: {{ patient_presentation }}\nAssigned Triage Level: {{ expected_triage_level }}\nRationale: {{ expected_rationale }}\n\nDoes this accurately follow the MTS guidelines?"
+        )
+    )
+
+
     # Drop the intermediate structured column and helper columns if you only want the text output
     config_builder.add_processor(
         processor_config=dd.DropColumnsProcessorConfig(
