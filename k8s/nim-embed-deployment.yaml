@@ -1,0 +1,92 @@
+# NIM Embedding — CPU workload
+#
+# Model: nvidia/nv-embedqa-e5-v5  (NeMo Retriever)
+# Runs on CPU to avoid requiring a third B200 during deployment.
+# 1B model remains usable on CPU for this pipeline.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medw-nim-embed
+  namespace: runai-medo
+  labels:
+    app: medw-nim-embed
+    app.kubernetes.io/part-of: medw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medw-nim-embed
+  template:
+    metadata:
+      labels:
+        app: medw-nim-embed
+        runai/tag: test
+    spec:
+      imagePullSecrets:
+        - name: dockerregistry-nvcr-io
+
+      containers:
+        - name: nim-embed
+          image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
+          ports:
+            - containerPort: 8000
+              name: nim-embed-api
+
+          env:
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: genericsecret-ngc
+                  key: NGC_API_KEY
+            - name: NIM_CACHE_PATH
+              value: "/opt/nim/.cache"
+
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "4"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+
+          readinessProbe:
+            httpGet:
+              path: /v1/health/ready
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /v1/health/live
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 5
+
+          volumeMounts:
+            - name: nim-embed-cache
+              mountPath: /opt/nim/.cache
+
+      volumes:
+        - name: nim-embed-cache
+          persistentVolumeClaim:
+            claimName: nim-embed-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nim-embed
+  namespace: runai-medo
+  labels:
+    app: medw-nim-embed
+    app.kubernetes.io/part-of: medw
+spec:
+  selector:
+    app: medw-nim-embed
+  ports:
+    - name: nim-embed-api
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

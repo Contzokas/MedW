@@ -18,6 +18,10 @@ class UrgencyAssessment(BaseModel):
     recommended_urgency: str = Field(description="One of: Low, Medium, High, Critical")
 
 
+class QueryVariations(BaseModel):
+    variations: list[str] = Field(description="5-10 distinct ways a layperson might describe these symptoms colloquially in a search bar or to a chatbot")
+
+
 def load_config_builder() -> dd.DataDesignerConfigBuilder:
     config_builder = dd.DataDesignerConfigBuilder()
 
@@ -89,6 +93,15 @@ def load_config_builder() -> dd.DataDesignerConfigBuilder:
         model_alias="nvidia-text",
         prompt="Write a first-person patient description (2-3 sentences) describing their symptoms as they would report them to a nurse or doctor.\n\nPatient: {{ patient_sex }}, age {{ patient_age }}\nBody region: {{ body_region }}\nPrimary symptom: {{ symptom_profile.primary_symptom }}\nAdditional symptoms: {{ symptom_profile.additional_symptoms }}\nSeverity: {{ severity }}\nPain level: {{ pain_level }}/10\nDuration: {{ duration_category }}\n\nWrite naturally as a patient would speak. Include how the symptoms affect daily life.",
         system_prompt="You generate realistic patient symptom descriptions. Write in a natural, conversational tone as a patient describing their condition. Vary sentence structure and detail level.",
+    ))
+
+    # Query variations
+    config_builder.add_column(dd.LLMStructuredColumnConfig(
+        name="query_variations",
+        model_alias="nvidia-text",
+        output_format=QueryVariations,
+        prompt="Generate 5-10 conversational query variations a layperson might use to describe the following condition.\n\nBody region: {{ body_region }}\nPrimary symptom: {{ symptom_profile.primary_symptom }}\nAdditional symptoms: {{ symptom_profile.additional_symptoms }}\nSeverity: {{ severity }}\n\nWrite these as natural language search queries or chat messages. Use colloquialisms and avoid strict medical jargon.",
+        system_prompt="You generate diverse, realistic patient queries. Think about how real people search for medical help when they don't know the exact diagnosis."
     ))
 
     return config_builder
