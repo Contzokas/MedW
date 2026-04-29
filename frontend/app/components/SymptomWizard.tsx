@@ -284,7 +284,7 @@ export default function SymptomWizard({ patientId, onResult, onStartLoading, lat
                 key={option.id}
                 type="button"
                 onClick={() => setState((prev) => ({ ...prev, severity: option.id }))}
-                className={`${CARD_BASE} ${gradient} group ${
+                className={`${CARD_BASE} w-full block text-left ${gradient} group ${
                   selected
                     ? "border-primary bg-primary/5 shadow-md shadow-primary/10"
                     : "border-border/60 bg-card"

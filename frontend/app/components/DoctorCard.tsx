@@ -23,6 +23,8 @@ interface DoctorCardProps {
 export default function DoctorCard({ doctor, redirectUrl, userLat, userLon }: DoctorCardProps) {
   const { t } = useLang()
 
+  if (!doctor) return null
+
   const showDistance = userLat !== null && userLon !== null && doctor.lat !== null && doctor.lon !== null
   const distanceKm = showDistance ? haversineKm(userLat, userLon, doctor.lat!, doctor.lon!).toFixed(1) : null
 
