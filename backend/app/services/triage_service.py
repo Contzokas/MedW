@@ -167,7 +167,7 @@ async def classify(
 
     try:
         try:
-            context = await retrieve_context(enriched_symptoms)
+            context = await retrieve_context(symptoms)
             llm_result = await llm_classify(
                 symptoms=enriched_symptoms,
                 context=context,
@@ -203,6 +203,7 @@ async def classify(
             return FollowUpResponse(
                 question=llm_result["follow_up_question"],
                 follow_up_count=follow_up_count + 1,
+                suggested_answers=llm_result.get("suggested_answers", []),
             )
 
         lookup_specialty = _specialty_for_doctor_lookup(llm_result["specialty"], resolved_lang)

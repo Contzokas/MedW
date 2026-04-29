@@ -147,7 +147,8 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
     '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
     "2. If the symptoms are vague or missing key details, use one of your remaining follow-up questions:\n"
-    '{{"follow_up_question": "YOUR QUESTION IN {output_language}"}}\n'
+    '{{"follow_up_question": "YOUR QUESTION IN {output_language}", "suggested_answers": ["OPTION 1", "OPTION 2", "OPTION 3"]}}\n'
+    "suggested_answers: 3-5 short tappable options (2-5 words each) in {output_language} that directly answer your question. Always include a final open-ended option ('Other' / 'Άλλο').\n"
     "Only do this if a single targeted question would meaningfully improve your confidence.\n\n"
     "3. If the input is TRULY empty or contains zero symptom information "
     "(e.g. just a greeting, \"idk\", \"nothing\", single characters), "
@@ -476,7 +477,9 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     if "follow_up_question" in data:
         if not isinstance(data["follow_up_question"], str) or not data["follow_up_question"].strip():
             raise LLMParseError("follow_up_question must be a non-empty string")
-        return {"follow_up_question": data["follow_up_question"]}
+        raw_answers = data.get("suggested_answers", [])
+        suggested = [a for a in raw_answers if isinstance(a, str) and a.strip()] if isinstance(raw_answers, list) else []
+        return {"follow_up_question": data["follow_up_question"], "suggested_answers": suggested}
 
     if "uncertain_result" in data:
         if not isinstance(data["uncertain_result"], str) or not data["uncertain_result"].strip():

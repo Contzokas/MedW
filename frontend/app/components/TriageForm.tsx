@@ -27,6 +27,7 @@ interface FollowUpState {
   question: string
   followUpCount: number
   conversationContext: string
+  suggestedAnswers: string[]
 }
 
 const PROMPTS = [
@@ -94,7 +95,7 @@ export default function TriageForm({
       const result = await submitTriage(symptoms, patientId, lang, 0, "", true, latitude, longitude, profile)
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
-        setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "" })
+        setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "", suggestedAnswers: fu.suggested_answers ?? [] })
       } else if (result.type === "redirect_to_wizard") {
         setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
         onRedirectActive?.(true)
@@ -127,7 +128,7 @@ export default function TriageForm({
       const result = await submitTriage(symptoms, patientId, lang, followUp.followUpCount, newContext, true, latitude, longitude)
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
-        setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: newContext })
+        setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: newContext, suggestedAnswers: fu.suggested_answers ?? [] })
         setFollowUpAnswer("")
       } else if (result.type === "redirect_to_wizard") {
         setFollowUp(null)
@@ -199,6 +200,26 @@ export default function TriageForm({
             <p>{followUp.question}</p>
           </div>
         </div>
+
+        {followUp.suggestedAnswers.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {followUp.suggestedAnswers.map((answer, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={isLoading}
+                onClick={() => setFollowUpAnswer(answer)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all disabled:cursor-not-allowed ${
+                  followUpAnswer === answer
+                    ? "border-primary bg-primary text-white"
+                    : "border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+              >
+                {answer}
+              </button>
+            ))}
+          </div>
+        )}
 
         <textarea
           rows={3}

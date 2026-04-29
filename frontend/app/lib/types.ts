@@ -41,6 +41,7 @@ export interface FollowUpResponse {
   type: "follow_up"
   question: string
   follow_up_count: number
+  suggested_answers?: string[]
 }
 
 export interface RedirectToWizardResponse {

@@ -21,6 +21,7 @@ class FollowUpResponse(BaseModel):
     type: Literal["follow_up"] = "follow_up"
     question: str
     follow_up_count: int
+    suggested_answers: list[str] = []
 
 
 class TriageResponse(BaseModel):
