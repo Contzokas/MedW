@@ -5,12 +5,13 @@ import { ThemeProvider } from "@/app/lib/theme-context";
 import { LangProvider } from "@/app/lib/lang-context";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import LangToggle from "@/app/components/LangToggle";
-import SettingsLink from "@/app/components/SettingsLink";
-import AnalyticsLink from "@/app/components/AnalyticsLink";
+import DoctorsLink from "@/app/components/DoctorsLink";
+import HistoryToggle from "@/app/components/HistoryToggle";
+import ManagementLink from "@/app/components/ManagementLink";
 import EmergencyBar from "@/app/components/EmergencyBar";
 import ErrorBoundary from "@/app/components/ErrorBoundary";
-import InstallPrompt from "@/app/components/InstallPrompt";
 import { Toaster } from "react-hot-toast";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
@@ -71,10 +73,13 @@ export default function RootLayout({
           <LangProvider>
             {/* Floating controls — top right */}
             <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+              <DoctorsLink />
               <LangToggle />
               <ThemeToggle />
-              <AnalyticsLink />
-              <SettingsLink />
+              <Suspense fallback={<div className="w-11 h-11" />}>
+                <HistoryToggle />
+              </Suspense>
+              <ManagementLink />
             </div>
 
             <ErrorBoundary>
@@ -85,7 +90,6 @@ export default function RootLayout({
             </ErrorBoundary>
 
             <EmergencyBar />
-            <InstallPrompt />
           </LangProvider>
         </ThemeProvider>
       </body>

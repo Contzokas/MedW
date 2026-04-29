@@ -85,7 +85,7 @@ export default function SettingsPanel() {
           <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground mb-3">
             {t.settings.theme}
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setTheme("light")}
@@ -127,27 +127,6 @@ export default function SettingsPanel() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
               </svg>
               {t.settings.dark}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme("system")}
-              className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold tracking-wide transition-colors ${
-                theme === "system"
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border/50 bg-card/60 text-muted-foreground hover:border-border"
-              }`}
-            >
-              <svg
-                className="w-5 h-5 mx-auto mb-1.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25Z" />
-              </svg>
-              {t.settings.system}
             </button>
           </div>
         </section>
