@@ -212,7 +212,6 @@ jobs:
       NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
       NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
       NIM_EMBED_MODEL: nvidia/nv-embedqa-e5-v5
-      NIM_RERANKER_BASE_URL: ${{ vars.NIM_RERANKER_BASE_URL || 'http://nim-reranker:8000/v1' }}
       NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
       RAG_DEBUG_ENABLED: ${{ vars.RAG_DEBUG_ENABLED || 'false' }}
     steps:
@@ -317,7 +316,6 @@ jobs:
           else
             echo "No (redeploy-ai) flag — preserving existing NIM workloads"
           fi
-          delete_workload "medw-nim-reranker${SUFFIX}"   # legacy cleanup from previous runs
           delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
           delete_workload "medw-milvus-etcd${SUFFIX}"    # legacy cleanup from previous runs
           delete_workload "medw-milvus-minio${SUFFIX}"   # legacy cleanup from previous runs
@@ -406,7 +404,7 @@ jobs:
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
 
       # ── Resolve NIM service URLs ──────────────────────────────────────────
-      - name: Resolve NIM and Embed URLs
+      - name: Resolve NIM service URLs
         run: |
           resolve_url() {
             local name="$1" scheme="${2:-http}" max=120
@@ -438,6 +436,13 @@ jobs:
 
           NIM_URL=$(resolve_url   "medw-nim${SUFFIX}")       || NIM_URL=""
           EMBED_URL=$(resolve_url "medw-nim-embed${SUFFIX}") || EMBED_URL=""
+          RERANKER_URL=$(resolve_url "medw-nim-reranker${SUFFIX}") || RERANKER_URL=""
+          # Reranker is optional — fall back to retrieval order if unavailable
+          if [ -n "$RERANKER_URL" ]; then
+            echo "NIM_RERANKER_BASE_URL=${RERANKER_URL}/v1" >> "$GITHUB_ENV"
+          else
+            echo "NIM_RERANKER_BASE_URL=" >> "$GITHUB_ENV"
+          fi
 
           [ -z "$NIM_URL" ]   && NIM_URL="${{ vars.NIM_URL }}"
           [ -z "$EMBED_URL" ] && EMBED_URL="${{ vars.NIM_EMBED_URL }}"
@@ -446,10 +451,11 @@ jobs:
             echo "Failed to resolve NIM/Embed URLs"; exit 1
           fi
 
-          echo "NIM_BASE_URL=${NIM_URL}/v1"         >> "$GITHUB_ENV"
-          echo "NIM_EMBED_BASE_URL=${EMBED_URL}/v1" >> "$GITHUB_ENV"
-          echo "NIM LLM: ${NIM_URL}/v1"
-          echo "Embed:   ${EMBED_URL}/v1"
+          echo "NIM_BASE_URL=${NIM_URL}/v1"               >> "$GITHUB_ENV"
+          echo "NIM_EMBED_BASE_URL=${EMBED_URL}/v1"       >> "$GITHUB_ENV"
+          echo "NIM LLM:     ${NIM_URL}/v1"
+          echo "Embed:       ${EMBED_URL}/v1"
+          echo "Reranker:    ${RERANKER_URL:-not deployed}"
 
       - name: Deploy Backend
         run: |
