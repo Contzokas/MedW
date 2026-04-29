@@ -6,6 +6,7 @@ import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainRe
 import { useLang } from "@/app/lib/lang-context"
 import { useProfile } from "@/app/lib/profile-context"
 import { QUICK_SYMPTOMS } from "@/app/lib/wizard-data"
+import LoadingOverlay from "./LoadingOverlay"
 
 interface TriageFormProps {
   onResult: (result: TriageResponse) => void
@@ -362,6 +363,9 @@ export default function TriageForm({
           <span className="absolute inset-0 bg-white/10 scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left rounded-xl" />
         )}
       </button>
+
+      {/* Loading overlay */}
+      <LoadingOverlay visible={isLoading} />
     </form>
   )
 }

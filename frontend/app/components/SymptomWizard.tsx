@@ -12,6 +12,7 @@ import {
   type BodyArea,
   type SeverityOption,
 } from "@/app/lib/wizard-data"
+import LoadingOverlay from "./LoadingOverlay"
 
 type WizardStep = "body-area" | "symptoms" | "severity" | "duration" | "review"
 
@@ -448,6 +449,9 @@ export default function SymptomWizard({ patientId, onResult, onStartLoading, lat
               : t.wizard.next}
         </button>
       </div>
+
+      {/* Loading overlay */}
+      <LoadingOverlay visible={isLoading} />
     </div>
   )
 }

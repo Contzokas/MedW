@@ -512,3 +512,12 @@ body {
   color: var(--foreground);
   background: var(--muted);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ── Loading Overlay ─────────────────────────────────────────────
+   ═══════════════════════════════════════════════════════════════ */
+
+@keyframes loadingProgress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
