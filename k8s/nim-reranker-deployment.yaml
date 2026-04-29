@@ -1,0 +1,92 @@
+# NIM Reranker — CPU-only workload
+#
+# Model: nvidia/nv-rerankqa-llama-3_2-1b-v2  (NeMo Retriever)
+# Runs on CPU — 1B model is tolerable without GPU at this scale.
+# GPU 0 is fully allocated to nim-embed; GPU 1+2 to the LLM.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medw-nim-reranker
+  namespace: runai-medo
+  labels:
+    app: medw-nim-reranker
+    app.kubernetes.io/part-of: medw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medw-nim-reranker
+  template:
+    metadata:
+      labels:
+        app: medw-nim-reranker
+        runai/tag: test
+    spec:
+      imagePullSecrets:
+        - name: dockerregistry-nvcr-io
+
+      containers:
+        - name: nim-reranker
+          image: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
+          ports:
+            - containerPort: 8000
+              name: nim-rerank-api
+
+          env:
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: genericsecret-ngc
+                  key: NGC_API_KEY
+            - name: NIM_CACHE_PATH
+              value: "/opt/nim/.cache"
+
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "4"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+
+          readinessProbe:
+            httpGet:
+              path: /v1/health/ready
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 40
+          livenessProbe:
+            httpGet:
+              path: /v1/health/live
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 5
+
+          volumeMounts:
+            - name: nim-reranker-cache
+              mountPath: /opt/nim/.cache
+
+      volumes:
+        - name: nim-reranker-cache
+          persistentVolumeClaim:
+            claimName: nim-reranker-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nim-reranker
+  namespace: runai-medo
+  labels:
+    app: medw-nim-reranker
+    app.kubernetes.io/part-of: medw
+spec:
+  selector:
+    app: medw-nim-reranker
+  ports:
+    - name: nim-rerank-api
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

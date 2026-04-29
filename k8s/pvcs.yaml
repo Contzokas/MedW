@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ollama-pvc
+  name: nim-pvc
   namespace: runai-medo
   labels:
     app.kubernetes.io/part-of: medw
@@ -10,12 +10,12 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi   # mistral:7b ~4 GB; room for additional models
+      storage: 500Gi   # NIM engine cache for LLM model
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: chroma-pvc
+  name: nim-embed-pvc
   namespace: runai-medo
   labels:
     app.kubernetes.io/part-of: medw
@@ -24,4 +24,32 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 20Gi   # NIM engine cache for 1B embedding model
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nim-reranker-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi   # NIM engine cache for 1B reranker model
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-pvc
+  namespace: runai-medo
+  labels:
+    app.kubernetes.io/part-of: medw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi    # Milvus Lite embedded database file

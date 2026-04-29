@@ -65,7 +65,7 @@ def test_parse_response_raises_on_float_mts_level():
 
 
 async def test_classify_returns_dict_with_mocked_chain(monkeypatch):
-    def mock_invoke(symptoms, context, lang="el"):
+    def mock_invoke(symptoms, context, lang="el", follow_up_count=0, max_follow_ups=2):
         return VALID_JSON
 
     monkeypatch.setattr("app.services.llm_service._invoke_chain_sync", mock_invoke)
@@ -140,7 +140,7 @@ def test_parse_response_translates_greek_specialty_when_lang_is_en():
 async def test_classify_passes_lang_to_chain(monkeypatch):
     captured = {}
 
-    def mock_invoke(symptoms, context, lang):
+    def mock_invoke(symptoms, context, lang, follow_up_count=0, max_follow_ups=2):
         captured["lang"] = lang
         return VALID_JSON_EN
 
@@ -189,7 +189,7 @@ async def test_triage_tier2_rag_unavailable_falls_back_to_llm(monkeypatch):
     result = await triage_classify("πόνος", "patient-002")
     assert result.rag_used is False
     assert result.mts_level == 2
-    mock_llm.assert_called_once_with(symptoms="πόνος", context="", lang="el")
+    mock_llm.assert_called_once_with(symptoms="πόνος", context="", lang="el", follow_up_count=0, max_follow_ups=2)
 
 
 async def test_triage_tier3_llm_parse_error_returns_safe_default(monkeypatch):
@@ -218,7 +218,7 @@ async def test_triage_en_passes_lang_to_llm_and_returns_english_default_on_failu
     assert result.mts_label == "Urgent"
     assert result.specialty == "General Practice"
     assert "please contact a doctor" in result.reasoning
-    llm_mock.assert_called_once_with(symptoms="chest pain", context="ctx", lang="en")
+    llm_mock.assert_called_once_with(symptoms="chest pain", context="ctx", lang="en", follow_up_count=0, max_follow_ups=2)
 
 
 async def test_triage_en_translates_english_specialty_for_doctor_lookup(monkeypatch):
@@ -264,3 +264,65 @@ async def test_triage_queue_not_appended_on_tier3(monkeypatch):
     await triage_classify("πόνος", "patient-007")
     entries = await queue_module.get_all_entries()
     assert len(entries) == 0
+
+
+# ── Story: follow-up question tests ──────────────────────────────────────────
+
+from app.schemas.triage import FollowUpResponse as _FollowUpResponse, TriageResponse
+from app.core.config import MAX_FOLLOW_UP_QUESTIONS as _MAX_FOLLOW_UP_QUESTIONS
+
+
+async def test_follow_up_returned_when_llm_asks_and_count_is_zero(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr(
+        "app.services.triage_service.llm_classify",
+        AsyncMock(return_value={"follow_up_question": "Πότε ξεκίνησαν τα συμπτώματα;"}),
+    )
+    result = await triage_classify("πόνος", "patient-fu-001", follow_up_count=0)
+    assert isinstance(result, _FollowUpResponse)
+    assert result.type == "follow_up"
+    assert result.question == "Πότε ξεκίνησαν τα συμπτώματα;"
+    assert result.follow_up_count == 1
+    entries = await queue_module.get_all_entries()
+    assert len(entries) == 0
+
+
+async def test_follow_up_bypassed_when_count_at_max(monkeypatch):
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+    monkeypatch.setattr(
+        "app.services.triage_service.llm_classify",
+        AsyncMock(return_value={"follow_up_question": "Ερώτηση;"}),
+    )
+    result = await triage_classify("πόνος", "patient-fu-002", follow_up_count=_MAX_FOLLOW_UP_QUESTIONS)
+    assert isinstance(result, TriageResponse)
+
+
+async def test_enriched_symptoms_includes_conversation_context(monkeypatch):
+    captured = {}
+    monkeypatch.setattr("app.services.triage_service.retrieve_context", AsyncMock(return_value="ctx"))
+
+    async def capturing_llm(symptoms, context, lang, follow_up_count, max_follow_ups):
+        captured["symptoms"] = symptoms
+        return _VALID_LLM_RESULT
+
+    monkeypatch.setattr("app.services.triage_service.llm_classify", capturing_llm)
+    ctx = "Q: Πότε ξεκίνησαν;\nA: Χθες."
+    await triage_classify("πόνος", "patient-fu-003", conversation_context=ctx)
+    assert "πόνος" in captured["symptoms"]
+    assert ctx in captured["symptoms"]
+    assert captured["symptoms"].startswith("πόνος")
+
+
+async def test_existing_fallback_tiers_unchanged_with_follow_up_params(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.triage_service.retrieve_context",
+        AsyncMock(side_effect=_RAGUnavailableError("down")),
+    )
+    monkeypatch.setattr(
+        "app.services.triage_service.llm_classify",
+        AsyncMock(return_value=_VALID_LLM_RESULT),
+    )
+    result = await triage_classify("πόνος", "patient-fu-004", follow_up_count=0, conversation_context="")
+    assert isinstance(result, TriageResponse)
+    assert result.rag_used is False
+    assert result.mts_level == 2
