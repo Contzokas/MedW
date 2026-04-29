@@ -37,9 +37,9 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       suffix: ${{ steps.resolve.outputs.suffix }}
       env: ${{ steps.resolve.outputs.env }}
-        sha_short: ${{ steps.resolve.outputs.sha_short }}
-        immutable_tag: ${{ steps.resolve.outputs.immutable_tag }}
-        redeploy_ai: ${{ steps.extract.outputs.redeploy_ai }}
+      sha_short: ${{ steps.resolve.outputs.sha_short }}
+      immutable_tag: ${{ steps.resolve.outputs.immutable_tag }}
+      redeploy_ai: ${{ steps.extract.outputs.redeploy_ai }}
     steps:
       - name: Resolve tag and suffix from branch
         id: resolve
