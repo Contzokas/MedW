@@ -48,4 +48,5 @@ class QueueEntry(BaseModel):
     patient_id: str
     mts_level: int
     specialty: str
+    doctor_name: str = ""
     timestamp: str  # ISO 8601, e.g. "2026-04-17T10:30:00+00:00"

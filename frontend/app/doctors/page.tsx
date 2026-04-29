@@ -94,7 +94,7 @@ export default function DoctorsPage() {
   const assignedPatients = useMemo(() => {
     if (!loggedInDoctor) return []
     return queueEntries.filter((e) =>
-      e.specialty.toLowerCase() === loggedInDoctor.specialty.toLowerCase()
+      e.doctor_name === loggedInDoctor.name
     )
   }, [queueEntries, loggedInDoctor])
 

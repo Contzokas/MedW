@@ -233,6 +233,7 @@ async def classify(
             patient_id=patient_id,
             mts_level=result.mts_level,
             specialty=result.specialty,
+            doctor_name=result.doctor.name,
             timestamp=timestamp,
         ))
     except Exception as exc:

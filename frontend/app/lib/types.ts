@@ -79,5 +79,6 @@ export interface QueueEntry {
   patient_id: string
   mts_level: number
   specialty: string
+  doctor_name: string
   timestamp: string
 }
