@@ -213,6 +213,7 @@ jobs:
       NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
       NIM_EMBED_MODEL: nvidia/nv-embedqa-e5-v5
       NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
+      RAG_DEBUG_ENABLED: ${{ vars.RAG_DEBUG_ENABLED || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -467,6 +468,7 @@ jobs:
             --arg nimRerankerBaseUrl "https://integrate.api.nvidia.com/v1" \
             --arg nimRerankerModel "${NIM_RERANKER_MODEL}" \
             --arg ngcApiKey "${{ secrets.NGC_API_KEY }}" \
+            --arg ragDebugEnabled "${RAG_DEBUG_ENABLED}" \
             '{
               name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
@@ -484,7 +486,8 @@ jobs:
                   {name: "NIM_RERANKER_BASE_URL",    value: $nimRerankerBaseUrl},
                   {name: "NIM_RERANKER_MODEL",       value: $nimRerankerModel},
                   {name: "NIM_API_KEY",              value: $ngcApiKey},
-                  {name: "MILVUS_DB_PATH",           value: "/tmp/milvus.db"}
+                  {name: "MILVUS_DB_PATH",           value: "/tmp/milvus.db"},
+                  {name: "RAG_DEBUG_ENABLED",        value: $ragDebugEnabled}
                 ],
                 ports: [{container: 8000, serviceType: "NodePort"}]
               }
