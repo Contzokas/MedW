@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { submitTriage } from "@/app/lib/api"
 import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainResultResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
+import { useProfile } from "@/app/lib/profile-context"
 import { QUICK_SYMPTOMS } from "@/app/lib/wizard-data"
 
 interface TriageFormProps {
@@ -62,6 +63,7 @@ export default function TriageForm({
   const [chipsVisible, setChipsVisible] = useState(true)
   const [promptIdx, setPromptIdx] = useState(0)
   const { t, lang } = useLang()
+  const { profile } = useProfile()
 
   // Random daily prompt — safe one-time init after mount
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function TriageForm({
     setError(null)
 
     try {
-      const result = await submitTriage(symptoms, patientId, lang, 0, "", true, latitude, longitude)
+      const result = await submitTriage(symptoms, patientId, lang, 0, "", true, latitude, longitude, profile)
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "" })
@@ -363,3 +365,4 @@ export default function TriageForm({
     </form>
   )
 }
+

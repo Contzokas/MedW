@@ -1,7 +1,19 @@
+export interface UserProfile {
+  age: number | null
+  sex: "M" | "F" | "other" | null
+  chronic_conditions: string
+  medications: string
+  allergies: string
+  smoking: boolean
+  alcohol: boolean
+  pregnant: boolean | null
+}
+
 export interface TriageRequest {
   symptoms: string
   patient_id: string
   lang: "en" | "el"
+  patient_profile?: string
 }
 
 export interface Doctor {

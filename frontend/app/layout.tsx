@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/lib/theme-context";
 import { LangProvider } from "@/app/lib/lang-context";
+import { ProfileProvider } from "@/app/lib/profile-context";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import LangToggle from "@/app/components/LangToggle";
 import DoctorsLink from "@/app/components/DoctorsLink";
@@ -71,6 +72,7 @@ export default function RootLayout({
         </a>
         <ThemeProvider>
           <LangProvider>
+            <ProfileProvider>
             {/* Floating controls — top right */}
             <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
               <DoctorsLink />
@@ -89,7 +91,8 @@ export default function RootLayout({
               </main>
             </ErrorBoundary>
 
-            <EmergencyBar />
+              <EmergencyBar />
+            </ProfileProvider>
           </LangProvider>
         </ThemeProvider>
       </body>

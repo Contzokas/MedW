@@ -153,6 +153,7 @@ async def classify(
     allow_follow_up: bool = True,
     latitude: float | None = None,
     longitude: float | None = None,
+    patient_profile: str = "",
 ) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse:
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
@@ -172,6 +173,7 @@ async def classify(
                 lang=resolved_lang,
                 follow_up_count=follow_up_count,
                 max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
+                patient_profile=patient_profile,
             )
             rag_used = True
         except RAGUnavailableError as exc:
@@ -182,6 +184,7 @@ async def classify(
                 lang=resolved_lang,
                 follow_up_count=follow_up_count,
                 max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
+                patient_profile=patient_profile,
             )
             rag_used = False
 

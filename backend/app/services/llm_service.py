@@ -96,6 +96,7 @@ _SYSTEM_PROMPT = (
 )
 
 _HUMAN_TEMPLATE = (
+    "{patient_profile_section}"
     "Clinical context:\n{context}\n\n"
     "Patient symptoms ({input_language}):\n{symptoms}\n\n"
     "Return JSON with exactly these fields:\n"
@@ -221,6 +222,14 @@ def _get_chain():
     return _chain
 
 
+def _build_profile_section(patient_profile: str) -> str:
+    """Format patient_profile as a clinical summary block for the LLM prompt."""
+    profile = patient_profile.strip()
+    if not profile:
+        return ""
+    return f"Patient medical history:\n{profile}\n\n"
+
+
 def _get_followup_chain():
     global _chain_followup
     if _chain_followup is None:
@@ -234,9 +243,11 @@ def _invoke_chain_sync(
     lang: str = "el",
     follow_up_count: int = 0,
     max_follow_ups: int = 2,
+    patient_profile: str = "",
 ) -> str:
     output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
     input_language = output_language
+    profile_section = _build_profile_section(patient_profile)
     if follow_up_count < max_follow_ups:
         return _get_followup_chain().invoke(
             {
@@ -246,6 +257,7 @@ def _invoke_chain_sync(
                 "input_language": input_language,
                 "follow_up_count": follow_up_count,
                 "max_follow_ups": max_follow_ups,
+                "patient_profile_section": profile_section,
             }
         )
     return _get_chain().invoke(
@@ -254,6 +266,7 @@ def _invoke_chain_sync(
             "context": context,
             "output_language": output_language,
             "input_language": input_language,
+            "patient_profile_section": _build_profile_section(patient_profile),
         }
     )
 
@@ -462,10 +475,11 @@ async def classify(
     lang: str = "el",
     follow_up_count: int = 0,
     max_follow_ups: int = 2,
+    patient_profile: str = "",
 ) -> dict:
     try:
         raw = await asyncio.to_thread(
-            _invoke_chain_sync, symptoms, context, lang, follow_up_count, max_follow_ups
+            _invoke_chain_sync, symptoms, context, lang, follow_up_count, max_follow_ups, patient_profile
         )
         return _parse_response(raw, lang)
     except LLMParseError:

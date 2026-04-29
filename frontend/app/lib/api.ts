@@ -1,5 +1,6 @@
-import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainResultResponse, TriageHistoryList, TriageHistoryEntry } from "@/app/lib/types"
+import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainResultResponse, TriageHistoryList, TriageHistoryEntry, UserProfile } from "@/app/lib/types"
 import { buildApiUrl, resolveApiBase } from "@/app/lib/backendResolver"
+import { serializeProfileForLLM } from "@/app/lib/profile-cookie"
 
 export async function submitTriage(
   symptoms: string,
@@ -10,8 +11,13 @@ export async function submitTriage(
   allowFollowUp: boolean = true,
   latitude: number | null = null,
   longitude: number | null = null,
+  profile?: UserProfile | null,
 ): Promise<TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse> {
   const apiBase = await resolveApiBase()
+
+  const patient_profile = profile
+    ? serializeProfileForLLM(profile, lang)
+    : undefined
 
   const res = await fetch(buildApiUrl(apiBase, "/api/v1/triage"), {
     method: "POST",
@@ -25,6 +31,7 @@ export async function submitTriage(
       ...(allowFollowUp === false && { allow_follow_up: false }),
       ...(latitude !== null && { latitude }),
       ...(longitude !== null && { longitude }),
+      ...(patient_profile && { patient_profile }),
     }),
   })
 
@@ -59,3 +66,4 @@ export async function getTriageHistoryEntry(
   if (!res.ok) throw new Error(`History entry fetch failed (status ${res.status})`)
   return res.json()
 }
+
