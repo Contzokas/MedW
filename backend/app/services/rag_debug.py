@@ -327,7 +327,7 @@ async def debug_retrieve(
             start_ms=(time.perf_counter() - pipeline_start) * 1000,
         )
         try:
-            query_emb = _embed_texts([query])[0]
+            query_emb = _embed_texts([query], input_type="query")[0]
             span_embed.finish((time.perf_counter() - pipeline_start) * 1000)
             if include_embeddings:
                 span_embed.metadata["embedding_dim"] = len(query_emb)

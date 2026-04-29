@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -34,15 +35,18 @@ class RAGUnavailableError(Exception):
 def _get_milvus_client() -> MilvusClient:
     global _milvus_client
     if _milvus_client is None:
+        # Prevent "too_many_pings" gRPC errors with Milvus Lite
+        os.environ.setdefault("GRPC_KEEPALIVE_TIME_MS", "60000")
+        os.environ.setdefault("GRPC_KEEPALIVE_TIMEOUT_MS", "20000")
         _milvus_client = MilvusClient(uri=MILVUS_URI)
     return _milvus_client
 
 
-def _embed_texts(texts: list[str]) -> list[list[float]]:
+def _embed_texts(texts: list[str], input_type: str = "passage") -> list[list[float]]:
     response = httpx.post(
         f"{NIM_EMBED_BASE_URL.rstrip('/')}/embeddings",
         headers={"Authorization": f"Bearer {NIM_API_KEY}"},
-        json={"model": NIM_EMBED_MODEL, "input": texts},
+        json={"model": NIM_EMBED_MODEL, "input": texts, "input_type": input_type},
         timeout=30.0,
     )
     response.raise_for_status()
@@ -156,7 +160,7 @@ def _cached_retrieve(symptoms: str) -> str:
     if row_count == 0:
         return ""
 
-    query_emb = _embed_texts([symptoms])[0]
+    query_emb = _embed_texts([symptoms], input_type="query")[0]
     n = min(RETRIEVAL_CANDIDATES, row_count)
     results = client.search(
         collection_name=COLLECTION_NAME,
