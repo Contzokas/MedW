@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import TriageForm from "@/app/components/TriageForm"
 import TriageResult from "@/app/components/TriageResult"
 import SymptomWizard from "@/app/components/SymptomWizard"
 import SkeletonTriageResult from "@/app/components/SkeletonTriageResult"
 import FollowUpGuidance from "@/app/components/FollowUpGuidance"
-import Tabs from "@/app/components/Tabs"
 import HistoryList from "@/app/components/HistoryList"
 import Disclaimer from "@/app/components/Disclaimer"
 import TeamSection from "@/app/components/TeamSection"
@@ -28,10 +28,11 @@ function generatePatientId(): string {
 }
 
 export default function Home() {
+  const searchParams = useSearchParams()
+  const showHistory = searchParams.get("history") === "1"
   const [result, setResult] = useState<TriageResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [heroVisible, setHeroVisible] = useState(true)
-  const [activeTab, setActiveTab] = useState<"form" | "history">("form")
   const [useWizard, setUseWizard] = useState(false)
   const heroRef = useRef<HTMLElement>(null)
   const { t, lang } = useLang()
@@ -61,14 +62,6 @@ export default function Home() {
     setResult(r)
     setLoading(false)
   }
-
-  const tabs = useMemo(
-    () => [
-      { id: "form", label: t.history.newAssessment },
-      { id: "history", label: t.history.title, tabId: "tab-history" },
-    ],
-    [t.history.newAssessment, t.history.title]
-  )
 
   const scrollToBottom = () => {
     const bottomAnchor = document.getElementById("page-bottom")
@@ -102,11 +95,11 @@ export default function Home() {
         </div>
 
         <div className="relative flex-1 w-full flex flex-col items-center justify-center py-16">
-          <div className={`w-full ${result === null ? "max-w-xl" : "max-w-2xl"}`}>
+          <div className={`w-full ${result === null ? (useWizard ? "max-w-3xl" : "max-w-xl") : "max-w-2xl"}`}>
             {/* Logo */}
             <div className="mb-8 text-center">
               <button
-                onClick={() => { setResult(null); setLoading(false); setActiveTab("form") }}
+                onClick={() => { setResult(null); setLoading(false) }}
                 className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-lg"
                 title={t.hero.logoTitle}
               >
@@ -121,76 +114,86 @@ export default function Home() {
 
             {/* Card */}
             <div className="triage-card rounded-2xl border border-primary/20 bg-card p-6 sm:p-8">
-              <div className="mb-6">
-                <Tabs
-                  tabs={tabs}
-                  activeTab={activeTab}
-                  onChange={(id) => setActiveTab(id as "form" | "history")}
-                />
-              </div>
 
-              {activeTab === "history" ? (
+              {showHistory ? (
                 <HistoryList patientId={patientId} />
               ) : loading ? (
                 <SkeletonTriageResult />
               ) : result === null ? (
-                useWizard ? (
+                <div key={useWizard ? "wizard" : "text"} className="animate-[fadeIn_200ms_ease-out]">
+                {useWizard ? (
                   <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
-                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} />
-                )
+                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
+                )}
+                </div>
               ) : (
                 <>
                   <TriageResult result={result} userLat={geo.latitude} userLon={geo.longitude} />
                   <FollowUpGuidance mtsLevel={result.mts_level} />
+
+                  {geo.latitude === null && (
+                    <div className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                      <span className="text-sm text-muted-foreground flex-1">{t.doctor.locationBanner}</span>
+                      <button
+                        type="button"
+                        onClick={geo.request}
+                        disabled={geo.loading}
+                        className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white hover:bg-primary-hover transition-colors"
+                      >
+                        {geo.loading ? "..." : t.doctor.enableLocation}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={geo.dismiss}
+                        className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {t.doctor.skipLocation}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 
-              {/* Location permission banner */}
-              {activeTab === "form" && geo.latitude === null && !geo.denied && (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground">
-                  <span className="flex-1">{t.doctor.locationBanner}</span>
-                  {geo.loading ? (
-                    <span className="text-muted-foreground animate-pulse">...</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={geo.request}
-                      className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white hover:bg-primary-hover transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                    >
-                      {t.doctor.enableLocation}
-                    </button>
-                  )}
+              {/* Mode switcher — pill toggle between free-text and wizard */}
+              {!showHistory && result === null && !loading && (
+                <div className="flex gap-2 rounded-xl bg-muted/60 p-1.5 mt-2 mb-4">
                   <button
+                    id="mode-text"
                     type="button"
-                    onClick={() => geo.denied || true}
-                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    style={{ visibility: geo.loading ? "hidden" : "visible" }}
+                    onClick={() => setUseWizard(false)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold transition-all duration-200 ${
+                      !useWizard
+                        ? "bg-primary text-white shadow-md shadow-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/30 dark:hover:bg-white/5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_1px_4px_rgba(0,0,0,0.45)]"
+                    }`}
                   >
-                    {t.doctor.skipLocation}
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+                    </svg>
+                    {toCaps(lang === "el" ? "Ελεύθερο Κείμενο" : "Free Text", lang)}
+                  </button>
+                  <button
+                    id="mode-wizard"
+                    type="button"
+                    onClick={() => setUseWizard(true)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold transition-all duration-200 ${
+                      useWizard
+                        ? "bg-primary text-white shadow-md shadow-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/30 dark:hover:bg-white/5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_1px_4px_rgba(0,0,0,0.45)]"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                    </svg>
+                    {toCaps(lang === "el" ? "Καθοδηγούμενο" : "Guided", lang)}
                   </button>
                 </div>
-              )}
-
-              {activeTab === "form" && geo.denied && (
-                <p className="text-xs text-muted-foreground text-center">{t.doctor.locationDenied}</p>
-              )}
-
-              {/* Wizard / free-text toggle */}
-              {activeTab === "form" && result === null && !loading && (
-                <button
-                  id="wizard-toggle"
-                  type="button"
-                  onClick={() => setUseWizard(!useWizard)}
-                  className="mt-4 block mx-auto text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
-                >
-                  {useWizard ? t.wizard.freeText : t.wizard.tryWizardLink}
-                </button>
               )}
             </div>
 
             {/* Back button */}
-            {result !== null && activeTab === "form" && (
+            {result !== null && !showHistory && (
               <div className="mt-4">
                 <button
                   type="button"

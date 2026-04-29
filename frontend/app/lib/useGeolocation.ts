@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 
 export interface GeolocationState {
   latitude: number | null
@@ -8,7 +8,10 @@ export interface GeolocationState {
   error: string | null
   loading: boolean
   denied: boolean
+  ipBased: boolean
   request: () => void
+  dismiss: () => void
+  dismissed: boolean
 }
 
 const GEO_OPTIONS: PositionOptions = {
@@ -23,6 +26,32 @@ export function useGeolocation(): GeolocationState {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [denied, setDenied] = useState(false)
+  const [ipBased, setIpBased] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const ipRan = useRef(false)
+
+  const dismiss = useCallback(() => setDismissed(true), [])
+
+  useEffect(() => {
+    if (ipRan.current) return
+    ipRan.current = true
+
+    let cancelled = false
+    fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(5000) })
+      .then((res) => {
+        if (!res.ok || cancelled) return null
+        return res.json() as Promise<{ latitude?: number; longitude?: number; error?: boolean }>
+      })
+      .then((data) => {
+        if (cancelled || !data || data.error || !data.latitude || !data.longitude) return
+        setLatitude(data.latitude)
+        setLongitude(data.longitude)
+        setIpBased(true)
+      })
+      .catch(() => { /* IP geolocation unavailable */ })
+
+    return () => { cancelled = true }
+  }, [])
 
   const request = useCallback(() => {
     if (!("geolocation" in navigator)) {
@@ -30,12 +59,14 @@ export function useGeolocation(): GeolocationState {
       setDenied(true)
       return
     }
+    setDismissed(false)
     setLoading(true)
     setError(null)
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLatitude(position.coords.latitude)
         setLongitude(position.coords.longitude)
+        setIpBased(false)
         setLoading(false)
       },
       (err) => {
@@ -49,5 +80,5 @@ export function useGeolocation(): GeolocationState {
     )
   }, [])
 
-  return { latitude, longitude, error, loading, denied, request }
+  return { latitude, longitude, error, loading, denied, ipBased, request, dismiss, dismissed }
 }

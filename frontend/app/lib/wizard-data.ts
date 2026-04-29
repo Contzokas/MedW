@@ -157,3 +157,22 @@ export const DURATION_OPTIONS: DurationOption[] = [
   { id: "weeks", label_en: "Several weeks", label_el: "Πολλές εβδομάδες" },
   { id: "longer", label_en: "Months or longer", label_el: "Μήνες ή περισσότερο" },
 ]
+
+export interface QuickSymptom {
+  id: string
+  label_en: string
+  label_el: string
+  fill: string
+  icon: string
+}
+
+export const QUICK_SYMPTOMS: QuickSymptom[] = [
+  { id: "headache", label_en: "Headache", label_el: "Πονοκέφαλος", fill: "Headache", icon: "🤕" },
+  { id: "chest_pain", label_en: "Chest pain", label_el: "Πόνος στο στήθος", fill: "Chest pain", icon: "💔" },
+  { id: "fever", label_en: "Fever", label_el: "Πυρετός", fill: "Fever", icon: "🌡️" },
+  { id: "cough", label_en: "Cough", label_el: "Βήχας", fill: "Cough", icon: "🫁" },
+  { id: "nausea", label_en: "Nausea", label_el: "Ναυτία", fill: "Nausea / Vomiting", icon: "🤢" },
+  { id: "dizziness", label_en: "Dizziness", label_el: "Ζάλη", fill: "Dizziness", icon: "😵" },
+  { id: "back_pain", label_en: "Back pain", label_el: "Πόνος στη μέση", fill: "Back pain", icon: "🧎" },
+  { id: "fatigue", label_en: "Fatigue", label_el: "Κόπωση", fill: "Fatigue / Weakness", icon: "😴" },
+]
