@@ -6,7 +6,7 @@ langchain==1.2.15
 langchain-core==1.2.29
 langchain-community
 langchain-nvidia-ai-endpoints
-pymilvus>=2.5.0
+pymilvus[milvus_lite]>=2.5.0
 pytest
 pytest-asyncio
 httpx

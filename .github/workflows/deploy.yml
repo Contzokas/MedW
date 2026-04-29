@@ -37,8 +37,9 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       suffix: ${{ steps.resolve.outputs.suffix }}
       env: ${{ steps.resolve.outputs.env }}
-      sha_short: ${{ steps.resolve.outputs.sha_short }}
-      immutable_tag: ${{ steps.resolve.outputs.immutable_tag }}
+        sha_short: ${{ steps.resolve.outputs.sha_short }}
+        immutable_tag: ${{ steps.resolve.outputs.immutable_tag }}
+        redeploy_ai: ${{ steps.extract.outputs.redeploy_ai }}
     steps:
       - name: Resolve tag and suffix from branch
         id: resolve
@@ -77,6 +78,20 @@ jobs:
           echo "  Suffix : ${SUFFIX:-(none)}"
           echo "  Env    : $ENV"
           echo "──────────────────────────────────"
+
+      - name: Check for redeploy-ai flag in commit message
+        id: extract
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          TITLE=$(echo "$MSG" | head -1)
+          echo "Commit title: $TITLE"
+          if echo "$TITLE" | grep -qiE '\(redeploy-ai\)'; then
+            echo "Flag (redeploy-ai) detected — NIM instances will be redeployed"
+            echo "redeploy_ai=true" >> $GITHUB_OUTPUT
+          else
+            echo "No (redeploy-ai) flag in commit title"
+            echo "redeploy_ai=false" >> $GITHUB_OUTPUT
+          fi
 
   # ─────────────────────────────────────────────────────────────────────────
   # Jobs 1-2: Build images in parallel
@@ -190,6 +205,7 @@ jobs:
       SUFFIX: ${{ needs.setup.outputs.suffix }}
       SHA_SHORT: ${{ needs.setup.outputs.sha_short }}
       IMMUTABLE_TAG: ${{ needs.setup.outputs.immutable_tag }}
+      REDEPLOY_AI: ${{ needs.setup.outputs.redeploy_ai }}
       NIM_MODEL: ${{ vars.NIM_MODEL || 'nvidia/nemotron-3-super-120b-a12b' }}
       NIM_TIMEOUT: ${{ vars.NIM_TIMEOUT || '120' }}
       NIM_WARMUP_ENABLED: ${{ vars.NIM_WARMUP_ENABLED || 'true' }}
@@ -292,9 +308,13 @@ jobs:
             echo "  WARNING: $name not removed after 150s — proceeding"
           }
 
-          # medw-nim (LLM) is intentionally NOT deleted — model download takes too long.
-          # It will be reused if already running; the deploy step handles 409 gracefully.
-          delete_workload "medw-nim-embed${SUFFIX}"
+          if [ "$REDEPLOY_AI" = "true" ]; then
+            echo "(redeploy-ai) flag detected — deleting NIM workloads for fresh redeploy"
+            delete_workload "medw-nim${SUFFIX}"
+            delete_workload "medw-nim-embed${SUFFIX}"
+          else
+            echo "No (redeploy-ai) flag — preserving existing NIM workloads"
+          fi
           delete_workload "medw-nim-reranker${SUFFIX}"   # legacy cleanup from previous runs
           delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
           delete_workload "medw-milvus-etcd${SUFFIX}"    # legacy cleanup from previous runs
@@ -307,6 +327,14 @@ jobs:
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
+          # Check if NIM LLM workload already exists — skip if already running
+          EXISTING=$(curl -sSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+            -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"medw-nim${SUFFIX}\") | .name // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "NIM LLM workload already exists — skipping deploy"
+            exit 0
+          fi
           PAYLOAD=$(jq -n \
             --arg name "medw-nim${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
@@ -333,13 +361,20 @@ jobs:
             -d "$PAYLOAD") || true
           STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
           echo "NIM LLM (HTTP $STATUS): $BODY"
-          [ "$STATUS" = "409" ] && echo "NIM LLM already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM LLM failed"; exit 1; }
 
       - name: Deploy NIM Embed (GPU 3 — embedding)
         env:
           NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
         run: |
+          # Check if NIM Embed workload already exists — skip if already running
+          EXISTING=$(curl -sSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+            -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"medw-nim-embed${SUFFIX}\") | .name // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "NIM Embed workload already exists — skipping deploy"
+            exit 0
+          fi
           PAYLOAD=$(jq -n \
             --arg name "medw-nim-embed${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
@@ -366,7 +401,6 @@ jobs:
             -d "$PAYLOAD") || true
           STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
           echo "NIM Embed (HTTP $STATUS): $BODY"
-          [ "$STATUS" = "409" ] && echo "NIM Embed already exists" && exit 0
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
 
       # ── Resolve NIM service URLs ──────────────────────────────────────────
@@ -529,7 +563,8 @@ jobs:
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
                 environmentVariables: [{name: "BACKEND_URL", value: $backendUrl}],
-                ports: [{container: 3000, serviceType: "NodePort"}]
+                ports: [{container: 3000, serviceType: "NodePort"}],
+                externalUrl: true
               }
             }')
           RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
