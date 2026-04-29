@@ -18,28 +18,24 @@ spec:
     spec:
       containers:
         - name: backend
+          # Replace with your actual GHCR image after CI builds it:
+          # ghcr.io/medw/medw-backend:latest
           image: ghcr.io/contzokas/medw-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
               name: http
           env:
-            - name: NIM_BASE_URL
-              value: "http://nim:8000/v1"
-            - name: NIM_MODEL
-              value: "nvidia/nemotron-3-super-120b-a12b"
-            - name: NIM_TIMEOUT
+            - name: OLLAMA_HOST
+              value: "http://ollama:11434"
+            - name: OLLAMA_MODEL
+              value: "medgemma:27b"
+            - name: OLLAMA_TIMEOUT
               value: "120"
-            - name: NIM_EMBED_BASE_URL
-              value: "http://nim-embed:8000/v1"
-            - name: NIM_EMBED_MODEL
-              value: "nvidia/nv-embedqa-e5-v5"
-            - name: NIM_RERANKER_BASE_URL
-              value: "https://integrate.api.nvidia.com/v1"
-            - name: NIM_RERANKER_MODEL
-              value: "nvidia/nv-rerankqa-llama-3_2-1b-v2"
-            - name: MILVUS_URI
-              value: "/data/milvus.db"
+            - name: CHROMA_HOST
+              value: "chromadb"
+            - name: CHROMA_PORT
+              value: "8000"
             - name: QUEUE_MAX_ENTRIES
               value: "1000"
           resources:
@@ -62,13 +58,6 @@ spec:
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 20
-          volumeMounts:
-            - name: backend-data
-              mountPath: /data
-      volumes:
-        - name: backend-data
-          persistentVolumeClaim:
-            claimName: backend-pvc
 ---
 apiVersion: v1
 kind: Service

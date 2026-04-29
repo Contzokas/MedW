@@ -7,18 +7,18 @@ from typing import Any
 
 import httpx
 
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.core.config import (
-    NIM_BASE_URL,
-    NIM_MODEL,
-    NIM_API_KEY,
-    NIM_TIMEOUT,
-    NIM_WARMUP_ENABLED,
-    NIM_WARMUP_RETRIES,
-    NIM_WARMUP_RETRY_DELAY_SECONDS,
+    OLLAMA_HOST,
+    OLLAMA_MODEL,
+    OLLAMA_TIMEOUT,
+    OLLAMA_WARMUP_ENABLED,
+    OLLAMA_WARMUP_KEEP_ALIVE,
+    OLLAMA_WARMUP_RETRIES,
+    OLLAMA_WARMUP_RETRY_DELAY_SECONDS,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,6 @@ _PROMPT_LANGUAGE_HINT = {
 }
 
 _GREEK_CHAR_RE = re.compile(r"[\u0370-\u03FF\u1F00-\u1FFF]")
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 # TODO: Greek medical terminology validation required in Sprint 1.
 # Run classify() against ≥20 Greek symptom test cases covering MTS levels 1–5.
@@ -86,7 +85,7 @@ _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 #   Fallback strategy: translate `symptoms` to English before LLM inference,
 #   then instruct the model to return `reasoning` in Greek.
 #   Implement as: symptoms_en = translate_to_english(symptoms); classify(symptoms_en, context)
-#   Translation can use a secondary NIM call or a lightweight library (e.g., googletrans).
+#   Translation can use a secondary Ollama call or a lightweight library (e.g., googletrans).
 #   Document accuracy results and chosen approach in the Story 2.2 dev agent record.
 
 _SYSTEM_PROMPT = (
@@ -118,15 +117,6 @@ _HUMAN_TEMPLATE = (
     "- Level 4: less urgent (mild symptoms, stable chronic issues, minor complaints)\n"
     "- Level 5: non-urgent (very mild, routine, information-seeking)\n"
     "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage."
-)
-
-_HUMAN_TEMPLATE_WITH_FOLLOWUP = (
-    _HUMAN_TEMPLATE
-    + "\n\nIf the symptoms are too vague to confidently triage, you may instead return:\n"
-    '{{"follow_up_question": "<one concise clarifying question in {output_language}>"}}\n'
-    "Only do this if a single targeted question would meaningfully improve your confidence.\n"
-    "Do not ask follow-up questions if follow_up_count >= {max_follow_ups}.\n"
-    "Current follow_up_count: {follow_up_count}"
 )
 
 
@@ -163,28 +153,23 @@ def _extract_json_object(raw: str) -> str:
     return ""
 
 
-def _build_chain(human_template: str = _HUMAN_TEMPLATE):
-    llm = ChatNVIDIA(
-        base_url=NIM_BASE_URL,
-        model=NIM_MODEL,
-        api_key=NIM_API_KEY,
-        temperature=1,
-        top_p=0.95,
-        max_tokens=16384,
-        model_kwargs={
-            "reasoning_budget": 16384,
-            "chat_template_kwargs": {"enable_thinking": True},
-        },
+def _build_chain():
+    llm = ChatOllama(
+        base_url=OLLAMA_HOST,
+        model=OLLAMA_MODEL,
+        temperature=0,
+        request_timeout=OLLAMA_TIMEOUT,
+        num_ctx=131072,
+        keep_alive=-1,
     )
     prompt = ChatPromptTemplate.from_messages(
-        [("system", _SYSTEM_PROMPT), ("human", human_template)]
+        [("system", _SYSTEM_PROMPT), ("human", _HUMAN_TEMPLATE)]
     )
     return prompt | llm | StrOutputParser()
 
 
-# Module-level lazy singletons — chains are built once and reused across requests.
+# Module-level lazy singleton — chain is built once and reused across requests.
 _chain = None
-_chain_followup = None
 
 
 def _get_chain():
@@ -194,33 +179,9 @@ def _get_chain():
     return _chain
 
 
-def _get_followup_chain():
-    global _chain_followup
-    if _chain_followup is None:
-        _chain_followup = _build_chain(_HUMAN_TEMPLATE_WITH_FOLLOWUP)
-    return _chain_followup
-
-
-def _invoke_chain_sync(
-    symptoms: str,
-    context: str,
-    lang: str = "el",
-    follow_up_count: int = 0,
-    max_follow_ups: int = 2,
-) -> str:
+def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el") -> str:
     output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
     input_language = output_language
-    if follow_up_count < max_follow_ups:
-        return _get_followup_chain().invoke(
-            {
-                "symptoms": symptoms,
-                "context": context,
-                "output_language": output_language,
-                "input_language": input_language,
-                "follow_up_count": follow_up_count,
-                "max_follow_ups": max_follow_ups,
-            }
-        )
     return _get_chain().invoke(
         {
             "symptoms": symptoms,
@@ -237,24 +198,32 @@ async def warmup_model() -> None:
     _warmup_state["started_at"] = _utc_now_iso()
     _warmup_state["last_error"] = None
 
-    if not NIM_WARMUP_ENABLED:
+    if not OLLAMA_WARMUP_ENABLED:
         _warmup_state["in_progress"] = False
-        logger.info("NIM warmup disabled via NIM_WARMUP_ENABLED")
+        logger.info("Ollama warmup disabled via OLLAMA_WARMUP_ENABLED")
         return
 
-    timeout = httpx.Timeout(timeout=float(NIM_TIMEOUT))
-    endpoint = f"{NIM_BASE_URL.rstrip('/')}/health/ready"
+    payload: dict[str, Any] = {
+        "model": OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": "ping"}],
+        "stream": False,
+        "options": {"num_predict": 1},
+        "keep_alive": -1,
+    }
 
-    for attempt in range(1, NIM_WARMUP_RETRIES + 1):
+    timeout = httpx.Timeout(timeout=float(OLLAMA_TIMEOUT))
+    endpoint = f"{OLLAMA_HOST.rstrip('/')}/api/chat"
+
+    for attempt in range(1, OLLAMA_WARMUP_RETRIES + 1):
         _warmup_state["attempts"] = attempt
         _warmup_state["last_attempt_at"] = _utc_now_iso()
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.get(endpoint)
+                response = await client.post(endpoint, json=payload)
                 response.raise_for_status()
             logger.info(
-                "NIM warmup succeeded for model '%s' on attempt %s",
-                NIM_MODEL,
+                "Ollama warmup succeeded for model '%s' on attempt %s",
+                OLLAMA_MODEL,
                 attempt,
             )
             _get_chain()
@@ -263,6 +232,7 @@ async def warmup_model() -> None:
             _warmup_state["in_progress"] = False
             return
         except Exception as exc:  # noqa: BLE001
+            # Log response body for HTTPStatusError so we can see Ollama's error message
             body = ""
             if hasattr(exc, "response"):
                 try:
@@ -271,32 +241,33 @@ async def warmup_model() -> None:
                     pass
             _warmup_state["last_error"] = f"{type(exc).__name__}: {exc}"
             logger.warning(
-                "NIM warmup attempt %s/%s failed: %s%s",
+                "Ollama warmup attempt %s/%s failed: %s%s",
                 attempt,
-                NIM_WARMUP_RETRIES,
+                OLLAMA_WARMUP_RETRIES,
                 type(exc).__name__,
                 f" — {body}" if body else "",
             )
-            if attempt < NIM_WARMUP_RETRIES:
-                await asyncio.sleep(NIM_WARMUP_RETRY_DELAY_SECONDS)
+            if attempt < OLLAMA_WARMUP_RETRIES:
+                await asyncio.sleep(OLLAMA_WARMUP_RETRY_DELAY_SECONDS)
 
     _warmup_state["in_progress"] = False
     logger.error(
-        "NIM warmup failed after %s attempts; continuing without blocking startup",
-        NIM_WARMUP_RETRIES,
+        "Ollama warmup failed after %s attempts; continuing without blocking startup",
+        OLLAMA_WARMUP_RETRIES,
     )
 
 
 def get_warmup_status() -> dict[str, Any]:
-    ready = (not NIM_WARMUP_ENABLED) or (_warmup_state["last_success_at"] is not None)
+    ready = (not OLLAMA_WARMUP_ENABLED) or (_warmup_state["last_success_at"] is not None)
 
     return {
-        "enabled": NIM_WARMUP_ENABLED,
+        "enabled": OLLAMA_WARMUP_ENABLED,
         "ready": ready,
-        "model": NIM_MODEL,
-        "timeout_seconds": NIM_TIMEOUT,
-        "max_retries": NIM_WARMUP_RETRIES,
-        "retry_delay_seconds": NIM_WARMUP_RETRY_DELAY_SECONDS,
+        "model": OLLAMA_MODEL,
+        "timeout_seconds": OLLAMA_TIMEOUT,
+        "keep_alive": OLLAMA_WARMUP_KEEP_ALIVE,
+        "max_retries": OLLAMA_WARMUP_RETRIES,
+        "retry_delay_seconds": OLLAMA_WARMUP_RETRY_DELAY_SECONDS,
         "in_progress": _warmup_state["in_progress"],
         "attempts": _warmup_state["attempts"],
         "started_at": _warmup_state["started_at"],
@@ -365,7 +336,6 @@ def _enforce_output_language(data: dict, lang: str) -> dict:
 
 
 def _parse_response(raw: str, lang: str = "el") -> dict:
-    raw = _THINK_RE.sub("", raw).strip()
     json_str = _extract_json_object(raw)
     if not json_str:
         logger.warning("LLM response contained no JSON object")
@@ -375,11 +345,6 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     except json.JSONDecodeError as exc:
         logger.warning("LLM response JSON decode failed: %s", type(exc).__name__)
         raise LLMParseError("JSON decode failed") from exc
-
-    if "follow_up_question" in data:
-        if not isinstance(data["follow_up_question"], str) or not data["follow_up_question"].strip():
-            raise LLMParseError("follow_up_question must be a non-empty string")
-        return {"follow_up_question": data["follow_up_question"]}
 
     required = {"mts_level", "mts_label", "specialty", "reasoning"}
     missing = required - set(data.keys())
@@ -418,17 +383,9 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     return _enforce_output_language(data, lang)
 
 
-async def classify(
-    symptoms: str,
-    context: str,
-    lang: str = "el",
-    follow_up_count: int = 0,
-    max_follow_ups: int = 2,
-) -> dict:
+async def classify(symptoms: str, context: str, lang: str = "el") -> dict:
     try:
-        raw = await asyncio.to_thread(
-            _invoke_chain_sync, symptoms, context, lang, follow_up_count, max_follow_ups
-        )
+        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
         return _parse_response(raw, lang)
     except LLMParseError:
         raise

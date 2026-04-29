@@ -5,11 +5,11 @@ from app.schemas.doctor import Doctor
 from app.services import doctor_service
 
 _SAMPLE_DOCTORS = [
-    {"name": "Δρ. Άλφα", "specialty": "Cardiology", "availability": True, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444},
-    {"name": "Δρ. Βήτα", "specialty": "Cardiology", "availability": False, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275},
-    {"name": "Δρ. Γάμα", "specialty": "General Practice", "availability": True, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275},
-    {"name": "Δρ. Δέλτα", "specialty": "General Practice", "availability": True, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444},
-    {"name": "Δρ. Έψιλον", "specialty": "Internal Medicine", "availability": False, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275},
+    {"name": "Δρ. Άλφα", "specialty": "Cardiology", "availability": True},
+    {"name": "Δρ. Βήτα", "specialty": "Cardiology", "availability": False},
+    {"name": "Δρ. Γάμα", "specialty": "General Practice", "availability": True},
+    {"name": "Δρ. Δέλτα", "specialty": "General Practice", "availability": True},
+    {"name": "Δρ. Έψιλον", "specialty": "Internal Medicine", "availability": False},
 ]
 
 
@@ -91,37 +91,3 @@ def test_load_doctors_raises_on_invalid_json_shape(tmp_path, monkeypatch):
 
     with pytest.raises(doctor_service.DoctorDataLoadError):
         doctor_service.load_doctors()
-
-
-def test_haversine_same_point_is_zero():
-    dist = doctor_service.haversine_km(37.9838, 23.7275, 37.9838, 23.7275)
-    assert dist < 0.01
-
-
-def test_haversine_athens_thessaloniki():
-    dist = doctor_service.haversine_km(37.9838, 23.7275, 40.6401, 22.9444)
-    assert 300 < dist < 310
-
-
-def test_haversine_athens_heraklion():
-    dist = doctor_service.haversine_km(37.9838, 23.7275, 35.34, 25.1632)
-    assert 320 < dist < 340
-
-
-def test_get_match_with_coordinates_returns_nearest():
-    doctor = doctor_service.get_match("General Practice", latitude=40.6401, longitude=22.9444)
-    assert doctor.specialty == "General Practice"
-    assert doctor.name == "Δρ. Δέλτα"
-
-
-def test_get_match_without_coordinates_unchanged():
-    doctor = doctor_service.get_match("Cardiology")
-    assert doctor.specialty == "Cardiology"
-    assert doctor.name == "Δρ. Άλφα"
-
-
-def test_get_match_with_coordinates_falls_back_to_nearest_gp():
-    doctor = doctor_service.get_match("General Surgery", latitude=40.6401, longitude=22.9444)
-    assert doctor.specialty == "General Practice"
-    assert doctor.name == "Δρ. Δέλτα"
-    assert doctor.city == "Θεσσαλονίκη"

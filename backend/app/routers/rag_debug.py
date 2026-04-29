@@ -70,11 +70,11 @@ async def debug_status() -> dict:
 
 
 @router.get("/rag/debug/health")
-async def milvus_health() -> dict:
-    """Deep health check of Milvus connection and collection state."""
+async def chroma_health() -> dict:
+    """Deep health check of ChromaDB connection and collection state."""
     _guard()
-    from app.services.rag_debug import check_milvus_health
-    return await check_milvus_health()
+    from app.services.rag_debug import check_chroma_health
+    return await check_chroma_health()
 
 
 @router.get("/rag/debug/corpus")
