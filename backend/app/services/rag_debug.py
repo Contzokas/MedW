@@ -29,6 +29,7 @@ from app.services.rag_service import (
     RETRIEVAL_CANDIDATES,
     _get_milvus_client,
     _embed_texts,
+    _rerank_sync,
     clear_retrieval_cache,
 )
 
@@ -371,18 +372,49 @@ async def debug_retrieve(
         )
 
         hits = results[0]
-        docs: list[str] = []
+        raw_docs: list[str] = []
+        hit_by_text: dict[str, Any] = {}
         for hit in hits:
-            doc_id = hit["id"]
             doc = hit["entity"].get("text", "")
-            cosine_sim = float(hit["distance"])  # Milvus COSINE returns similarity
+            raw_docs.append(doc)
+            hit_by_text[doc] = hit
+
+        if hits and float(hits[0]["distance"]) < 0.3:
+            trace.warnings.append(
+                f"Top result cosine similarity is {float(hits[0]['distance']):.3f} — weak relevance"
+            )
+
+        span_process.finish((time.perf_counter() - pipeline_start) * 1000)
+        trace.spans.append(span_process)
+
+        # -- Span: rerank
+        span_rerank = TimingSpan(
+            name="rerank",
+            start_ms=(time.perf_counter() - pipeline_start) * 1000,
+        )
+        try:
+            reranked_docs = _rerank_sync(query, raw_docs)
+            span_rerank.finish((time.perf_counter() - pipeline_start) * 1000)
+            span_rerank.metadata["candidates_in"] = len(raw_docs)
+            span_rerank.metadata["returned"] = len(reranked_docs)
+        except Exception as exc:
+            span_rerank.finish((time.perf_counter() - pipeline_start) * 1000)
+            span_rerank.metadata["error"] = str(exc)
+            reranked_docs = raw_docs[:k]
+            trace.warnings.append(f"Reranker failed, using retrieval order: {type(exc).__name__}")
+        trace.spans.append(span_rerank)
+
+        for doc in reranked_docs:
+            hit = hit_by_text.get(doc)
+            if hit is None:
+                continue
+            doc_id = hit["id"]
+            cosine_sim = float(hit["distance"])
             distance = round(1.0 - cosine_sim, 6)
             relevance = round(max(0.0, cosine_sim), 4)
-
             parts = doc_id.rsplit("_", 1)
             source_file = f"{parts[0]}.md" if len(parts) == 2 else "unknown"
             chunk_idx = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else -1
-
             trace.retrieved_chunks.append(RetrievedChunk(
                 chunk_id=doc_id,
                 content_preview=doc[:200],
@@ -392,20 +424,12 @@ async def debug_retrieve(
                 source_file=source_file,
                 chunk_index=chunk_idx,
             ))
-            docs.append(doc)
 
-        trace.context_assembled = "\n\n".join(docs[:k])
+        trace.context_assembled = "\n\n".join(reranked_docs)
         trace.context_char_count = len(trace.context_assembled)
-
-        if hits and float(hits[0]["distance"]) < 0.3:
-            trace.warnings.append(
-                f"Top result cosine similarity is {float(hits[0]['distance']):.3f} — weak relevance"
-            )
         if trace.context_char_count < 50:
             trace.warnings.append("Assembled context is very short (<50 chars)")
 
-        span_process.finish((time.perf_counter() - pipeline_start) * 1000)
-        trace.spans.append(span_process)
         trace.total_duration_ms = round((time.perf_counter() - pipeline_start) * 1000, 3)
         return trace
 
@@ -567,11 +591,23 @@ async def debug_full_pipeline(
         rag_trace = await debug_retrieve(symptoms, top_k=top_k)
         rag_duration = (time.perf_counter() - rag_start) * 1000
         context = rag_trace.get("context_assembled", "")
+        chunks = rag_trace.get("retrieved_chunks", [])
+        spans_by_name = {s["name"]: s["duration_ms"] for s in rag_trace.get("spans", [])}
+        relevance_scores = [c["relevance_score"] for c in chunks if c.get("relevance_score") is not None]
         result["stages"]["rag_retrieval"] = {
             "duration_ms": round(rag_duration, 3),
-            "chunks_retrieved": len(rag_trace.get("retrieved_chunks", [])),
+            "spans": {
+                "milvus_connect_ms": spans_by_name.get("milvus_connect"),
+                "embed_query_ms": spans_by_name.get("embed_query"),
+                "milvus_search_ms": spans_by_name.get("milvus_search"),
+                "rerank_ms": spans_by_name.get("rerank"),
+                "process_results_ms": spans_by_name.get("process_results"),
+            },
+            "chunks_retrieved": len(chunks),
             "context_length": len(context),
-            "chunks": rag_trace.get("retrieved_chunks", []),
+            "top_relevance": round(max(relevance_scores), 4) if relevance_scores else None,
+            "mean_relevance": round(sum(relevance_scores) / len(relevance_scores), 4) if relevance_scores else None,
+            "chunks": chunks,
             "warnings": rag_trace.get("warnings", []),
         }
         result["warnings"].extend(rag_trace.get("warnings", []))
@@ -587,13 +623,17 @@ async def debug_full_pipeline(
     llm_start = time.perf_counter()
     raw_response = None
     try:
-        raw_response = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
+        raw_response, llm_usage = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
         llm_duration = (time.perf_counter() - llm_start) * 1000
         result["stages"]["llm_invocation"] = {
-            "duration_ms": round(llm_duration, 3),
+            "duration_ms": llm_usage.get("llm_ms", round(llm_duration, 3)),
             "raw_response": raw_response,
             "response_length": len(raw_response) if raw_response else 0,
             "model_used": os.environ.get("NIM_MODEL", "unknown"),
+            "prompt_tokens": llm_usage.get("prompt_tokens"),
+            "completion_tokens": llm_usage.get("completion_tokens"),
+            "total_tokens": llm_usage.get("total_tokens"),
+            "tokens_per_sec": llm_usage.get("tokens_per_sec"),
         }
     except Exception as exc:
         llm_duration = (time.perf_counter() - llm_start) * 1000

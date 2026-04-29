@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -191,28 +192,35 @@ def _extract_json_object(raw: str) -> str:
     return ""
 
 
+# Module-level lazy singletons.
+_llm_instance: ChatNVIDIA | None = None
+_chain = None
+_chain_followup = None
+
+
+def _get_llm() -> ChatNVIDIA:
+    global _llm_instance
+    if _llm_instance is None:
+        _llm_instance = ChatNVIDIA(
+            base_url=NIM_BASE_URL,
+            model=NIM_MODEL,
+            api_key=NIM_API_KEY,
+            temperature=1,
+            top_p=0.95,
+            max_tokens=16384,
+            model_kwargs={
+                "reasoning_budget": 16384,
+                "chat_template_kwargs": {"enable_thinking": True},
+            },
+        )
+    return _llm_instance
+
+
 def _build_chain(human_template: str = _HUMAN_TEMPLATE):
-    llm = ChatNVIDIA(
-        base_url=NIM_BASE_URL,
-        model=NIM_MODEL,
-        api_key=NIM_API_KEY,
-        temperature=1,
-        top_p=0.95,
-        max_tokens=16384,
-        model_kwargs={
-            "reasoning_budget": 16384,
-            "chat_template_kwargs": {"enable_thinking": True},
-        },
-    )
     prompt = ChatPromptTemplate.from_messages(
         [("system", _SYSTEM_PROMPT), ("human", human_template)]
     )
-    return prompt | llm | StrOutputParser()
-
-
-# Module-level lazy singletons — chains are built once and reused across requests.
-_chain = None
-_chain_followup = None
+    return prompt | _get_llm() | StrOutputParser()
 
 
 def _get_chain():
@@ -237,6 +245,25 @@ def _get_followup_chain():
     return _chain_followup
 
 
+def _extract_usage(ai_msg: Any) -> dict:
+    rm = getattr(ai_msg, "response_metadata", None) or {}
+    tu = rm.get("token_usage") or {}
+    if tu:
+        return {
+            "prompt_tokens": int(tu.get("prompt_tokens", 0)),
+            "completion_tokens": int(tu.get("completion_tokens", 0)),
+            "total_tokens": int(tu.get("total_tokens", 0)),
+        }
+    um = getattr(ai_msg, "usage_metadata", None) or {}
+    if um:
+        return {
+            "prompt_tokens": int(um.get("input_tokens", 0)),
+            "completion_tokens": int(um.get("output_tokens", 0)),
+            "total_tokens": int(um.get("total_tokens", 0)),
+        }
+    return {}
+
+
 def _invoke_chain_sync(
     symptoms: str,
     context: str,
@@ -244,31 +271,44 @@ def _invoke_chain_sync(
     follow_up_count: int = 0,
     max_follow_ups: int = 2,
     patient_profile: str = "",
-) -> str:
+) -> tuple[str, dict]:
+    """Invoke the LLM and return (text, usage_dict).
+
+    usage_dict keys: prompt_tokens, completion_tokens, total_tokens,
+                     llm_ms, tokens_per_sec
+    """
     output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
     input_language = output_language
-    profile_section = _build_profile_section(patient_profile)
-    if follow_up_count < max_follow_ups:
-        return _get_followup_chain().invoke(
-            {
-                "symptoms": symptoms,
-                "context": context,
-                "output_language": output_language,
-                "input_language": input_language,
-                "follow_up_count": follow_up_count,
-                "max_follow_ups": max_follow_ups,
-                "patient_profile_section": profile_section,
-            }
-        )
-    return _get_chain().invoke(
-        {
-            "symptoms": symptoms,
-            "context": context,
-            "output_language": output_language,
-            "input_language": input_language,
-            "patient_profile_section": _build_profile_section(patient_profile),
-        }
+    use_followup = follow_up_count < max_follow_ups
+    human_template = _HUMAN_TEMPLATE_WITH_FOLLOWUP if use_followup else _HUMAN_TEMPLATE
+
+    variables: dict[str, Any] = {
+        "symptoms": symptoms,
+        "context": context,
+        "output_language": output_language,
+        "input_language": input_language,
+        "patient_profile_section": _build_profile_section(patient_profile),
+    }
+    if use_followup:
+        variables["follow_up_count"] = follow_up_count
+        variables["max_follow_ups"] = max_follow_ups
+
+    prompt_tmpl = ChatPromptTemplate.from_messages(
+        [("system", _SYSTEM_PROMPT), ("human", human_template)]
     )
+    messages = prompt_tmpl.format_messages(**variables)
+
+    t0 = time.perf_counter()
+    ai_msg = _get_llm().invoke(messages)
+    llm_ms = round((time.perf_counter() - t0) * 1000, 1)
+
+    text = ai_msg.content if hasattr(ai_msg, "content") else str(ai_msg)
+    usage = _extract_usage(ai_msg)
+    usage["llm_ms"] = llm_ms
+    if usage.get("completion_tokens") and llm_ms > 0:
+        usage["tokens_per_sec"] = round(usage["completion_tokens"] / (llm_ms / 1000), 1)
+
+    return text, usage
 
 
 async def warmup_model() -> None:
@@ -478,9 +518,17 @@ async def classify(
     patient_profile: str = "",
 ) -> dict:
     try:
-        raw = await asyncio.to_thread(
+        raw, usage = await asyncio.to_thread(
             _invoke_chain_sync, symptoms, context, lang, follow_up_count, max_follow_ups, patient_profile
         )
+        if usage:
+            logger.info(
+                "LLM usage — prompt: %d, completion: %d tokens, %.1f tok/s, %.0f ms",
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
+                usage.get("tokens_per_sec", 0.0),
+                usage.get("llm_ms", 0.0),
+            )
         return _parse_response(raw, lang)
     except LLMParseError:
         raise
