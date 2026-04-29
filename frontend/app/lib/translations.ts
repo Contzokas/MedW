@@ -46,6 +46,11 @@ export const translations = {
       submit: "Continue",
       back: "Start over",
     },
+    redirectToWizard: {
+      title: "More Details Needed",
+      tryWizard: "Try Guided Mode",
+      startOver: "Start Over",
+    },
     guidance: {
       title: "What to do next",
     },
@@ -162,6 +167,11 @@ export const translations = {
       answerPlaceholder: "Η απάντησή σας...",
       submit: "Συνέχεια",
       back: "Ξεκινήστε από την αρχή",
+    },
+    redirectToWizard: {
+      title: "Χρειάζονται Περισσότερες Λεπτομέρειες",
+      tryWizard: "Δοκιμή Καθοδηγούμενης Λειτουργίας",
+      startOver: "Ξεκινήστε από την αρχή",
     },
     guidance: {
       title: "Τι να κάνετε στη συνέχεια",

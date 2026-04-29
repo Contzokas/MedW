@@ -32,6 +32,11 @@ class TriageResponse(BaseModel):
     rag_used: bool = True
 
 
+class RedirectToWizardResponse(BaseModel):
+    type: Literal["redirect_to_wizard"] = "redirect_to_wizard"
+    guidance_message: str
+
+
 class QueueEntry(BaseModel):
     patient_id: str
     mts_level: int

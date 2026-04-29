@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { submitTriage } from "@/app/lib/api"
-import { FollowUpResponse, TriageResponse } from "@/app/lib/types"
+import { FollowUpResponse, TriageResponse, RedirectToWizardResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 import { QUICK_SYMPTOMS } from "@/app/lib/wizard-data"
 
 interface TriageFormProps {
   onResult: (result: TriageResponse) => void
   onStartLoading?: () => void
+  onSwitchToWizard?: () => void
   patientId: string
   latitude: number | null
   longitude: number | null
@@ -37,6 +38,7 @@ const PROMPTS = [
 export default function TriageForm({
   onResult,
   onStartLoading,
+  onSwitchToWizard,
   patientId,
   latitude,
   longitude,
@@ -50,6 +52,7 @@ export default function TriageForm({
   const [error, setError] = useState<string | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpState | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState("")
+  const [redirectToWizard, setRedirectToWizard] = useState<string | null>(null)
   const [userDismissed, setUserDismissed] = useState(false)
   const [chipsVisible, setChipsVisible] = useState(true)
   const [promptIdx, setPromptIdx] = useState(0)
@@ -65,6 +68,7 @@ export default function TriageForm({
   const handleReset = () => {
     setFollowUp(null)
     setFollowUpAnswer("")
+    setRedirectToWizard(null)
     setError(null)
     setSymptoms("")
   }
@@ -81,6 +85,8 @@ export default function TriageForm({
       if (result.type === "follow_up") {
         const fu = result as FollowUpResponse
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "" })
+      } else if (result.type === "redirect_to_wizard") {
+        setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
       } else {
         onResult(result as TriageResponse)
         setSymptoms("")
@@ -109,6 +115,10 @@ export default function TriageForm({
         const fu = result as FollowUpResponse
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: newContext })
         setFollowUpAnswer("")
+      } else if (result.type === "redirect_to_wizard") {
+        setFollowUp(null)
+        setFollowUpAnswer("")
+        setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
       } else {
         onResult(result as TriageResponse)
         setFollowUp(null)
@@ -179,6 +189,39 @@ export default function TriageForm({
           </button>
         </div>
       </form>
+    )
+  }
+
+  if (redirectToWizard) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <span className="text-lg mt-0.5">💡</span>
+          <div className="text-sm text-foreground">
+            <p className="mb-1 font-semibold text-amber-600 dark:text-amber-400">{t.redirectToWizard.title}</p>
+            <p>{redirectToWizard}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={handleReset}
+            className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.redirectToWizard.startOver}
+          </button>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => onSwitchToWizard?.()}
+            className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.redirectToWizard.tryWizard}
+          </button>
+        </div>
+      </div>
     )
   }
 

@@ -33,6 +33,7 @@ export function useOnboarding(totalSteps: number = 4): OnboardingState {
 
   const finish = useCallback(() => {
     setIsOpen(false)
+    window.scrollTo({ top: 0, behavior: "smooth" })
     try { localStorage.setItem(STORAGE_KEY, "1") } catch { /* noop */ }
   }, [])
 

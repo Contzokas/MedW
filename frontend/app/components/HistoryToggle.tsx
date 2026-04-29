@@ -25,9 +25,10 @@ export default function HistoryToggle() {
   }, [active, router, pathname, searchParams])
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
+      <button
+        id="tab-history"
+        type="button"
+        onClick={toggle}
       aria-label={active ? "Back to assessment" : "View history"}
       title={active ? "Back to assessment" : "View history"}
       className={`theme-toggle-btn w-11 h-11 rounded-full flex items-center justify-center border transition-all ${

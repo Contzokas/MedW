@@ -117,16 +117,37 @@ _HUMAN_TEMPLATE = (
     "- Level 3: urgent but stable (moderate pain, worsening chronic condition)\n"
     "- Level 4: less urgent (mild symptoms, stable chronic issues, minor complaints)\n"
     "- Level 5: non-urgent (very mild, routine, information-seeking)\n"
-    "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage."
+    "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage.\n\n"
+    "VAGUE INPUT DETECTION:\n"
+    "If the patient's input is too vague or generic to produce a meaningful triage "
+    "(e.g. empty/trivial greetings, single-word answers, \"I don't feel well\", \"what's wrong with me\", "
+    "\"help\", \"not sure\", \"nothing\" — inputs that lack ANY specific symptom, body area, severity, or duration), "
+    "you must instead return:\n"
+    '{{"needs_structured_input": true, "guidance_message": '
+    '"<a polite, encouraging message in {output_language} explaining that more detail is needed '
+    'and suggesting the patient use the structured symptom wizard to provide detailed information '
+    'like body area, symptom type, severity, and duration>"}}\n'
+    "A specific symptom mention (even brief, like \"headache\", \"chest pain\", \"knee hurts\") "
+    "is sufficient — always triage those normally. Only use this redirect for truly empty or "
+    "content-free inputs."
 )
 
 _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     _HUMAN_TEMPLATE
-    + "\n\nIf the symptoms are too vague to confidently triage, you may instead return:\n"
+    + "\n\nIf the symptoms are too vague to confidently triage, you may instead return a follow-up question:\n"
     '{{"follow_up_question": "<one concise clarifying question in {output_language}>"}}\n'
     "Only do this if a single targeted question would meaningfully improve your confidence.\n"
     "Do not ask follow-up questions if follow_up_count >= {max_follow_ups}.\n"
-    "Current follow_up_count: {follow_up_count}"
+    "Current follow_up_count: {follow_up_count}\n\n"
+    "VAGUE INPUT DETECTION:\n"
+    "If the patient gives an extremely vague or content-free answer to a follow-up question "
+    "(e.g. \"idk\", \"nothing really\", \"just bad\"), or if the original input was too generic "
+    "(greetings, single words with no symptom information), you must instead return:\n"
+    '{{"needs_structured_input": true, "guidance_message": '
+    '"<a polite, encouraging message in {output_language} explaining that more detail is needed '
+    'and suggesting the patient use the guided symptom wizard>"}}\n'
+    "This should take priority over asking yet another follow-up question when the patient shows "
+    "they cannot or will not provide specific symptom details."
 )
 
 
@@ -380,6 +401,12 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
         if not isinstance(data["follow_up_question"], str) or not data["follow_up_question"].strip():
             raise LLMParseError("follow_up_question must be a non-empty string")
         return {"follow_up_question": data["follow_up_question"]}
+
+    if data.get("needs_structured_input"):
+        guidance = data.get("guidance_message", "")
+        if not isinstance(guidance, str) or not guidance.strip():
+            raise LLMParseError("guidance_message must be a non-empty string when needs_structured_input is true")
+        return {"needs_structured_input": True, "guidance_message": guidance.strip()}
 
     required = {"mts_level", "mts_label", "specialty", "reasoning"}
     missing = required - set(data.keys())

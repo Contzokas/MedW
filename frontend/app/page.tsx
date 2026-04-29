@@ -99,6 +99,7 @@ function HomeContent() {
             {/* Logo */}
             <div className="mb-8 text-center">
               <button
+                id="medw-logo"
                 onClick={() => { setResult(null); setLoading(false) }}
                 className="group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-lg"
                 title={t.hero.logoTitle}
@@ -110,6 +111,14 @@ function HomeContent() {
               <p className="mt-3 text-xs font-medium tracking-[0.15em] text-muted-foreground">
                 {toCaps(t.hero.subtitle, lang)}
               </p>
+              <button
+                type="button"
+                onClick={() => onboarding.restart()}
+                className="mt-1 text-[10px] text-muted-foreground/30 hover:text-primary/50 transition-colors"
+                title="Restart onboarding tour"
+              >
+                replay tour
+              </button>
             </div>
 
             {/* Card */}
@@ -124,7 +133,7 @@ function HomeContent() {
                 {useWizard ? (
                   <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
-                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
+                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onSwitchToWizard={() => setUseWizard(true)} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
                 )}
                 </div>
               ) : (
@@ -157,7 +166,7 @@ function HomeContent() {
 
               {/* Mode switcher — pill toggle between free-text and wizard */}
               {!showHistory && result === null && !loading && (
-                <div className="flex gap-2 rounded-xl bg-muted/60 p-1.5 mt-2 mb-4">
+                <div id="wizard-toggle" className="flex gap-2 rounded-xl bg-muted/60 p-1.5 mt-2 mb-4">
                   <button
                     id="mode-text"
                     type="button"

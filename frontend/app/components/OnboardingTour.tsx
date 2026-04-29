@@ -14,6 +14,7 @@ interface OnboardingTourProps {
 
 interface StepConfig {
   targetId?: string
+  centerCard?: boolean
   titleEn: string
   titleEl: string
   bodyEn: string
@@ -22,6 +23,7 @@ interface StepConfig {
 
 const STEPS: StepConfig[] = [
   {
+    targetId: "medw-logo",
     titleEn: "Welcome to MEDΩ",
     titleEl: "Καλωσήρθατε στο MEDΩ",
     bodyEn:
@@ -34,31 +36,31 @@ const STEPS: StepConfig[] = [
     titleEn: "Describe Your Symptoms",
     titleEl: "Περιγράψτε τα Συμπτώματά σας",
     bodyEn:
-      "Type your symptoms in plain language here — as much detail as you like. The AI will assess the urgency and guide you to the right care.",
+      "Type your symptoms here in plain language — be as detailed as you like. The AI will assess urgency and guide you to the right level of care.",
     bodyEl:
-      "Γράψτε τα συμπτώματά σας με απλά λόγια εδώ. Η τεχνητή νοημοσύνη θα αξιολογήσει την επείγουσα ανάγκη και θα σας καθοδηγήσει.",
+      "Γράψτε τα συμπτώματά σας εδώ με απλά λόγια — όσο πιο λεπτομερή γίνεται. Η τεχνητή νοημοσύνη θα αξιολογήσει την επείγουσα ανάγκη.",
   },
   {
     targetId: "wizard-toggle",
-    titleEn: "Try the Symptom Wizard",
-    titleEl: "Δοκιμάστε τον Οδηγό Συμπτωμάτων",
+    titleEn: "Choose Your Input Mode",
+    titleEl: "Επιλέξτε Τρόπο Εισαγωγής",
     bodyEn:
-      "Prefer guided questions? Switch to the step-by-step wizard mode that walks you through body area, symptoms, and severity.",
+      "Toggle between free-text (type anything) and the guided wizard (step-by-step with body area, symptoms, and severity). Pick whichever feels more comfortable.",
     bodyEl:
-      "Προτιμάτε καθοδηγημένες ερωτήσεις; Μεταβείτε στον οδηγό βήμα-βήμα.",
+      "Εναλλάξτε μεταξύ ελεύθερου κειμένου και καθοδηγούμενου οδηγού βήμα-βήμα. Επιλέξτε ό,τι σας βολεύει περισσότερο.",
   },
   {
     targetId: "tab-history",
-    titleEn: "Review Past Assessments",
-    titleEl: "Δείτε Παλαιότερες Αξιολογήσεις",
+    titleEn: "Access Your History",
+    titleEl: "Δείτε το Ιστορικό σας",
     bodyEn:
-      "All your previous triage results are saved locally. Switch to the History tab to review them anytime.",
+      "Tap the clock icon anytime to review your past assessments. All results are saved locally on your device — nothing leaves your browser.",
     bodyEl:
-      "Όλες οι προηγούμενες αξιολογήσεις αποθηκεύονται τοπικά. Μεταβείτε στην Ιστορικό για να τις δείτε.",
+      "Πατήστε το εικονίδιο ρολογιού για να δείτε προηγούμενες αξιολογήσεις. Όλα αποθηκεύονται τοπικά στη συσκευή σας.",
   },
 ]
 
-const PADDING = 12
+const PADDING = 8
 
 interface SpotlightRect {
   top: number
@@ -81,8 +83,8 @@ function computeSpotlight(targetId: string): SpotlightRect | null {
 }
 
 /** Compute card position relative to target element, clamped to viewport. */
-function computeCardStyle(targetId: string | undefined): React.CSSProperties {
-  if (!targetId) {
+function computeCardStyle(targetId: string | undefined, centerCard?: boolean): React.CSSProperties {
+  if (!targetId || centerCard) {
     return {
       top: "50%",
       left: "50%",
@@ -104,17 +106,18 @@ function computeCardStyle(targetId: string | undefined): React.CSSProperties {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const cardWidth = Math.min(vw * 0.9, 380)
-  const cardHeight = 220 // conservative estimate
+  const cardHeight = 220
 
   let left = rect.left + rect.width / 2 - cardWidth / 2
   left = Math.max(12, Math.min(left, vw - cardWidth - 12))
 
-  const spaceBelow = vh - (rect.bottom + PADDING)
+  // Prefer above the target to avoid page scroll
+  const spaceAbove = rect.top - PADDING
   let top: number
-  if (spaceBelow >= cardHeight + 16) {
-    top = rect.bottom + PADDING + 16
-  } else {
+  if (spaceAbove >= cardHeight + 16) {
     top = rect.top - PADDING - cardHeight - 16
+  } else {
+    top = rect.bottom + PADDING + 16
   }
   top = Math.max(12, Math.min(top, vh - cardHeight - 12))
 
@@ -171,23 +174,20 @@ export default function OnboardingTour({
 
     const targetId = cfg?.targetId
 
-    // Clear spotlight immediately on step change to avoid stale flash
-    setSpotlightRect(null)
-
     if (targetId) {
       const el = document.getElementById(targetId)
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" })
+        el.scrollIntoView({ behavior: "instant", block: "center" })
       }
     }
 
-    // Wait for smooth-scroll to finish (~300ms), then measure
+    // Measure immediately — no smooth-scroll delay needed
     const timerId = setTimeout(() => {
       if (targetId) {
         setSpotlightRect(computeSpotlight(targetId))
       }
-      setCardStyle(computeCardStyle(targetId))
-    }, 350)
+      setCardStyle(computeCardStyle(targetId, cfg?.centerCard))
+    }, 50)
 
     return () => clearTimeout(timerId)
   }, [isOpen, step, cfg?.targetId])
@@ -198,11 +198,11 @@ export default function OnboardingTour({
     const targetId = cfg?.targetId
     const handler = () => {
       setSpotlightRect(targetId ? computeSpotlight(targetId) : null)
-      setCardStyle(computeCardStyle(targetId))
+      setCardStyle(computeCardStyle(targetId, cfg?.centerCard))
     }
     window.addEventListener("resize", handler)
     return () => window.removeEventListener("resize", handler)
-  }, [isOpen, cfg?.targetId])
+  }, [isOpen, cfg?.targetId, cfg?.centerCard])
 
   if (!isOpen || !cfg) return null
 
@@ -210,27 +210,48 @@ export default function OnboardingTour({
   const body = lang === "el" ? cfg.bodyEl : cfg.bodyEn
   const hasTarget = !!cfg.targetId
 
+  // ── Spotlight clip-path: punches a hole in the overlay ──────────────
+  const clipPathValue =
+    spotlightRect
+      ? `polygon(
+          0% 0%, 0% 100%, 100% 100%, 100% 0%,
+          0% 0%,
+          ${spotlightRect.left}px ${spotlightRect.top}px,
+          ${spotlightRect.left + spotlightRect.width}px ${spotlightRect.top}px,
+          ${spotlightRect.left + spotlightRect.width}px ${spotlightRect.top + spotlightRect.height}px,
+          ${spotlightRect.left}px ${spotlightRect.top + spotlightRect.height}px,
+          ${spotlightRect.left}px ${spotlightRect.top}px
+        )`
+      : undefined
+
   return (
-    <div
-      ref={overlayRef}
-      className="tour-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={lang === "el" ? "Ξενάγηση εφαρμογής" : "Application tour"}
-      onClick={(e) => {
-        if (e.target === overlayRef.current) onSkip()
-      }}
-    >
-      {/* Spotlight — rendered only once rect is measured */}
+    <>
+      {/* Darkened blurred overlay with spotlight hole (card & ring are siblings, not children) */}
+      <div
+        ref={overlayRef}
+        className="tour-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label={lang === "el" ? "Ξενάγηση εφαρμογής" : "Application tour"}
+        onClick={onSkip}
+        style={clipPathValue ? { clipPath: clipPathValue, WebkitClipPath: clipPathValue } : undefined}
+      />
+
+      {/* Spotlight blue ring — outside overlay so it stays fully visible */}
       {hasTarget && spotlightRect && (
         <div
-          className="tour-spotlight"
-          style={spotlightRect}
+          className="tour-spotlight-ring"
+          style={{
+            top: spotlightRect.top,
+            left: spotlightRect.left,
+            width: spotlightRect.width,
+            height: spotlightRect.height,
+          }}
           aria-hidden="true"
         />
       )}
 
-      {/* Tour card */}
+      {/* Tour card — outside overlay so it's never clipped */}
       <div ref={cardRef} className="tour-card" style={cardStyle}>
         {/* Progress dots */}
         <div className="tour-dots" aria-hidden="true">
@@ -285,6 +306,6 @@ export default function OnboardingTour({
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

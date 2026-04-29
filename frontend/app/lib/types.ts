@@ -31,6 +31,11 @@ export interface FollowUpResponse {
   follow_up_count: number
 }
 
+export interface RedirectToWizardResponse {
+  type: "redirect_to_wizard"
+  guidance_message: string
+}
+
 export interface TriageHistoryEntry {
   id: number
   patient_id: string
