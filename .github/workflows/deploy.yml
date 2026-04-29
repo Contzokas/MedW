@@ -563,8 +563,7 @@ jobs:
                 image: $image,
                 compute: { cpuCoreRequest: 1, cpuCoreLimit: 1, cpuMemoryRequest: "512M", cpuMemoryLimit: "512M" },
                 environmentVariables: [{name: "BACKEND_URL", value: $backendUrl}],
-                ports: [{container: 3000, serviceType: "NodePort"}],
-                externalUrl: true
+                ports: [{container: 3000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
