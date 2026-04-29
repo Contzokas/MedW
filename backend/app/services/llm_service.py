@@ -95,6 +95,7 @@ _SYSTEM_PROMPT = (
 )
 
 _HUMAN_TEMPLATE = (
+    "{patient_profile_section}"
     "Clinical context:\n{context}\n\n"
     "Patient symptoms ({input_language}):\n{symptoms}\n\n"
     "Return JSON with exactly these fields:\n"
@@ -179,7 +180,15 @@ def _get_chain():
     return _chain
 
 
-def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el") -> str:
+def _build_profile_section(patient_profile: str) -> str:
+    """Format patient_profile as a clinical summary block for the LLM prompt."""
+    profile = patient_profile.strip()
+    if not profile:
+        return ""
+    return f"Patient medical history:\n{profile}\n\n"
+
+
+def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el", patient_profile: str = "") -> str:
     output_language = _PROMPT_LANGUAGE_HINT.get(lang, "Greek")
     input_language = output_language
     return _get_chain().invoke(
@@ -188,6 +197,7 @@ def _invoke_chain_sync(symptoms: str, context: str, lang: str = "el") -> str:
             "context": context,
             "output_language": output_language,
             "input_language": input_language,
+            "patient_profile_section": _build_profile_section(patient_profile),
         }
     )
 
@@ -383,9 +393,9 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     return _enforce_output_language(data, lang)
 
 
-async def classify(symptoms: str, context: str, lang: str = "el") -> dict:
+async def classify(symptoms: str, context: str, lang: str = "el", patient_profile: str = "") -> dict:
     try:
-        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang)
+        raw = await asyncio.to_thread(_invoke_chain_sync, symptoms, context, lang, patient_profile)
         return _parse_response(raw, lang)
     except LLMParseError:
         raise

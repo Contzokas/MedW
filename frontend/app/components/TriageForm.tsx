@@ -4,6 +4,7 @@ import { useState } from "react"
 import { submitTriage } from "@/app/lib/api"
 import { TriageResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
+import { useProfile } from "@/app/lib/profile-context"
 
 function generatePatientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -24,6 +25,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { t, lang } = useLang()
+  const { profile } = useProfile()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +35,7 @@ export default function TriageForm({ onResult }: TriageFormProps) {
 
     try {
       const patientId = generatePatientId()
-      const result = await submitTriage(symptoms, patientId, lang)
+      const result = await submitTriage(symptoms, patientId, lang, profile)
       onResult(result)
       setSymptoms("")
     } catch (err) {
@@ -79,3 +81,4 @@ export default function TriageForm({ onResult }: TriageFormProps) {
     </form>
   )
 }
+

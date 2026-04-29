@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/lib/theme-context";
 import { LangProvider } from "@/app/lib/lang-context";
+import { ProfileProvider } from "@/app/lib/profile-context";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import LangToggle from "@/app/components/LangToggle";
 import EmergencyBar from "@/app/components/EmergencyBar";
@@ -35,15 +36,17 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <LangProvider>
-            {/* Floating controls — top right */}
-            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
-              <LangToggle />
-              <ThemeToggle />
-            </div>
+            <ProfileProvider>
+              {/* Floating controls — top right */}
+              <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+                <LangToggle />
+                <ThemeToggle />
+              </div>
 
-            <main className="flex-1 flex flex-col">{children}</main>
+              <main className="flex-1 flex flex-col">{children}</main>
 
-            <EmergencyBar />
+              <EmergencyBar />
+            </ProfileProvider>
           </LangProvider>
         </ThemeProvider>
       </body>

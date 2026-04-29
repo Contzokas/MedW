@@ -12,7 +12,12 @@ router = APIRouter()
 
 @router.post("/triage", response_model=TriageResponse)
 async def perform_triage(request: TriageRequest) -> TriageResponse:
-    return await triage_service.classify(request.symptoms, request.patient_id, request.lang)
+    return await triage_service.classify(
+        request.symptoms,
+        request.patient_id,
+        request.lang,
+        request.patient_profile or "",
+    )
 
 
 def _entry_key(entry: QueueEntry) -> tuple[str, int, str, str]:

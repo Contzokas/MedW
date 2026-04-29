@@ -9,6 +9,7 @@ class TriageRequest(BaseModel):
     symptoms: constr(strip_whitespace=True, min_length=1)
     patient_id: constr(strip_whitespace=True, min_length=1)
     lang: Literal["en", "el"] = "el"
+    patient_profile: str | None = None  # Optional serialised medical history from the profiler
 
 
 class TriageResponse(BaseModel):

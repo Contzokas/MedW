@@ -106,16 +106,20 @@ def _safe_default_for_lang(lang: str) -> TriageResponse:
     return _SAFE_DEFAULT.model_copy()
 
 
-async def classify(symptoms: str, patient_id: str, lang: str = "el") -> TriageResponse:
+async def classify(symptoms: str, patient_id: str, lang: str = "el", patient_profile: str = "") -> TriageResponse:
     resolved_lang = _resolve_lang(lang)
     try:
         try:
             context = await retrieve_context(symptoms)
-            llm_result = await llm_classify(symptoms=symptoms, context=context, lang=resolved_lang)
+            llm_result = await llm_classify(
+                symptoms=symptoms, context=context, lang=resolved_lang, patient_profile=patient_profile
+            )
             rag_used = True
         except RAGUnavailableError as exc:
             logger.warning("RAG unavailable — falling back to LLM base knowledge", exc_info=exc)
-            llm_result = await llm_classify(symptoms=symptoms, context="", lang=resolved_lang)
+            llm_result = await llm_classify(
+                symptoms=symptoms, context="", lang=resolved_lang, patient_profile=patient_profile
+            )
             rag_used = False
 
         lookup_specialty = _specialty_for_doctor_lookup(llm_result["specialty"], resolved_lang)
