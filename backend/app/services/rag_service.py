@@ -4,6 +4,10 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+# Must be set before pymilvus imports gRPC to prevent "too_many_pings" GOAWAY from Milvus Lite
+os.environ["GRPC_KEEPALIVE_TIME_MS"] = "60000"
+os.environ["GRPC_KEEPALIVE_TIMEOUT_MS"] = "20000"
+
 import httpx
 from pymilvus import DataType, MilvusClient
 
@@ -35,9 +39,6 @@ class RAGUnavailableError(Exception):
 def _get_milvus_client() -> MilvusClient:
     global _milvus_client
     if _milvus_client is None:
-        # Prevent "too_many_pings" gRPC errors with Milvus Lite
-        os.environ.setdefault("GRPC_KEEPALIVE_TIME_MS", "60000")
-        os.environ.setdefault("GRPC_KEEPALIVE_TIMEOUT_MS", "20000")
         _milvus_client = MilvusClient(uri=MILVUS_URI)
     return _milvus_client
 
@@ -80,9 +81,8 @@ def _ensure_collection(client: MilvusClient) -> None:
     index_params = client.prepare_index_params()
     index_params.add_index(
         field_name="embedding",
-        index_type="HNSW",
+        index_type="AUTOINDEX",
         metric_type="COSINE",
-        params={"M": 16, "efConstruction": 200},
     )
 
     client.create_collection(
