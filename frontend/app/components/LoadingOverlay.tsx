@@ -10,7 +10,7 @@ interface LoadingOverlayProps {
 
 const LOADING_STEPS = {
   en: ["Analyzing your symptoms...", "Consulting AI triage system...", "Generating assessment...", "Finalizing results..."],
-  el: ["Ανάλυση των συμπτωμάτων σας...", "Συμβουλή με το σύστημα τριμαζ AI...", "Δημιουργία αξιολόγησης...", "Οριστικοποίηση αποτελεσμάτων..."]
+  el: ["Ανάλυση των συμπτωμάτων σας...", "Συμβουλή με το σύστημα τριάζ AI...", "Δημιουργία αξιολόγησης...", "Οριστικοποίηση αποτελεσμάτων..."]
 }
 
 const STEP_DELAY_MS = 800

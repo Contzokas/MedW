@@ -64,7 +64,7 @@ export default function TeamSection() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {["AI Triage", "FastAPI", "Next.js", "Run:ai", "Ollama", "K8s"].map((tag) => (
+            {["AI Triage", "NVIDIA NIM", "FastAPI", "Next.js", "Milvus", "RAG", "Run:ai", "Docker", "K8s"].map((tag) => (
               <span
                 key={tag}
                 className="rounded-full border border-primary/25 bg-primary/8 px-3 py-1 text-sm font-medium text-primary"
@@ -84,7 +84,7 @@ export default function TeamSection() {
             {toCaps(t.team.team, lang)}
           </p>
 
-          <div className="flex flex-wrap justify-center gap-10 lg:gap-14 max-w-2xl">
+          <div className="flex flex-wrap justify-center gap-8 lg:gap-12 max-w-2xl">
             {TEAM.map(({ id, nameKey, roleKey, imgSrc, gradient, socials }) => (
               <div
                 key={id}

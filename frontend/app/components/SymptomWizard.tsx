@@ -275,7 +275,7 @@ export default function SymptomWizard({ patientId, onResult, onStartLoading, lat
         <h2 className="text-base font-bold text-foreground mb-4 flex items-center gap-2">
           <span className="text-xl">📊</span> {t.wizard.severityTitle}
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-3 max-w-sm mx-auto">
           {SEVERITY_OPTIONS.map((option) => {
             const selected = state.severity === option.id
             const gradient = SEVERITY_GRADIENTS[option.id] ?? ""

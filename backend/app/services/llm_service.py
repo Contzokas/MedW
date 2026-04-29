@@ -136,12 +136,13 @@ async def translate_to_english(text: str) -> str:
                     ],
                     "max_tokens": 256,
                     "temperature": 0,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 },
                 timeout=timeout,
             ),
         )
         response.raise_for_status()
-        translated = response.json()["choices"][0]["message"]["content"].strip()
+        translated = _THINK_RE.sub("", response.json()["choices"][0]["message"]["content"]).strip()
         logger.debug("Translated Greek symptoms → English: %r → %r", text[:80], translated[:80])
         return translated
     except Exception as exc:
@@ -178,12 +179,13 @@ async def translate_to_greek(text: str) -> str:
                     ],
                     "max_tokens": 512,
                     "temperature": 0,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 },
                 timeout=timeout,
             ),
         )
         response.raise_for_status()
-        translated = response.json()["choices"][0]["message"]["content"].strip()
+        translated = _THINK_RE.sub("", response.json()["choices"][0]["message"]["content"]).strip()
         logger.debug("Translated reasoning → Greek: %r → %r", text[:80], translated[:80])
         return translated
     except Exception as exc:
