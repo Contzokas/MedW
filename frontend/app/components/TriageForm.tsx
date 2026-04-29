@@ -82,6 +82,7 @@ export default function TriageForm({
     onRedirectActive?.(false)
     setError(null)
     setSymptoms("")
+    setChipsVisible(true)
   }
 
   const handleInitialSubmit = async (e: React.FormEvent) => {

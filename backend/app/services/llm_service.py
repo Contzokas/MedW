@@ -103,8 +103,8 @@ _HUMAN_TEMPLATE = (
     "Patient symptoms ({input_language}):\n{symptoms}\n\n"
     "Return JSON with exactly these fields:\n"
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-    '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
-    "Use {output_language} for specialty and reasoning.\n"
+    '"specialty": "SPECIALTY IN {output_language}", "reasoning": "YOUR CLINICAL EXPLANATION IN {output_language}"}}\n\n'
+    "Use {output_language} for specialty and reasoning. The reasoning field must be a non-empty explanation — never '...' or a placeholder.\n"
     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
     "IMPORTANT rules for specialty selection:\n"
     "- Always choose the MOST SPECIFIC specialty that matches the symptoms.\n"
@@ -145,7 +145,7 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     "1. If the symptoms contain enough specific detail (body area, symptom type, severity, or duration) "
     "to produce a meaningful triage, return the standard triage JSON:\n"
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
-    '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
+    '"specialty": "SPECIALTY IN {output_language}", "reasoning": "YOUR CLINICAL EXPLANATION IN {output_language}"}}\n\n'
     "2. If the symptoms are vague or missing key details, use one of your remaining follow-up questions:\n"
     '{{"follow_up_question": "YOUR QUESTION IN {output_language}", "suggested_answers": ["OPTION 1", "OPTION 2", "OPTION 3"]}}\n'
     "suggested_answers: 3-5 short tappable options (2-5 words each) in {output_language} that directly answer your question. Always include a final open-ended option ('Other' / 'Άλλο').\n"
@@ -512,7 +512,11 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
             raise LLMParseError(f"Field '{field}' must be a non-empty string")
 
     if _REASONING_PLACEHOLDER_RE.match(data["reasoning"]) and think_content:
-        data["reasoning"] = think_content
+        think_has_greek = bool(_GREEK_CHAR_RE.search(think_content))
+        if lang == "el" and think_has_greek:
+            data["reasoning"] = think_content
+        elif lang != "el":
+            data["reasoning"] = think_content
 
     expected_label_en = MTS_LABELS[mts_level]
     expected_label_el = MTS_LABELS_EL[mts_level]
