@@ -168,7 +168,7 @@ export default function TriageForm({
 
   if (uncertainResult) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-5 max-w-sm mx-auto w-full">
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
           <span className="text-lg mt-0.5">⚠️</span>
           <div className="text-sm text-foreground flex-1">
@@ -193,7 +193,7 @@ export default function TriageForm({
 
   if (followUp) {
     return (
-      <form onSubmit={handleFollowUpSubmit} className="space-y-5">
+      <form onSubmit={handleFollowUpSubmit} className="space-y-5 max-w-sm mx-auto w-full">
         <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
           <span className="text-lg mt-0.5">🤖</span>
           <div className="text-sm text-foreground">
@@ -263,7 +263,7 @@ export default function TriageForm({
     <form onSubmit={handleInitialSubmit} className="space-y-5">
       {/* Redirect to wizard banner — inline, above the form */}
       {redirectToWizard && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 max-w-sm mx-auto">
           <div className="flex items-start gap-3">
             <span className="text-lg mt-0.5">💡</span>
             <div className="text-sm text-foreground flex-1">

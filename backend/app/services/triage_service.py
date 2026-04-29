@@ -12,6 +12,7 @@ from app.services.llm_service import (
     SPECIALTY_TRANSLATIONS_EL_TO_EN,
     SPECIALTY_TRANSLATIONS_EN_TO_EL,
     classify as llm_classify,
+    translate_to_english,
 )
 from app.services.rag_service import RAGUnavailableError, retrieve_context
 
@@ -169,7 +170,8 @@ async def classify(
 
     try:
         try:
-            context = await retrieve_context(symptoms)
+            search_symptoms = await translate_to_english(symptoms) if resolved_lang == "el" else symptoms
+            context = await retrieve_context(search_symptoms)
             llm_result = await llm_classify(
                 symptoms=enriched_symptoms,
                 context=context,
@@ -201,11 +203,15 @@ async def classify(
                 message=llm_result["uncertain_result"],
             )
 
-        if allow_follow_up and "follow_up_question" in llm_result and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:
-            return FollowUpResponse(
-                question=llm_result["follow_up_question"],
-                follow_up_count=follow_up_count + 1,
-                suggested_answers=llm_result.get("suggested_answers", []),
+        if "follow_up_question" in llm_result:
+            if allow_follow_up and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:
+                return FollowUpResponse(
+                    question=llm_result["follow_up_question"],
+                    follow_up_count=follow_up_count + 1,
+                    suggested_answers=llm_result.get("suggested_answers", []),
+                )
+            return RedirectToWizardResponse(
+                guidance_message=_VAGUE_REDIRECT_EL if resolved_lang == "el" else _VAGUE_REDIRECT_EN,
             )
 
         lookup_specialty = _specialty_for_doctor_lookup(llm_result["specialty"], resolved_lang)

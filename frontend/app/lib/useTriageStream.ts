@@ -63,18 +63,18 @@ export function useTriageStream(): QueueEntry[] {
             if (entry.mts_level <= 2) {
               const audio = new Audio('/emergency.mp3');
               audio.play().catch(e => console.error("Audio playback failed", e));
-              toast.error(`EMERGENCY: ${entry.specialty} Level ${entry.mts_level}\nPatient: ${entry.patient_id.slice(0, 8)}`, {
+              toast.error(`EMERGENCY: ${entry.specialty} Level ${entry.mts_level}\nPatient: ${entry.patient_id}`, {
                 duration: 10000,
                 style: { background: '#ef4444', color: '#fff' }
               })
               
               if ("Notification" in window && Notification.permission === "granted") {
                 new Notification(`Emergency Level ${entry.mts_level}`, {
-                  body: `Specialty: ${entry.specialty}\nPatient: ${entry.patient_id.slice(0, 8)}`,
+                  body: `Specialty: ${entry.specialty}\nPatient: ${entry.patient_id}`,
                 });
               }
             } else {
-              toast.success(`New Patient: ${entry.specialty} - Level ${entry.mts_level}\nPatient: ${entry.patient_id.slice(0, 8)}`)
+              toast.success(`New Patient: ${entry.specialty} - Level ${entry.mts_level}\nPatient: ${entry.patient_id}`)
             }
           }
 

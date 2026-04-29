@@ -137,7 +137,7 @@ export default function DoctorsPage() {
               MED<span className="logo-omega text-primary">Ω</span>
             </h1>
           </div>
-          <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase hidden sm:block">
+          <p className="text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase hidden sm:block">
             {toCaps("Doctors Dashboard", lang)}
           </p>
         </div>
@@ -158,7 +158,7 @@ export default function DoctorsPage() {
               ) : (
                 <form onSubmit={handleLogin} className="space-y-3.5">
                   <div>
-                    <label htmlFor="doctor-select" className="block text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1.5">
+                      <label htmlFor="doctor-select" className="block text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1.5">
                       {lang === "el" ? "Επιλέξτε Ιατρό" : "Select Doctor"}
                     </label>
                     <select
@@ -177,7 +177,7 @@ export default function DoctorsPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="doctor-password" className="block text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1.5">
+                      <label htmlFor="doctor-password" className="block text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1.5">
                       {lang === "el" ? "Κωδικός" : "Password"}
                     </label>
                     <input
@@ -222,19 +222,19 @@ export default function DoctorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-foreground">{loggedInDoctor.name}</p>
-                  <p className="text-[11px] text-muted-foreground">
+                   <p className="text-sm text-muted-foreground">
                     {loggedInDoctor.specialty}
                     {loggedInDoctor.city && ` · ${loggedInDoctor.city}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold ${loggedInDoctor.availability ? "text-success" : "text-destructive"}`}>
+                   <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${loggedInDoctor.availability ? "text-success" : "text-destructive"}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${loggedInDoctor.availability ? "bg-success" : "bg-destructive"}`} />
                     {loggedInDoctor.availability ? (lang === "el" ? "Διαθέσιμος" : "Available") : (lang === "el" ? "Μη Διαθέσιμος" : "Unavailable")}
                   </span>
                   <button
                     onClick={handleLogout}
-                    className="text-[10px] text-muted-foreground hover:text-destructive transition-colors font-semibold"
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors font-semibold"
                   >
                     {lang === "el" ? "Αποσύνδεση" : "Logout"}
                   </button>
@@ -249,11 +249,11 @@ export default function DoctorsPage() {
                 const count = groupedByLevel[level]?.length ?? 0
                 return (
                   <Card key={level}>
-                    <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1">
+                     <p className="text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase mb-1">
                       {lang === "el" ? `Επίπεδο ${level}` : `Level ${level}`}
                     </p>
                     <p className={`text-2xl font-black ${palette.text}`}>{count}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{palette.label}</p>
+                     <p className="text-xs text-muted-foreground mt-0.5">{palette.label}</p>
                   </Card>
                 )
               })}
@@ -268,7 +268,7 @@ export default function DoctorsPage() {
                 <Card key={level}>
                   <div className="flex items-center gap-2 mb-4">
                     <span className={`inline-block w-2.5 h-2.5 rounded-full ${palette.bg}`} />
-                    <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase">
+                     <p className="text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase">
                       {QUEUE_MTS_LABELS[level]} ({patients.length})
                     </p>
                   </div>
@@ -276,9 +276,9 @@ export default function DoctorsPage() {
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Time</th>
-                          <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Patient ID</th>
-                          <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Specialty</th>
+                          <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Time</th>
+                          <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Patient ID</th>
+                          <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Specialty</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -289,9 +289,9 @@ export default function DoctorsPage() {
                             : date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
                           return (
                             <tr key={`${entry.patient_id}-${entry.timestamp}`} className={`border-b border-border/40 ${level <= 2 ? "bg-destructive/5" : ""}`}>
-                              <td className="py-1.5 px-2 text-[11px] text-muted-foreground font-mono whitespace-nowrap">{time}</td>
-                              <td className="py-1.5 px-2 text-[11px] text-foreground font-mono">{entry.patient_id.slice(0, 12)}...</td>
-                              <td className="py-1.5 px-2 text-[11px] text-foreground">{entry.specialty}</td>
+                              <td className="py-1.5 px-2 text-sm text-muted-foreground font-mono whitespace-nowrap">{time}</td>
+                              <td className="py-1.5 px-2 text-sm text-foreground font-mono">{entry.patient_id}</td>
+                              <td className="py-1.5 px-2 text-sm text-foreground">{entry.specialty}</td>
                             </tr>
                           )
                         })}

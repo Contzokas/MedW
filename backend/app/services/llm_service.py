@@ -97,6 +97,52 @@ _SYSTEM_PROMPT = (
     "Respond ONLY with a valid JSON object — no explanation, no markdown, no extra text."
 )
 
+TRANSLATION_PROMPT = (
+    "Translate the following Greek medical symptom text to English. "
+    "Return ONLY the English translation, no explanation, no markdown, no extra text.\n\n"
+    "{text}"
+)
+
+
+async def translate_to_english(text: str) -> str:
+    """Translate Greek symptom text to English for RAG retrieval accuracy.
+
+    The nv-embedqa-e5-v5 embedding model is English-optimised; Greek tokens
+    yield near-random vectors, causing Milvus to retrieve irrelevant clinical
+    context. Translating to English first fixes retrieval quality.
+    """
+    if not text or not _contains_greek(text):
+        return text
+
+    timeout = httpx.Timeout(timeout=30.0)
+    endpoint = f"{NIM_BASE_URL.rstrip('/')}/chat/completions"
+
+    try:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: httpx.post(
+                endpoint,
+                headers={"Authorization": f"Bearer {NIM_API_KEY}"},
+                json={
+                    "model": NIM_MODEL,
+                    "messages": [
+                        {"role": "user", "content": TRANSLATION_PROMPT.format(text=text)}
+                    ],
+                    "max_tokens": 256,
+                    "temperature": 0,
+                },
+                timeout=timeout,
+            ),
+        )
+        response.raise_for_status()
+        translated = response.json()["choices"][0]["message"]["content"].strip()
+        logger.debug("Translated Greek symptoms → English: %r → %r", text[:80], translated[:80])
+        return translated
+    except Exception as exc:
+        logger.warning("Symptom translation failed, falling back to original: %s", type(exc).__name__)
+        return text
+
 _HUMAN_TEMPLATE = (
     "{patient_profile_section}"
     "Clinical context:\n{context}\n\n"
@@ -512,11 +558,7 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
             raise LLMParseError(f"Field '{field}' must be a non-empty string")
 
     if _REASONING_PLACEHOLDER_RE.match(data["reasoning"]) and think_content:
-        think_has_greek = bool(_GREEK_CHAR_RE.search(think_content))
-        if lang == "el" and think_has_greek:
-            data["reasoning"] = think_content
-        elif lang != "el":
-            data["reasoning"] = think_content
+        data["reasoning"] = think_content
 
     expected_label_en = MTS_LABELS[mts_level]
     expected_label_el = MTS_LABELS_EL[mts_level]

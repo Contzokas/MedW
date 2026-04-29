@@ -25,7 +25,7 @@ export default function TriageQueueItem({ entry, onRowClick }: TriageQueueItemPr
   const badgeClass = MTS_COLORS[entry.mts_level] ?? "bg-gray-500 text-white"
   const label = MTS_LABELS[entry.mts_level] ?? `Επίπεδο ${entry.mts_level}`
   const rowClass = entry.mts_level <= 2 ? "bg-destructive/10" : "bg-card"
-  const patientId = entry.patient_id.slice(0, 8)
+  const patientId = entry.patient_id
 
   const parsedDate = new Date(entry.timestamp)
   const formattedTime = Number.isNaN(parsedDate.getTime())
@@ -41,7 +41,7 @@ export default function TriageQueueItem({ entry, onRowClick }: TriageQueueItemPr
         {formattedTime}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground font-mono">
-        {patientId}...
+        {patientId}
       </td>
       <td className="px-6 py-4 whitespace-nowrap">
         <span

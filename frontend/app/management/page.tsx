@@ -507,10 +507,10 @@ export default function ManagementPage() {
         {/* ─── Row 5: Live Triage Queue ─── */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase">
+            <p className="text-xs font-bold tracking-[0.15em] text-muted-foreground uppercase">
               {toCaps("Live Triage Queue", lang)}
             </p>
-            <span className="text-[10px] text-muted-foreground font-mono">{queueEntries.length} entries</span>
+            <span className="text-xs text-muted-foreground font-mono">{queueEntries.length} entries</span>
           </div>
 
           {queueEntries.length === 0 ? (
@@ -522,10 +522,10 @@ export default function ManagementPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Time</th>
-                    <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Patient ID</th>
-                    <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Level</th>
-                    <th className="text-left py-2 px-2 text-[9px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Specialty</th>
+                    <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Time</th>
+                    <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Patient ID</th>
+                    <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Level</th>
+                    <th className="text-left py-2 px-2 text-[11px] font-bold tracking-[0.15em] text-muted-foreground uppercase">Specialty</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -539,12 +539,12 @@ export default function ManagementPage() {
                     const rowBg = entry.mts_level <= 2 ? "bg-destructive/5" : ""
                     return (
                       <tr key={`${entry.patient_id}-${entry.timestamp}`} className={`border-b border-border/40 ${rowBg}`}>
-                        <td className="py-1.5 px-2 text-[11px] text-muted-foreground font-mono whitespace-nowrap">{time}</td>
-                        <td className="py-1.5 px-2 text-[11px] text-foreground font-mono">{entry.patient_id.slice(0, 10)}...</td>
+                        <td className="py-1.5 px-2 text-sm text-muted-foreground font-mono whitespace-nowrap">{time}</td>
+                        <td className="py-1.5 px-2 text-sm text-foreground font-mono">{entry.patient_id}</td>
                         <td className="py-1.5 px-2">
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${badge}`}>{label}</span>
+                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[11px] font-bold ${badge}`}>{label}</span>
                         </td>
-                        <td className="py-1.5 px-2 text-[11px] text-foreground whitespace-nowrap">{entry.specialty}</td>
+                        <td className="py-1.5 px-2 text-sm text-foreground whitespace-nowrap">{entry.specialty}</td>
                       </tr>
                     )
                   })}
@@ -553,7 +553,7 @@ export default function ManagementPage() {
             </div>
           )}
           {queueEntries.length > 35 && (
-            <p className="text-[10px] text-muted-foreground mt-2 text-center">
+            <p className="text-xs text-muted-foreground mt-2 text-center">
               Showing 35 of {queueEntries.length} entries
             </p>
           )}
