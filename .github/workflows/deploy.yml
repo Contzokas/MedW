@@ -17,7 +17,6 @@ env:
   ORG: contzokas
   NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
   NIM_EMBED_IMAGE: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
-  NIM_RERANKER_IMAGE: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
   RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
@@ -95,8 +94,45 @@ jobs:
           fi
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Jobs 1-2: Build images in parallel
+  # Jobs 1-3: Build images in parallel
   # ─────────────────────────────────────────────────────────────────────────
+  build-reranker:
+    name: Build reranker → :${{ needs.setup.outputs.tag }}
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/medw-reranker
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.tag }}
+            type=raw,value=${{ needs.setup.outputs.immutable_tag }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./reranker
+          file: ./reranker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   build-backend:
     name: Build backend → :${{ needs.setup.outputs.tag }}
     runs-on: ubuntu-latest
@@ -196,7 +232,7 @@ jobs:
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
     runs-on: ubuntu-latest
-    needs: [setup, build-backend, build-frontend]
+    needs: [setup, build-reranker, build-backend, build-frontend]
     environment: ${{ needs.setup.outputs.env }}
     permissions:
       contents: read
@@ -314,13 +350,13 @@ jobs:
             echo "(redeploy-ai) flag detected — deleting NIM workloads for fresh redeploy"
             delete_workload "medw-nim${SUFFIX}"
             delete_workload "medw-nim-embed${SUFFIX}"
-            delete_workload "medw-nim-reranker${SUFFIX}"
           else
             echo "No (redeploy-ai) flag — preserving existing NIM workloads"
           fi
           delete_workload "medw-milvus${SUFFIX}"         # legacy cleanup from previous runs
           delete_workload "medw-milvus-etcd${SUFFIX}"    # legacy cleanup from previous runs
           delete_workload "medw-milvus-minio${SUFFIX}"   # legacy cleanup from previous runs
+          delete_workload "medw-nim-reranker${SUFFIX}"
           delete_workload "medw-backend${SUFFIX}"
           delete_workload "medw-frontend${SUFFIX}"
 
@@ -405,35 +441,26 @@ jobs:
           echo "NIM Embed (HTTP $STATUS): $BODY"
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
 
-      - name: Deploy NIM Reranker (GPU 3 — shared with embed)
-        env:
-          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+      - name: Deploy Reranker (CPU — cross-encoder)
         run: |
           EXISTING=$(curl -sSL --max-time 30 \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
             -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"medw-nim-reranker${SUFFIX}\") | .name // empty")
           if [ -n "$EXISTING" ]; then
-            echo "NIM Reranker workload already exists — skipping deploy"
+            echo "Reranker workload already exists — skipping deploy"
             exit 0
           fi
           PAYLOAD=$(jq -n \
             --arg name "medw-nim-reranker${SUFFIX}" \
             --arg projectId "$PROJECT_ID" \
             --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
-            --arg image "${{ env.NIM_RERANKER_IMAGE }}" \
-            --arg ngcApiKey "$NGC_API_KEY" \
+            --arg image "${{ env.REGISTRY }}/${{ env.ORG }}/medw-reranker:${IMMUTABLE_TAG}" \
             '{
               name: $name, projectId: $projectId, clusterId: $clusterId,
               spec: {
                 image: $image,
-                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
-                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
-                environmentVariables: [
-                  {name: "NGC_API_KEY",    value: $ngcApiKey},
-                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
-                ],
-                ports: [{container: 8000, serviceType: "NodePort"}],
-                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-reranker-pvc", existingPvc: false, claimInfo: { size: "10Gi" } }] }
+                compute: { cpuCoreRequest: 2, cpuCoreLimit: 2, cpuMemoryRequest: "2G", cpuMemoryLimit: "2G" },
+                ports: [{container: 8000, serviceType: "NodePort"}]
               }
             }')
           RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
@@ -441,8 +468,8 @@ jobs:
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d "$PAYLOAD") || true
           STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
-          echo "NIM Reranker (HTTP $STATUS): $BODY"
-          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Reranker failed"; exit 1; }
+          echo "Reranker (HTTP $STATUS): $BODY"
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "Reranker failed"; exit 1; }
 
       # ── Resolve NIM service URLs ──────────────────────────────────────────
       - name: Resolve NIM service URLs
