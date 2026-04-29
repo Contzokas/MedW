@@ -143,7 +143,7 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     "If the symptoms are still too vague to confidently triage and you have reached the maximum number "
     "of follow-up questions, you may instead return:\n"
     '{{"uncertain_result": "<a message in {output_language} explaining you cannot provide a reliable result '
-    "and suggesting they consult a doctor>"}\n'
+    'and suggesting they consult a doctor>"}\n'
     "Only use this option when you genuinely lack sufficient information after all follow-up attempts.\n"
     "If you are confident enough to triage, you must return the standard triage JSON instead.\n\n"
     "VAGUE INPUT DETECTION:\n"
