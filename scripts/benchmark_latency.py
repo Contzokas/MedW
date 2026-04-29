@@ -18,7 +18,7 @@ Modes
     RAG quality:  cosine similarity scores per retrieved chunk
 
   Fallback mode (RAG_DEBUG_ENABLED=false):
-    Client-side wall-clock timing only via /api/triage
+    Client-side wall-clock timing only via /api/v1/triage
 """
 
 import argparse
@@ -71,7 +71,7 @@ def _post(url, path, payload, timeout):
 
 def check_debug_available(base_url):
     try:
-        r = requests.get(f"{base_url.rstrip('/')}/api/rag/debug/status", timeout=10)
+        r = requests.get(f"{base_url.rstrip('/')}/api/v1/rag/debug/status", timeout=10)
         return r.status_code == 200 and r.json().get("rag_debug_enabled", False)
     except Exception:
         return False
@@ -83,7 +83,7 @@ def check_debug_available(base_url):
 
 def run_debug_pipeline(base_url, symptoms, lang, timeout):
     payload = {"symptoms": symptoms, "lang": lang}
-    body, wall_ms = _post(base_url, "/api/rag/debug/pipeline", payload, timeout)
+    body, wall_ms = _post(base_url, "/api/v1/rag/debug/pipeline", payload, timeout)
 
     rag  = body.get("stages", {}).get("rag_retrieval", {})
     llm  = body.get("stages", {}).get("llm_invocation", {})
@@ -121,7 +121,7 @@ def run_triage(base_url, symptoms, lang, timeout):
         "patient_id":    str(uuid.uuid4()),
         "allow_follow_up": False,
     }
-    body, wall_ms = _post(base_url, "/api/triage", payload, timeout)
+    body, wall_ms = _post(base_url, "/api/v1/triage", payload, timeout)
     pre_filtered = wall_ms < 50 and "mts_level" not in body
     return {
         "wall_ms": wall_ms,
@@ -204,7 +204,7 @@ def main():
 
     print("\n[1/3] Checking backend...")
     try:
-        r = requests.get(f"{args.url.rstrip('/')}/health", timeout=10)
+        r = requests.get(f"{args.url.rstrip('/')}/api/v1/health", timeout=10)
         print(f"  Health  : HTTP {r.status_code}")
     except Exception as exc:
         print(f"  ERROR: Cannot reach {args.url}: {exc}")

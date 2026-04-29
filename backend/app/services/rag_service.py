@@ -32,6 +32,7 @@ CACHE_MAX_SIZE = 1024
 _EMBED_BATCH_SIZE = 32
 _EMBED_MAX_RETRIES = 5
 _EMBED_INITIAL_BACKOFF = 2.0
+_EMBED_MAX_CHARS = 1100  # safe under nv-embedqa-e5-v5 512-token limit (~2.5 chars/tok)
 
 _milvus_client: MilvusClient | None = None
 
@@ -61,12 +62,21 @@ def _get_milvus_client() -> MilvusClient:
 
 def _embed_texts(texts: list[str], input_type: str = "passage") -> list[list[float]]:
     last_exception = None
+    truncated = [t[:_EMBED_MAX_CHARS] for t in texts]
+    if any(len(t) > _EMBED_MAX_CHARS for t in texts):
+        logger.debug("Truncated %d text(s) to %d chars for embedding token limit",
+                      sum(1 for t in texts if len(t) > _EMBED_MAX_CHARS), _EMBED_MAX_CHARS)
+    json_payloads = [
+        {"model": NIM_EMBED_MODEL, "input": truncated, "input_type": input_type},
+        {"model": NIM_EMBED_MODEL, "input": truncated},
+    ]
     for attempt in range(_EMBED_MAX_RETRIES):
+        payload = json_payloads[0] if attempt == 0 else json_payloads[1]
         try:
             response = httpx.post(
                 f"{NIM_EMBED_BASE_URL.rstrip('/')}/embeddings",
                 headers={"Authorization": f"Bearer {NIM_API_KEY}"},
-                json={"model": NIM_EMBED_MODEL, "input": texts, "input_type": input_type},
+                json=payload,
                 timeout=30.0,
             )
             response.raise_for_status()
@@ -74,13 +84,22 @@ def _embed_texts(texts: list[str], input_type: str = "passage") -> list[list[flo
             return [item["embedding"] for item in sorted(data, key=lambda x: x["index"])]
         except httpx.HTTPStatusError as exc:
             last_exception = exc
+            body = exc.response.text[:500] if exc.response.text else ""
+            if exc.response.status_code == 400 and attempt == 0:
+                logger.warning(
+                    "Embeddings service returned 400 with input_type, retrying without it: %s",
+                    body.replace("\n", " "),
+                )
+                time.sleep(1.0)
+                continue
             if exc.response.status_code == 400 and attempt < _EMBED_MAX_RETRIES - 1:
                 backoff = _EMBED_INITIAL_BACKOFF * (2 ** attempt)
                 logger.warning(
-                    "Embeddings service returned 400, retrying in %.1fs (attempt %d/%d)",
+                    "Embeddings service returned 400, retrying in %.1fs (attempt %d/%d): %s",
                     backoff,
                     attempt + 1,
                     _EMBED_MAX_RETRIES,
+                    body.replace("\n", " "),
                 )
                 time.sleep(backoff)
             else:

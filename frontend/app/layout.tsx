@@ -7,6 +7,7 @@ import { ProfileProvider } from "@/app/lib/profile-context";
 import ThemeToggle from "@/app/components/ThemeToggle";
 import LangToggle from "@/app/components/LangToggle";
 import DoctorsLink from "@/app/components/DoctorsLink";
+import ProfileToggle from "@/app/components/ProfileToggle";
 import HistoryToggle from "@/app/components/HistoryToggle";
 import ManagementLink from "@/app/components/ManagementLink";
 import EmergencyBar from "@/app/components/EmergencyBar";
@@ -78,6 +79,9 @@ export default function RootLayout({
               <DoctorsLink />
               <LangToggle />
               <ThemeToggle />
+              <Suspense fallback={<div className="w-11 h-11" />}>
+                <ProfileToggle />
+              </Suspense>
               <Suspense fallback={<div className="w-11 h-11" />}>
                 <HistoryToggle />
               </Suspense>

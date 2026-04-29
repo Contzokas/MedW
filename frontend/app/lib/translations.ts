@@ -282,8 +282,8 @@ export const translations = {
         frontend: "Προγραμματιστής Frontend",
         data: "Επιστήμονας Δεδομένων",
         data_eng: "Μηχανικός Δεδομένων",
-        pm: "Project Manager",
-        infra: "Infrastructure & DevOps Engineer",
+        pm: "Διαχειριστής Έργου",
+        infra: "Μηχανικός Υποδομών & DevOps",
       },
       socials: {
         linkedin: "LinkedIn",
