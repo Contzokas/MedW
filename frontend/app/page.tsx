@@ -34,6 +34,7 @@ function HomeContent() {
   const [loading, setLoading] = useState(false)
   const [heroVisible, setHeroVisible] = useState(true)
   const [useWizard, setUseWizard] = useState(false)
+  const [wizardPulse, setWizardPulse] = useState(false)
   const heroRef = useRef<HTMLElement>(null)
   const { t, lang } = useLang()
   const onboarding = useOnboarding(4)
@@ -113,14 +114,6 @@ function HomeContent() {
               <p className="mt-3 text-xs font-medium tracking-[0.15em] text-muted-foreground">
                 {toCaps(t.hero.subtitle, lang)}
               </p>
-              <button
-                type="button"
-                onClick={() => onboarding.restart()}
-                className="mt-1 text-[10px] text-muted-foreground/30 hover:text-primary/50 transition-colors"
-                title="Restart onboarding tour"
-              >
-                replay tour
-              </button>
             </div>
 
             {/* Card */}
@@ -135,7 +128,7 @@ function HomeContent() {
                 {useWizard ? (
                   <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
-                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onLoadingDone={handleLoadingDone} onSwitchToWizard={() => setUseWizard(true)} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
+                  <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onLoadingDone={handleLoadingDone} onSwitchToWizard={() => { setUseWizard(true); setWizardPulse(false) }} onRedirectActive={setWizardPulse} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
                 )}
                 </div>
               ) : (
@@ -187,11 +180,13 @@ function HomeContent() {
                   <button
                     id="mode-wizard"
                     type="button"
-                    onClick={() => setUseWizard(true)}
+                    onClick={() => { setUseWizard(true); setWizardPulse(false) }}
                     className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-bold transition-all duration-200 ${
                       useWizard
                         ? "bg-primary text-white shadow-md shadow-primary/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-white/30 dark:hover:bg-white/5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_1px_4px_rgba(0,0,0,0.45)]"
+                        : wizardPulse
+                          ? "text-primary border border-primary/50 animate-pulse shadow-[0_0_12px_rgba(var(--primary-rgb),0.3)]"
+                          : "text-muted-foreground hover:text-foreground hover:bg-white/30 dark:hover:bg-white/5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_1px_4px_rgba(0,0,0,0.45)]"
                     }`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

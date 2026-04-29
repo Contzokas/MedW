@@ -11,6 +11,7 @@ interface TriageFormProps {
   onStartLoading?: () => void
   onLoadingDone?: () => void
   onSwitchToWizard?: () => void
+  onRedirectActive?: (active: boolean) => void
   patientId: string
   latitude: number | null
   longitude: number | null
@@ -41,6 +42,7 @@ export default function TriageForm({
   onStartLoading,
   onLoadingDone,
   onSwitchToWizard,
+  onRedirectActive,
   patientId,
   latitude,
   longitude,
@@ -71,6 +73,7 @@ export default function TriageForm({
     setFollowUp(null)
     setFollowUpAnswer("")
     setRedirectToWizard(null)
+    onRedirectActive?.(false)
     setError(null)
     setSymptoms("")
   }
@@ -89,6 +92,7 @@ export default function TriageForm({
         setFollowUp({ question: fu.question, followUpCount: fu.follow_up_count, conversationContext: "" })
       } else if (result.type === "redirect_to_wizard") {
         setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
+        onRedirectActive?.(true)
       } else {
         onResult(result as TriageResponse)
         setSymptoms("")
@@ -122,6 +126,7 @@ export default function TriageForm({
         setFollowUp(null)
         setFollowUpAnswer("")
         setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
+        onRedirectActive?.(true)
       } else {
         onResult(result as TriageResponse)
         setFollowUp(null)
@@ -196,41 +201,29 @@ export default function TriageForm({
     )
   }
 
-  if (redirectToWizard) {
-    return (
-      <div className="space-y-5">
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-          <span className="text-lg mt-0.5">💡</span>
-          <div className="text-sm text-foreground">
-            <p className="mb-1 font-semibold text-amber-600 dark:text-amber-400">{t.redirectToWizard.title}</p>
-            <p>{redirectToWizard}</p>
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={handleReset}
-            className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t.redirectToWizard.startOver}
-          </button>
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => onSwitchToWizard?.()}
-            className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover transition-all disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t.redirectToWizard.tryWizard}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={handleInitialSubmit} className="space-y-5">
+      {/* Redirect to wizard banner — inline, above the form */}
+      {redirectToWizard && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg mt-0.5">💡</span>
+            <div className="text-sm text-foreground flex-1">
+              <p className="font-semibold text-amber-600 dark:text-amber-400">{t.redirectToWizard.title}</p>
+              <p className="mt-0.5">{redirectToWizard}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => { onSwitchToWizard?.(); onRedirectActive?.(false) }}
+            className="mt-3 w-full rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:bg-amber-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.redirectToWizard.tryWizard} ↓
+          </button>
+        </div>
+      )}
+
       {/* Daily prompt */}
       <p className="text-center text-sm font-medium italic text-primary/80 tracking-wide">
         {lang === "el" ? prompt.el : prompt.en}
