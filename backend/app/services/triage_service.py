@@ -29,6 +29,40 @@ _SAFE_REDIRECT = (
     f"?specialty={quote(_GP_SPECIALTY)}&doctor={quote(_GP_NAME)}"
 )
 
+# Symptom keywords used to quickly detect content-free inputs before LLM inference
+_SYMPTOM_KEYWORDS = {
+    "pain", "hurt", "ache", "fever", "cough", "headache", "chest", "breathing",
+    "nausea", "vomit", "dizzy", "bleeding", "injury", "broken", "rash", "swell",
+    "swollen", "sore", "throat", "stomach", "back", "joint", "muscle", "ear",
+    "eye", "nose", "diarrhea", "fatigue", "anxiety", "depression", "burn",
+    "πόνο", "πονά", "πυρετό", "βήχα", "πονοκέφαλο", "στήθο", "αναπνοή",
+    "ναυτία", "εμετό", "ζάλη", "αιμορραγία", "τραύμα", "σπάσιμο", "εξάνθημα",
+    "πρήξιμο", "λαιμό", "στομάχι", "πλάτη", "άρθρωση", "μυ", "αυτί",
+    "μάτι", "μύτη", "διάρροια", "κόπωση", "άγχο", "κατάθλιψη", "κάψιμο",
+}
+
+_VAGUE_REDIRECT_EL = (
+    "Για να σας βοηθήσουμε καλύτερα, χρειαζόμαστε περισσότερες λεπτομέρειες. "
+    "Δοκιμάστε τον καθοδηγούμενο οδηγό συμπτωμάτων — θα σας κάνει βήμα-βήμα ερωτήσεις "
+    "για την περιοχή του σώματος, τα συμπτώματα, τη σοβαρότητα και τη διάρκεια."
+)
+
+_VAGUE_REDIRECT_EN = (
+    "To help you better, we need a bit more detail. "
+    "Try the guided symptom wizard — it will ask you step by step "
+    "about body area, symptoms, severity, and duration."
+)
+
+
+def _is_vague_input(text: str) -> bool:
+    stripped = text.strip().lower()
+    if len(stripped) > 40:
+        return False
+    for keyword in _SYMPTOM_KEYWORDS:
+        if keyword in stripped:
+            return False
+    return True
+
 _SAFE_DEFAULT = TriageResponse(
     mts_level=3,
     mts_label="Urgent",
@@ -122,6 +156,13 @@ async def classify(
 ) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse:
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
+
+    # Fast pre-filter: redirect trivially vague inputs without wasting an LLM call
+    if _is_vague_input(enriched_symptoms):
+        return RedirectToWizardResponse(
+            guidance_message=_VAGUE_REDIRECT_EL if resolved_lang == "el" else _VAGUE_REDIRECT_EN,
+        )
+
     try:
         try:
             context = await retrieve_context(enriched_symptoms)
