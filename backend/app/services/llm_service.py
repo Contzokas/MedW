@@ -146,16 +146,15 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
     '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
     "2. If the symptoms are vague or missing key details, use one of your remaining follow-up questions:\n"
-    '{{"follow_up_question": "<one concise clarifying question in {output_language}>"}}\n'
+    '{{"follow_up_question": "YOUR QUESTION IN {output_language}"}}\n'
     "Only do this if a single targeted question would meaningfully improve your confidence.\n\n"
     "3. If the input is TRULY empty or contains zero symptom information "
     "(e.g. just a greeting, \"idk\", \"nothing\", single characters), "
     "and asking a follow-up would be pointless, redirect them to the structured wizard:\n"
-    '{{"needs_structured_input": true, "guidance_message": '
-    '"<a polite message in {output_language} suggesting they use the guided symptom wizard>"}}\n\n'
+    '{{"needs_structured_input": true, "guidance_message": "YOUR POLITE MESSAGE IN {output_language}"}}\n\n'
     "4. If you have asked all {max_follow_ups} follow-up questions and still cannot confidently triage:\n"
-    '{{"uncertain_result": "<a message in {output_language} explaining you cannot provide a reliable result '
-    'and suggesting they consult a doctor>"}}\n\n'
+    '{{"uncertain_result": "YOUR MESSAGE IN {output_language} explaining you cannot provide a reliable result '
+    'and suggesting they consult a doctor"}}\n\n'
     "Return JSON with exactly these fields.\n"
     "Use {output_language} for specialty, reasoning, questions, and messages.\n"
     "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
