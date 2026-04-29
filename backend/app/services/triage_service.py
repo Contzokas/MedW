@@ -6,7 +6,7 @@ from urllib.parse import quote
 from app.core.config import MAX_FOLLOW_UP_QUESTIONS
 from app.core.queue import append_entry
 from app.schemas.doctor import Doctor
-from app.schemas.triage import FollowUpResponse, QueueEntry, TriageResponse, RedirectToWizardResponse
+from app.schemas.triage import FollowUpResponse, QueueEntry, TriageResponse, RedirectToWizardResponse, UncertainResultResponse
 from app.services import doctor_service
 from app.services.llm_service import (
     SPECIALTY_TRANSLATIONS_EL_TO_EN,
@@ -153,7 +153,7 @@ async def classify(
     allow_follow_up: bool = True,
     latitude: float | None = None,
     longitude: float | None = None,
-) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse:
+) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse:
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
 
@@ -188,6 +188,11 @@ async def classify(
         if "needs_structured_input" in llm_result:
             return RedirectToWizardResponse(
                 guidance_message=llm_result["guidance_message"],
+            )
+
+        if "uncertain_result" in llm_result:
+            return UncertainResultResponse(
+                message=llm_result["uncertain_result"],
             )
 
         if allow_follow_up and "follow_up_question" in llm_result and follow_up_count < MAX_FOLLOW_UP_QUESTIONS:

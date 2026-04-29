@@ -50,6 +50,11 @@ export const translations = {
       title: "More Details Needed",
       tryWizard: "Try Guided Mode",
     },
+    uncertainResult: {
+      title: "Unable to Provide Reliable Result",
+      message: "I don't have enough information to provide a reliable triage result with these symptoms. Please consult a doctor for accurate assessment.",
+      startOver: "Start Over",
+    },
     guidance: {
       title: "What to do next",
     },
@@ -170,6 +175,11 @@ export const translations = {
     redirectToWizard: {
       title: "Χρειάζονται Περισσότερες Λεπτομέρειες",
       tryWizard: "Δοκιμή Καθοδηγούμενης Λειτουργίας",
+    },
+    uncertainResult: {
+      title: "Αδυναμία Παροχής Αξιόπιστου Αποτελέσματος",
+      message: "Δεν έχω αρκετές πληροφορίες για να παρέχω μια αξιόπιστη διάγνωση με αυτά τα συμπτώματα. Παρακαλώ συμβουλευτείτε έναν γιατρό για ακριβή εκτίμηση.",
+      startOver: "Ξεκινήστε από την αρχή",
     },
     guidance: {
       title: "Τι να κάνετε στη συνέχεια",

@@ -139,6 +139,13 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     "Only do this if a single targeted question would meaningfully improve your confidence.\n"
     "Do not ask follow-up questions if follow_up_count >= {max_follow_ups}.\n"
     "Current follow_up_count: {follow_up_count}\n\n"
+    "UNCERTAIN RESULT (only when follow_up_count >= max_follow_ups):\n"
+    "If the symptoms are still too vague to confidently triage and you have reached the maximum number "
+    "of follow-up questions, you may instead return:\n"
+    '{{"uncertain_result": "<a message in {output_language} explaining you cannot provide a reliable result '
+    'and suggesting they consult a doctor>"}\n'
+    "Only use this option when you genuinely lack sufficient information after all follow-up attempts.\n"
+    "If you are confident enough to triage, you must return the standard triage JSON instead.\n\n"
     "VAGUE INPUT DETECTION:\n"
     "If the patient gives an extremely vague or content-free answer to a follow-up question "
     "(e.g. \"idk\", \"nothing really\", \"just bad\"), or if the original input was too generic "
@@ -401,6 +408,11 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
         if not isinstance(data["follow_up_question"], str) or not data["follow_up_question"].strip():
             raise LLMParseError("follow_up_question must be a non-empty string")
         return {"follow_up_question": data["follow_up_question"]}
+
+    if "uncertain_result" in data:
+        if not isinstance(data["uncertain_result"], str) or not data["uncertain_result"].strip():
+            raise LLMParseError("uncertain_result must be a non-empty string")
+        return {"uncertain_result": data["uncertain_result"]}
 
     if data.get("needs_structured_input"):
         guidance = data.get("guidance_message", "")

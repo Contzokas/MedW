@@ -4,14 +4,14 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.core import queue
-from app.schemas.triage import FollowUpResponse, QueueEntry, TriageRequest, TriageResponse, RedirectToWizardResponse
+from app.schemas.triage import FollowUpResponse, QueueEntry, TriageRequest, TriageResponse, RedirectToWizardResponse, UncertainResultResponse
 from app.services import triage_service
 
 router = APIRouter()
 
 
-@router.post("/triage", response_model=TriageResponse | FollowUpResponse | RedirectToWizardResponse)
-async def perform_triage(request: TriageRequest) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse:
+@router.post("/triage", response_model=TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse)
+async def perform_triage(request: TriageRequest) -> TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse:
     return await triage_service.classify(
         request.symptoms,
         request.patient_id,

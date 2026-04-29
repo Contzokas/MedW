@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { submitTriage } from "@/app/lib/api"
-import { FollowUpResponse, TriageResponse, RedirectToWizardResponse } from "@/app/lib/types"
+import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainResultResponse } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 import { QUICK_SYMPTOMS } from "@/app/lib/wizard-data"
 
@@ -57,6 +57,7 @@ export default function TriageForm({
   const [followUp, setFollowUp] = useState<FollowUpState | null>(null)
   const [followUpAnswer, setFollowUpAnswer] = useState("")
   const [redirectToWizard, setRedirectToWizard] = useState<string | null>(null)
+  const [uncertainResult, setUncertainResult] = useState<string | null>(null)
   const [userDismissed, setUserDismissed] = useState(false)
   const [chipsVisible, setChipsVisible] = useState(true)
   const [promptIdx, setPromptIdx] = useState(0)
@@ -73,6 +74,7 @@ export default function TriageForm({
     setFollowUp(null)
     setFollowUpAnswer("")
     setRedirectToWizard(null)
+    setUncertainResult(null)
     onRedirectActive?.(false)
     setError(null)
     setSymptoms("")
@@ -93,6 +95,8 @@ export default function TriageForm({
       } else if (result.type === "redirect_to_wizard") {
         setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
         onRedirectActive?.(true)
+      } else if (result.type === "uncertain_result") {
+        setUncertainResult((result as UncertainResultResponse).message)
       } else {
         onResult(result as TriageResponse)
         setSymptoms("")
@@ -127,6 +131,10 @@ export default function TriageForm({
         setFollowUpAnswer("")
         setRedirectToWizard((result as RedirectToWizardResponse).guidance_message)
         onRedirectActive?.(true)
+      } else if (result.type === "uncertain_result") {
+        setFollowUp(null)
+        setFollowUpAnswer("")
+        setUncertainResult((result as UncertainResultResponse).message)
       } else {
         onResult(result as TriageResponse)
         setFollowUp(null)
@@ -151,7 +159,32 @@ export default function TriageForm({
     })
   }
 
-  const showLocationHint = !followUp && symptoms.trim().length > 0 && latitude === null && !userDismissed && !geoDismissed
+  const showLocationHint = !followUp && !uncertainResult && symptoms.trim().length > 0 && latitude === null && !userDismissed && !geoDismissed
+
+  if (uncertainResult) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <span className="text-lg mt-0.5">⚠️</span>
+          <div className="text-sm text-foreground flex-1">
+            <p className="mb-2 font-semibold text-destructive">{t.uncertainResult.title}</p>
+            <p>{t.uncertainResult.message}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={handleReset}
+            className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-hover transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t.uncertainResult.startOver}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (followUp) {
     return (

@@ -1,4 +1,4 @@
-import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, TriageHistoryList, TriageHistoryEntry } from "@/app/lib/types"
+import { FollowUpResponse, TriageResponse, RedirectToWizardResponse, UncertainResultResponse, TriageHistoryList, TriageHistoryEntry } from "@/app/lib/types"
 import { buildApiUrl, resolveApiBase } from "@/app/lib/backendResolver"
 
 export async function submitTriage(
@@ -10,7 +10,7 @@ export async function submitTriage(
   allowFollowUp: boolean = true,
   latitude: number | null = null,
   longitude: number | null = null,
-): Promise<TriageResponse | FollowUpResponse | RedirectToWizardResponse> {
+): Promise<TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse> {
   const apiBase = await resolveApiBase()
 
   const res = await fetch(buildApiUrl(apiBase, "/api/v1/triage"), {
@@ -32,7 +32,7 @@ export async function submitTriage(
     throw new Error(`Triage request failed (status ${res.status})`)
   }
 
-  return res.json() as Promise<TriageResponse | FollowUpResponse | RedirectToWizardResponse>
+  return res.json() as Promise<TriageResponse | FollowUpResponse | RedirectToWizardResponse | UncertainResultResponse>
 }
 
 export async function getTriageHistory(

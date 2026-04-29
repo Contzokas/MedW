@@ -36,6 +36,11 @@ export interface RedirectToWizardResponse {
   guidance_message: string
 }
 
+export interface UncertainResultResponse {
+  type: "uncertain_result"
+  message: string
+}
+
 export interface TriageHistoryEntry {
   id: number
   patient_id: string

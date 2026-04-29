@@ -37,6 +37,11 @@ class RedirectToWizardResponse(BaseModel):
     guidance_message: str
 
 
+class UncertainResultResponse(BaseModel):
+    type: Literal["uncertain_result"] = "uncertain_result"
+    message: str
+
+
 class QueueEntry(BaseModel):
     patient_id: str
     mts_level: int
