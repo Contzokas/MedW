@@ -212,6 +212,7 @@ jobs:
       NIM_WARMUP_RETRIES: ${{ vars.NIM_WARMUP_RETRIES || '120' }}
       NIM_WARMUP_RETRY_DELAY_SECONDS: ${{ vars.NIM_WARMUP_RETRY_DELAY_SECONDS || '25' }}
       NIM_EMBED_MODEL: nvidia/nv-embedqa-e5-v5
+      NIM_RERANKER_BASE_URL: ${{ vars.NIM_RERANKER_BASE_URL || 'http://nim-reranker:8000/v1' }}
       NIM_RERANKER_MODEL: nvidia/nv-rerankqa-llama-3_2-1b-v2
       RAG_DEBUG_ENABLED: ${{ vars.RAG_DEBUG_ENABLED || 'false' }}
     steps:
@@ -280,7 +281,7 @@ jobs:
           echo "    medw-nim-embed${{ env.SUFFIX }} (GPU 3 — embedding NIM)"
           echo "    medw-backend${{ env.SUFFIX }}   (CPU — Milvus Lite embedded)"
           echo "    medw-frontend${{ env.SUFFIX }}  (CPU)"
-          echo "  Reranker    : NVIDIA cloud API (integrate.api.nvidia.com)"
+          echo "  Reranker    : $NIM_RERANKER_BASE_URL"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
       # ── Delete stale workloads ────────────────────────────────────────────
@@ -465,7 +466,7 @@ jobs:
             --arg nimWarmupRetryDelaySecs "${NIM_WARMUP_RETRY_DELAY_SECONDS}" \
             --arg nimEmbedBaseUrl "$NIM_EMBED_BASE_URL" \
             --arg nimEmbedModel "${NIM_EMBED_MODEL}" \
-            --arg nimRerankerBaseUrl "https://integrate.api.nvidia.com/v1" \
+            --arg nimRerankerBaseUrl "${NIM_RERANKER_BASE_URL}" \
             --arg nimRerankerModel "${NIM_RERANKER_MODEL}" \
             --arg ngcApiKey "${{ secrets.NGC_API_KEY }}" \
             --arg ragDebugEnabled "${RAG_DEBUG_ENABLED}" \
