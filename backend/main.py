@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -18,13 +17,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(seed_corpus_if_empty())
+    await seed_corpus_if_empty()
     try:
         doctor_service.load_doctors()
     except doctor_service.DoctorDataLoadError as exc:
         logger.exception("Doctor dataset load failed during startup")
         raise RuntimeError("Startup aborted: doctor dataset failed to load") from exc
-    asyncio.create_task(warmup_model())
+    await warmup_model()
     from app.core.database import close_db, get_db
     await get_db()
     yield

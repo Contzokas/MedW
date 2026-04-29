@@ -22,15 +22,15 @@ except ValueError:
     NIM_TIMEOUT: int = 120
 NIM_WARMUP_ENABLED: bool = _get_bool_env("NIM_WARMUP_ENABLED", True)
 try:
-    NIM_WARMUP_RETRIES: int = max(1, int(os.environ.get("NIM_WARMUP_RETRIES", "120")))
+    NIM_WARMUP_RETRIES: int = max(1, int(os.environ.get("NIM_WARMUP_RETRIES", "12")))
 except ValueError:
-    NIM_WARMUP_RETRIES = 120
+    NIM_WARMUP_RETRIES = 12
 try:
     NIM_WARMUP_RETRY_DELAY_SECONDS: int = max(
-        1, int(os.environ.get("NIM_WARMUP_RETRY_DELAY_SECONDS", "25"))
+        1, int(os.environ.get("NIM_WARMUP_RETRY_DELAY_SECONDS", "15"))
     )
 except ValueError:
-    NIM_WARMUP_RETRY_DELAY_SECONDS = 25
+    NIM_WARMUP_RETRY_DELAY_SECONDS = 15
 MILVUS_URI: str = os.environ.get("MILVUS_DB_PATH", "./milvus.db")
 try:
     QUEUE_MAX_ENTRIES: int = max(1, int(os.environ.get("QUEUE_MAX_ENTRIES", "1000")))

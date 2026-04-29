@@ -62,12 +62,12 @@ def _ensure_collection(client: MilvusClient) -> None:
     # Probe actual embedding dimension from NIM rather than hardcoding it
     import time
     dim = None
-    for attempt in range(120):
+    for attempt in range(20):
         try:
             dim = len(_embed_texts(["probe"])[0])
             break
         except Exception as exc:
-            logger.info("Waiting for NIM Embed to become ready (attempt %d/120)...", attempt + 1)
+            logger.info("Waiting for NIM Embed to become ready (attempt %d/20)...", attempt + 1)
             time.sleep(15)
             
     if dim is None:
