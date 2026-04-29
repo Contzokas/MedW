@@ -79,7 +79,8 @@ _PROMPT_LANGUAGE_HINT = {
 }
 
 _GREEK_CHAR_RE = re.compile(r"[\u0370-\u03FF\u1F00-\u1FFF]")
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+_REASONING_PLACEHOLDER_RE = re.compile(r"^[\s.\u2026\u00B7\-]*$")
 
 # TODO: Greek medical terminology validation required in Sprint 1.
 # Run classify() against ≥20 Greek symptom test cases covering MTS levels 1–5.
@@ -459,6 +460,8 @@ def _enforce_output_language(data: dict, lang: str) -> dict:
 
 
 def _parse_response(raw: str, lang: str = "el") -> dict:
+    think_match = _THINK_RE.search(raw)
+    think_content = think_match.group(1).strip() if think_match else ""
     raw = _THINK_RE.sub("", raw).strip()
     json_str = _extract_json_object(raw)
     if not json_str:
@@ -504,6 +507,9 @@ def _parse_response(raw: str, lang: str = "el") -> dict:
     for field in ("mts_label", "specialty", "reasoning"):
         if not isinstance(data[field], str) or not data[field].strip():
             raise LLMParseError(f"Field '{field}' must be a non-empty string")
+
+    if _REASONING_PLACEHOLDER_RE.match(data["reasoning"]) and think_content:
+        data["reasoning"] = think_content
 
     expected_label_en = MTS_LABELS[mts_level]
     expected_label_el = MTS_LABELS_EL[mts_level]
