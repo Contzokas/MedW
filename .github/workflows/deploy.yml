@@ -17,6 +17,7 @@ env:
   ORG: contzokas
   NIM_IMAGE: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
   NIM_EMBED_IMAGE: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:latest
+  NIM_RERANKER_IMAGE: nvcr.io/nim/nvidia/nv-rerankqa-llama-3_2-1b-v2:latest
   RUNAI_CLUSTER_URL: https://runai.kiefersa.gr
   RUNAI_PROJECT: medo
   RUNAI_CLUSTER_ID: 0403162b-5439-4561-b986-332482767449
@@ -313,6 +314,7 @@ jobs:
             echo "(redeploy-ai) flag detected — deleting NIM workloads for fresh redeploy"
             delete_workload "medw-nim${SUFFIX}"
             delete_workload "medw-nim-embed${SUFFIX}"
+            delete_workload "medw-nim-reranker${SUFFIX}"
           else
             echo "No (redeploy-ai) flag — preserving existing NIM workloads"
           fi
@@ -402,6 +404,45 @@ jobs:
           STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
           echo "NIM Embed (HTTP $STATUS): $BODY"
           { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Embed failed"; exit 1; }
+
+      - name: Deploy NIM Reranker (GPU 3 — shared with embed)
+        env:
+          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
+        run: |
+          EXISTING=$(curl -sSL --max-time 30 \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
+            -H "Authorization: Bearer $TOKEN" | jq -r ".workloads // . | .[]? | objects | select(.name ==\"medw-nim-reranker${SUFFIX}\") | .name // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "NIM Reranker workload already exists — skipping deploy"
+            exit 0
+          fi
+          PAYLOAD=$(jq -n \
+            --arg name "medw-nim-reranker${SUFFIX}" \
+            --arg projectId "$PROJECT_ID" \
+            --arg clusterId "${{ env.RUNAI_CLUSTER_ID }}" \
+            --arg image "${{ env.NIM_RERANKER_IMAGE }}" \
+            --arg ngcApiKey "$NGC_API_KEY" \
+            '{
+              name: $name, projectId: $projectId, clusterId: $clusterId,
+              spec: {
+                image: $image,
+                imagePullSecrets: [{name: "dockerregistry-nvcr-io"}],
+                compute: { cpuCoreRequest: 4, cpuCoreLimit: 4, cpuMemoryRequest: "8G", cpuMemoryLimit: "8G", gpuDevicesRequest: 1 },
+                environmentVariables: [
+                  {name: "NGC_API_KEY",    value: $ngcApiKey},
+                  {name: "NIM_CACHE_PATH", value: "/opt/nim/.cache"}
+                ],
+                ports: [{container: 8000, serviceType: "NodePort"}],
+                storage: { pvc: [{ path: "/opt/nim/.cache", claimName: "nim-reranker-pvc", existingPvc: false, claimInfo: { size: "10Gi" } }] }
+              }
+            }')
+          RESP=$(curl -sSL --max-time 30 -w "\n%{http_code}" -X POST \
+            "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads/workspaces" \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+            -d "$PAYLOAD") || true
+          STATUS=$(echo "$RESP" | tail -1); BODY=$(echo "$RESP" | head -n -1)
+          echo "NIM Reranker (HTTP $STATUS): $BODY"
+          { [ "$STATUS" = "200" ] || [ "$STATUS" = "201" ] || [ "$STATUS" = "202" ]; } || { echo "NIM Reranker failed"; exit 1; }
 
       # ── Resolve NIM service URLs ──────────────────────────────────────────
       - name: Resolve NIM service URLs
