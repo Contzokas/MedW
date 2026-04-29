@@ -707,7 +707,8 @@ jobs:
       - name: Show workload status
         if: always()
         run: |
-          curl -fsSL --max-time 30 \
+          curl -sSL --max-time 60 \
             "${{ env.RUNAI_CLUSTER_URL }}/api/v1/workloads?limit=100" \
             -H "Authorization: Bearer $TOKEN" \
-            | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end'
+            | jq '.workloads // . | if type == "array" then .[] | select(.name | startswith("medw-")) | {name, phase} else . end' \
+            || true
