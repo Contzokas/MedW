@@ -35,7 +35,7 @@ spec:
             - name: NIM_EMBED_MODEL
               value: "nvidia/nv-embedqa-e5-v5"
             - name: NIM_RERANKER_BASE_URL
-              value: "https://integrate.api.nvidia.com/v1"
+              value: "http://nim-reranker:8000/v1"
             - name: NIM_RERANKER_MODEL
               value: "nvidia/nv-rerankqa-llama-3_2-1b-v2"
             - name: MILVUS_URI
