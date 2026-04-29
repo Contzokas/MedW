@@ -110,26 +110,28 @@ def _resolve_lang(lang: str) -> str:
     return lang if lang in _SUPPORTED_LANGS else "el"
 
 
+_FALLBACK_NOTE_EL = "Δεν υπάρχει διαθέσιμος ειδικός — συνιστάται Γενική Ιατρική."
+
 def _specialty_for_doctor_lookup(specialty: str, lang: str) -> str:
-    if lang != "en":
-        return specialty
-    return _SPECIALTY_EN_TO_EL_NORMALIZED.get(_normalize_specialty(specialty), specialty)
-
-
-def _specialty_for_response(specialty: str, lang: str) -> str:
-    if lang != "en":
-        return specialty
+    """Translate LLM specialty output to the English key used in doctors.json."""
+    if lang == "en":
+        return specialty  # LLM returns English → matches English doctors.json keys
+    # Greek: LLM returns Greek → translate to English for lookup
     return _SPECIALTY_EL_TO_EN_NORMALIZED.get(_normalize_specialty(specialty), specialty)
 
 
 def _localize_doctor(doctor: Doctor, lang: str) -> Doctor:
-    if lang != "en":
-        return doctor
-
-    fallback_note = None if doctor.fallback_note is None else _FALLBACK_NOTE_EN
+    """Translate doctor fields from English (doctors.json) to the response language."""
+    if lang == "en":
+        return doctor  # doctors.json is already in English
+    # Greek: translate English specialty → Greek for display
+    greek_specialty = _SPECIALTY_EN_TO_EL_NORMALIZED.get(
+        _normalize_specialty(doctor.specialty), doctor.specialty
+    )
+    fallback_note = None if doctor.fallback_note is None else _FALLBACK_NOTE_EL
     return Doctor(
         name=doctor.name,
-        specialty=_specialty_for_response(doctor.specialty, lang),
+        specialty=greek_specialty,
         availability=doctor.availability,
         fallback_note=fallback_note,
         city=doctor.city,

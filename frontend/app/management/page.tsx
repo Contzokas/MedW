@@ -126,16 +126,27 @@ function ShimmerBlock({ height }: { height?: string }) {
   return <div className={`skeleton rounded-xl animate-pulse ${height ?? "h-32"}`} />
 }
 
+const CACHE_ANALYTICS = "medw_mgmt_analytics"
+const CACHE_RAG = "medw_mgmt_rag"
+const CACHE_NIM = "medw_mgmt_nim"
+
+function readCache<T>(key: string): T | null {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : null } catch { return null }
+}
+function writeCache(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota */ }
+}
+
 export default function ManagementPage() {
   const { lang } = useLang()
 
-  const [nim, setNim] = useState<NimWarmup | null>(null)
+  const [nim, setNim] = useState<NimWarmup | null>(() => readCache<NimWarmup>(CACHE_NIM))
   const [nimLoading, setNimLoading] = useState(true)
 
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(() => readCache<AnalyticsData>(CACHE_ANALYTICS))
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
 
-  const [ragStats, setRagStats] = useState<RagDebugStats | null>(null)
+  const [ragStats, setRagStats] = useState<RagDebugStats | null>(() => readCache<RagDebugStats>(CACHE_RAG))
   const [ragLoading, setRagLoading] = useState(true)
 
   const [healthPings, setHealthPings] = useState<number[]>([])
@@ -195,7 +206,7 @@ export default function ManagementPage() {
     resolveApiBase()
       .then((base) => fetch(buildApiUrl(base, "/api/v1/health/warmup")))
       .then((res) => res.json())
-      .then((val: NimStatusResponse) => { if (!cancelled) { setNim(val.warmup); setNimLoading(false) } })
+      .then((val: NimStatusResponse) => { if (!cancelled) { setNim(val.warmup); setNimLoading(false); writeCache(CACHE_NIM, val.warmup) } })
       .catch(() => { if (!cancelled) setNimLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -205,7 +216,7 @@ export default function ManagementPage() {
     resolveApiBase()
       .then((base) => fetch(buildApiUrl(base, "/api/v1/analytics")))
       .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() as Promise<AnalyticsData> })
-      .then((val) => { if (!cancelled) { setAnalytics(val); setAnalyticsLoading(false) } })
+      .then((val) => { if (!cancelled) { setAnalytics(val); setAnalyticsLoading(false); writeCache(CACHE_ANALYTICS, val) } })
       .catch(() => { if (!cancelled) setAnalyticsLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -215,7 +226,7 @@ export default function ManagementPage() {
     resolveApiBase()
       .then((base) => fetch(buildApiUrl(base, "/api/v1/rag/debug/stats")))
       .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() as Promise<RagDebugStats> })
-      .then((val) => { if (!cancelled) { setRagStats(val); setRagLoading(false) } })
+      .then((val) => { if (!cancelled) { setRagStats(val); setRagLoading(false); writeCache(CACHE_RAG, val) } })
       .catch(() => { if (!cancelled) setRagLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -275,7 +286,7 @@ export default function ManagementPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-2">NIM Status</p>
-            {nimLoading ? (
+            {nimLoading && !nim ? (
               <ShimmerBlock height="h-16" />
             ) : nim ? (
               <div>
@@ -318,7 +329,7 @@ export default function ManagementPage() {
 
           <Card>
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-2">Total Triages</p>
-            {analyticsLoading ? (
+            {analyticsLoading && !analytics ? (
               <ShimmerBlock height="h-16" />
             ) : (
               <div>
@@ -346,7 +357,7 @@ export default function ManagementPage() {
 
           <Card>
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-2">NIM Pipeline Duration</p>
-            {ragLoading ? (
+            {ragLoading && !ragStats ? (
               <ShimmerBlock height="h-20" />
             ) : ragStats?.duration_stats_ms ? (
               <div className="space-y-1.5">
@@ -373,7 +384,7 @@ export default function ManagementPage() {
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-3">
               {toCaps("MTS Distribution", lang)}
             </p>
-            {analyticsLoading ? (
+            {analyticsLoading && !analytics ? (
               <ShimmerBlock height="h-28" />
             ) : analytics && analytics.total_triages > 0 ? (
               <div className="space-y-2">
@@ -402,7 +413,7 @@ export default function ManagementPage() {
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-3">
               {toCaps("Top Specialties", lang)}
             </p>
-            {analyticsLoading ? (
+            {analyticsLoading && !analytics ? (
               <ShimmerBlock height="h-28" />
             ) : analytics && analytics.total_triages > 0 ? (
               <div className="space-y-1.5">
@@ -470,7 +481,7 @@ export default function ManagementPage() {
             <p className="text-[10px] font-bold tracking-[0.15em] text-muted-foreground uppercase mb-2">
               {toCaps("RAG Coverage", lang)}
             </p>
-            {ragLoading ? (
+            {ragLoading && !ragStats ? (
               <ShimmerBlock height="h-16" />
             ) : ragStats?.distance_stats ? (
               <div className="space-y-1">
