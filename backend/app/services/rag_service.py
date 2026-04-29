@@ -5,10 +5,11 @@ import time
 from functools import lru_cache
 from pathlib import Path
 
-# Must be set before pymilvus imports gRPC to prevent "too_many_pings" GOAWAY from Milvus Lite
-os.environ["GRPC_KEEPALIVE_TIME_MS"] = "120000"
+# Suppress gRPC idle keepalive pings — Milvus Lite responds with ENHANCE_YOUR_CALM GOAWAY
+# if pinged too frequently on idle connections. PERMIT_WITHOUT_CALLS=0 stops idle pings entirely.
+os.environ["GRPC_KEEPALIVE_TIME_MS"] = "600000"
 os.environ["GRPC_KEEPALIVE_TIMEOUT_MS"] = "30000"
-os.environ["GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS"] = "1"
+os.environ["GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS"] = "0"
 
 import httpx
 from pymilvus import DataType, MilvusClient
@@ -49,6 +50,13 @@ def _get_milvus_client() -> MilvusClient:
             _milvus_client = MilvusClient(
                 uri=MILVUS_URI,
                 timeout=30,
+                connection_args={
+                    "channel_options": [
+                        ("grpc.keepalive_time_ms", 600000),
+                        ("grpc.keepalive_timeout_ms", 30000),
+                        ("grpc.keepalive_permit_without_calls", 0),
+                    ]
+                },
             )
             # Test the connection
             _milvus_client.list_collections()
