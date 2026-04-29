@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import TriageForm from "@/app/components/TriageForm"
 import TriageResult from "@/app/components/TriageResult"
@@ -27,7 +27,7 @@ function generatePatientId(): string {
   })
 }
 
-export default function Home() {
+function HomeContent() {
   const searchParams = useSearchParams()
   const showHistory = searchParams.get("history") === "1"
   const [result, setResult] = useState<TriageResponse | null>(null)
@@ -266,5 +266,13 @@ export default function Home() {
         onSkip={onboarding.skip}
       />
     </>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   )
 }
