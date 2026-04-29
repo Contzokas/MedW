@@ -37,7 +37,7 @@ try:
 except ValueError:
     QUEUE_MAX_ENTRIES: int = 1000
 try:
-    MAX_FOLLOW_UP_QUESTIONS: int = max(0, int(os.environ.get("MAX_FOLLOW_UP_QUESTIONS", "2")))
+    MAX_FOLLOW_UP_QUESTIONS: int = max(0, int(os.environ.get("MAX_FOLLOW_UP_QUESTIONS", "3")))
 except ValueError:
-    MAX_FOLLOW_UP_QUESTIONS: int = 2
+    MAX_FOLLOW_UP_QUESTIONS: int = 3
 DB_PATH: str = os.environ.get("DB_PATH", "./data/medw.db")

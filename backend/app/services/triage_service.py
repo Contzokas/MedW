@@ -158,8 +158,9 @@ async def classify(
     resolved_lang = _resolve_lang(lang)
     enriched_symptoms = symptoms if not conversation_context else f"{symptoms}\n\n{conversation_context}"
 
-    # Fast pre-filter: redirect trivially vague inputs without wasting an LLM call
-    if _is_vague_input(enriched_symptoms):
+    # Fast pre-filter: redirect trivially vague inputs when follow-ups are disabled.
+    # When allow_follow_up is enabled, let the LLM ask clarifying questions instead.
+    if not allow_follow_up and _is_vague_input(enriched_symptoms):
         return RedirectToWizardResponse(
             guidance_message=_VAGUE_REDIRECT_EL if resolved_lang == "el" else _VAGUE_REDIRECT_EN,
         )

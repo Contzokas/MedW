@@ -135,27 +135,42 @@ _HUMAN_TEMPLATE = (
 )
 
 _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
-    _HUMAN_TEMPLATE
-    + "\n\nIf the symptoms are too vague to confidently triage, you may instead return a follow-up question:\n"
+    "{patient_profile_section}"
+    "Clinical context:\n{context}\n\n"
+    "Patient symptoms ({input_language}):\n{symptoms}\n\n"
+    "You have {max_follow_ups} follow-up question(s) you can ask. "
+    "You have already asked {follow_up_count}.\n\n"
+    "IMPORTANT — Check the symptoms first:\n"
+    "1. If the symptoms contain enough specific detail (body area, symptom type, severity, or duration) "
+    "to produce a meaningful triage, return the standard triage JSON:\n"
+    '{{"mts_level": <integer 1-5>, "mts_label": "<string>", '
+    '"specialty": "<specialty in output language>", "reasoning": "<explanation in output language>"}}\n\n'
+    "2. If the symptoms are vague or missing key details, use one of your remaining follow-up questions:\n"
     '{{"follow_up_question": "<one concise clarifying question in {output_language}>"}}\n'
-    "Only do this if a single targeted question would meaningfully improve your confidence.\n"
-    "Do not ask follow-up questions if follow_up_count >= {max_follow_ups}.\n"
-    "Current follow_up_count: {follow_up_count}\n\n"
-    "UNCERTAIN RESULT (only when follow_up_count >= max_follow_ups):\n"
-    "If the symptoms are still too vague to confidently triage and you have reached the maximum number "
-    "of follow-up questions, you may instead return:\n"
-    "{{\"uncertain_result\": \"<a message in {output_language} explaining you cannot provide a reliable result and suggesting they consult a doctor>\"}}\n"
-    "Only use this option when you genuinely lack sufficient information after all follow-up attempts.\n"
-    "If you are confident enough to triage, you must return the standard triage JSON instead.\n\n"
-    "VAGUE INPUT DETECTION:\n"
-    "If the patient gives an extremely vague or content-free answer to a follow-up question "
-    "(e.g. \"idk\", \"nothing really\", \"just bad\"), or if the original input was too generic "
-    "(greetings, single words with no symptom information), you must instead return:\n"
+    "Only do this if a single targeted question would meaningfully improve your confidence.\n\n"
+    "3. If the input is TRULY empty or contains zero symptom information "
+    "(e.g. just a greeting, \"idk\", \"nothing\", single characters), "
+    "and asking a follow-up would be pointless, redirect them to the structured wizard:\n"
     '{{"needs_structured_input": true, "guidance_message": '
-    '"<a polite, encouraging message in {output_language} explaining that more detail is needed '
-    'and suggesting the patient use the guided symptom wizard>"}}\n'
-    "This should take priority over asking yet another follow-up question when the patient shows "
-    "they cannot or will not provide specific symptom details."
+    '"<a polite message in {output_language} suggesting they use the guided symptom wizard>"}}\n\n'
+    "4. If you have asked all {max_follow_ups} follow-up questions and still cannot confidently triage:\n"
+    '{{"uncertain_result": "<a message in {output_language} explaining you cannot provide a reliable result '
+    'and suggesting they consult a doctor>"}}\n\n'
+    "Return JSON with exactly these fields.\n"
+    "Use {output_language} for specialty, reasoning, questions, and messages.\n"
+    "MTS levels: 1=Immediate, 2=Very Urgent, 3=Urgent, 4=Less Urgent, 5=Non-urgent\n"
+    "IMPORTANT rules for specialty selection:\n"
+    "- Always choose the MOST SPECIFIC specialty that matches the symptoms.\n"
+    "- Only use General Practice when symptoms are truly vague, systemic, or do not fit any specific specialty.\n"
+    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική).\n"
+    "- If output language is English, specialty must be an English name (e.g. Cardiology, Neurology, General Practice).\n"
+    "- Do NOT default to MTS level 3 (Urgent). Assign the level that genuinely reflects symptom severity.\n"
+    "- Level 1: life-threatening (cardiac arrest, anaphylaxis, severe trauma)\n"
+    "- Level 2: potentially life-threatening (chest pain, stroke signs, severe bleeding)\n"
+    "- Level 3: urgent but stable (moderate pain, worsening chronic condition)\n"
+    "- Level 4: less urgent (mild symptoms, stable chronic issues, minor complaints)\n"
+    "- Level 5: non-urgent (very mild, routine, information-seeking)\n"
+    "- Use levels 4 and 5 freely when symptoms are mild — not every patient needs urgent triage."
 )
 
 
