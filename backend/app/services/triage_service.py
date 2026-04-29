@@ -13,6 +13,8 @@ from app.services.llm_service import (
     SPECIALTY_TRANSLATIONS_EN_TO_EL,
     classify as llm_classify,
     translate_to_english,
+    translate_to_greek,
+    MTS_LABELS_EL,
 )
 from app.services.rag_service import RAGUnavailableError, retrieve_context
 
@@ -113,12 +115,16 @@ def _resolve_lang(lang: str) -> str:
 
 _FALLBACK_NOTE_EL = "Δεν υπάρχει διαθέσιμος ειδικός — συνιστάται Γενική Ιατρική."
 
+_SPECIALTY_ALIASES: dict[str, str] = {"ent": "Otolaryngology"}
+
 def _specialty_for_doctor_lookup(specialty: str, lang: str) -> str:
     """Translate LLM specialty output to the English key used in doctors.json."""
     if lang == "en":
-        return specialty  # LLM returns English → matches English doctors.json keys
-    # Greek: LLM returns Greek → translate to English for lookup
-    return _SPECIALTY_EL_TO_EN_NORMALIZED.get(_normalize_specialty(specialty), specialty)
+        result = specialty  # LLM returns English → matches English doctors.json keys
+    else:
+        # Greek: LLM returns Greek → translate to English for lookup
+        result = _SPECIALTY_EL_TO_EN_NORMALIZED.get(_normalize_specialty(specialty), specialty)
+    return _SPECIALTY_ALIASES.get(_normalize_specialty(result), result)
 
 
 def _localize_doctor(doctor: Doctor, lang: str) -> Doctor:
@@ -168,14 +174,25 @@ async def classify(
             guidance_message=_VAGUE_REDIRECT_EL if resolved_lang == "el" else _VAGUE_REDIRECT_EN,
         )
 
+    # ── Greek → run LLM in English for quality, then localise output ──
+    use_translation = resolved_lang == "el"
+    llm_lang = "en" if use_translation else resolved_lang
+
+    if use_translation:
+        english_symptoms = await translate_to_english(enriched_symptoms)
+        llm_symptoms = english_symptoms
+        search_symptoms = english_symptoms
+    else:
+        llm_symptoms = enriched_symptoms
+        search_symptoms = symptoms
+
     try:
         try:
-            search_symptoms = await translate_to_english(symptoms) if resolved_lang == "el" else symptoms
             context = await retrieve_context(search_symptoms)
             llm_result = await llm_classify(
-                symptoms=enriched_symptoms,
+                symptoms=llm_symptoms,
                 context=context,
-                lang=resolved_lang,
+                lang=llm_lang,
                 follow_up_count=follow_up_count,
                 max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
                 patient_profile=patient_profile,
@@ -184,14 +201,28 @@ async def classify(
         except RAGUnavailableError as exc:
             logger.warning("RAG unavailable — falling back to LLM base knowledge", exc_info=exc)
             llm_result = await llm_classify(
-                symptoms=enriched_symptoms,
+                symptoms=llm_symptoms,
                 context="",
-                lang=resolved_lang,
+                lang=llm_lang,
                 follow_up_count=follow_up_count,
                 max_follow_ups=MAX_FOLLOW_UP_QUESTIONS,
                 patient_profile=patient_profile,
             )
             rag_used = False
+
+        # ── Translate English LLM output back to Greek ──
+        if use_translation:
+            if "reasoning" in llm_result:
+                llm_result["reasoning"] = await translate_to_greek(llm_result["reasoning"])
+            if "follow_up_question" in llm_result:
+                llm_result["follow_up_question"] = await translate_to_greek(llm_result["follow_up_question"])
+            if "guidance_message" in llm_result:
+                llm_result["guidance_message"] = await translate_to_greek(llm_result["guidance_message"])
+            if "uncertain_result" in llm_result:
+                llm_result["uncertain_result"] = await translate_to_greek(llm_result["uncertain_result"])
+            if "mts_label" in llm_result and "mts_level" in llm_result:
+                llm_result["mts_label"] = MTS_LABELS_EL.get(llm_result["mts_level"], llm_result["mts_label"])
+            # specialty stays English for doctor lookup; _localize_doctor handles display translation
 
         if "needs_structured_input" in llm_result:
             return RedirectToWizardResponse(

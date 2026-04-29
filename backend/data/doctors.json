@@ -1,570 +1,75 @@
 [
-  {
-    "name": "Δρ. Αλέξανδρος Παπαδόπουλος",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Μαρία Νικολάου",
-    "specialty": "Cardiology",
-    "availability": false,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6401,
-    "lon": 22.9444
-  },
-  {
-    "name": "Δρ. Γεώργιος Κωνσταντίνου",
-    "specialty": "Orthopedics",
-    "availability": true,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6401,
-    "lon": 22.9444
-  },
-  {
-    "name": "Δρ. Ελένη Σταματίου",
-    "specialty": "Neurology",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2466,
-    "lon": 21.7346
-  },
-  {
-    "name": "Δρ. Νικόλαος Ανδρέου",
-    "specialty": "Pulmonology",
-    "availability": true,
-    "city": "Ηράκλειο",
-    "lat": 35.34,
-    "lon": 25.1632
-  },
-  {
-    "name": "Δρ. Σοφία Δημητρίου",
-    "specialty": "Gastroenterology",
-    "availability": false,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Κωνσταντίνος Παπανδρέου",
-    "specialty": "General Practice",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Χριστίνα Βασιλείου",
-    "specialty": "General Practice",
-    "availability": true,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6401,
-    "lon": 22.9444
-  },
-  {
-    "name": "Δρ. Αθηνά Μιχαηλίδου",
-    "specialty": "Dermatology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Σπύρος Αντωνίου",
-    "specialty": "Internal Medicine",
-    "availability": false,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6401,
-    "lon": 22.9444
-  },
-  {
-    "name": "Δρ. Ανδρέας Μαρκόπουλος",
-    "specialty": "Urology",
-    "availability": false,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Αναστασία Οικονόμου",
-    "specialty": "Psychiatry",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Μαρία Παπαγεωργίου",
-    "specialty": "Gynecology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Ιωάννης Μητρόπουλος",
-    "specialty": "Pediatrics",
-    "availability": false,
-    "city": "Λάρισα",
-    "lat": 39.632,
-    "lon": 22.4175
-  },
-  {
-    "name": "Δρ. Κατερίνα Λάμπρου",
-    "specialty": "Ophthalmology",
-    "availability": true,
-    "city": "Ηράκλειο",
-    "lat": 35.34,
-    "lon": 25.1632
-  },
-  {
-    "name": "Δρ. Βασίλειος Σαμαράς",
-    "specialty": "ENT",
-    "availability": true,
-    "city": "Βόλος",
-    "lat": 39.3622,
-    "lon": 22.9478
-  },
-  {
-    "name": "Δρ. Φωτεινή Καρρά",
-    "specialty": "Endocrinology",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.6643,
-    "lon": 20.8517
-  },
-  {
-    "name": "Δρ. Δημήτριος Αλεξίου",
-    "specialty": "Internal Medicine",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7275
-  },
-  {
-    "name": "Δρ. Πελαγία Ρήγα",
-    "specialty": "General Surgery",
-    "availability": false,
-    "city": "Πάτρα",
-    "lat": 38.2466,
-    "lon": 21.7346
-  },
-  {
-    "name": "Δρ. Θεόδωρος Γαλάνης",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Αλεξανδρούπολη",
-    "lat": 40.8453,
-    "lon": 25.9562
-  },
-  {
-    "name": "Δρ. Ευαγγελία Χατζή",
-    "specialty": "General Practice",
-    "availability": true,
-    "city": "Αλεξανδρούπολη",
-    "lat": 40.8453,
-    "lon": 25.9562
-  },
-  {
-    "name": "Δρ. Περσεφόνη Λώλος",
-    "specialty": "General Practice",
-    "availability": false,
-    "city": "Ηράκλειο",
-    "lat": 35.3335,
-    "lon": 25.1482
-  },
-  {
-    "name": "Δρ. Μιράντα Μάργαρης",
-    "specialty": "Pulmonology",
-    "availability": false,
-    "city": "Πάτρα",
-    "lat": 38.2338,
-    "lon": 21.7408
-  },
-  {
-    "name": "Δρ. Ευαγγελία Συμεωνίδου",
-    "specialty": "Pediatrics",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.6714,
-    "lon": 20.8695
-  },
-  {
-    "name": "Δρ. Ακριβή Γκάβρου",
-    "specialty": "Endocrinology",
-    "availability": true,
-    "city": "Βόλος",
-    "lat": 39.3613,
-    "lon": 22.9476
-  },
-  {
-    "name": "Δρ. Λάμπρος Φραγκόπουλος",
-    "specialty": "Pulmonology",
-    "availability": true,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6281,
-    "lon": 22.9275
-  },
-  {
-    "name": "Δρ. Λαέρτης Φούσκας",
-    "specialty": "Gastroenterology",
-    "availability": false,
-    "city": "Πάτρα",
-    "lat": 38.2356,
-    "lon": 21.7358
-  },
-  {
-    "name": "Δρ. Λάσκαρης Παππάς",
-    "specialty": "Urology",
-    "availability": true,
-    "city": "Λάρισα",
-    "lat": 39.6458,
-    "lon": 22.4263
-  },
-  {
-    "name": "Δρ. Κατερίνα Περουλάκη",
-    "specialty": "Internal Medicine",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.649,
-    "lon": 20.8401
-  },
-  {
-    "name": "Δρ. Ζαχαρίας Κοκορδέλης",
-    "specialty": "Pediatrics",
-    "availability": false,
-    "city": "Ιωάννινα",
-    "lat": 39.6491,
-    "lon": 20.8527
-  },
-  {
-    "name": "Δρ. Άλκηστις Κωνσταντινίδου",
-    "specialty": "Orthopedics",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2271,
-    "lon": 21.7294
-  },
-  {
-    "name": "Δρ. Φεβρωνία Μαυρικάκης",
-    "specialty": "Neurology",
-    "availability": false,
-    "city": "Ηράκλειο",
-    "lat": 35.327,
-    "lon": 25.1672
-  },
-  {
-    "name": "Δρ. Οδύσσεια Δακαναλής",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9867,
-    "lon": 23.7257
-  },
-  {
-    "name": "Δρ. Ιοκάστη Γιαννέλος",
-    "specialty": "General Surgery",
-    "availability": true,
-    "city": "Αλεξανδρούπολη",
-    "lat": 40.8382,
-    "lon": 25.9643
-  },
-  {
-    "name": "Δρ. Οδύσσεια Μόκας",
-    "specialty": "Neurology",
-    "availability": false,
-    "city": "Λάρισα",
-    "lat": 39.6241,
-    "lon": 22.4089
-  },
-  {
-    "name": "Δρ. Αλκινόη Χαλατσής",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.668,
-    "lon": 20.8465
-  },
-  {
-    "name": "Δρ. Καλλίνικος Σταθάτος",
-    "specialty": "Dermatology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9838,
-    "lon": 23.7421
-  },
-  {
-    "name": "Δρ. Εμμανουήλ Τσίμη",
-    "specialty": "Pediatrics",
-    "availability": false,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6343,
-    "lon": 22.958
-  },
-  {
-    "name": "Δρ. Δαμιανή Μαυρογονάτος",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2528,
-    "lon": 21.7451
-  },
-  {
-    "name": "Δρ. Σεβαστιανή Φουσιέκης",
-    "specialty": "General Practice",
-    "availability": false,
-    "city": "Ιωάννινα",
-    "lat": 39.6584,
-    "lon": 20.8429
-  },
-  {
-    "name": "Δρ. Μαργαρίτα Σύψα",
-    "specialty": "Gastroenterology",
-    "availability": false,
-    "city": "Βόλος",
-    "lat": 39.35,
-    "lon": 22.9368
-  },
-  {
-    "name": "Δρ. Χρήστος Φίλκα",
-    "specialty": "ENT",
-    "availability": false,
-    "city": "Βόλος",
-    "lat": 39.3482,
-    "lon": 22.951
-  },
-  {
-    "name": "Δρ. Αντωνία Σπαθάρη",
-    "specialty": "Cardiology",
-    "availability": true,
-    "city": "Βόλος",
-    "lat": 39.3641,
-    "lon": 22.9492
-  },
-  {
-    "name": "Δρ. Νικόλαος Μαυρούτσος",
-    "specialty": "Gastroenterology",
-    "availability": true,
-    "city": "Αλεξανδρούπολη",
-    "lat": 40.861,
-    "lon": 25.9533
-  },
-  {
-    "name": "Δρ. Διομήδης Ζαρειφοπούλου",
-    "specialty": "Gastroenterology",
-    "availability": false,
-    "city": "Ηράκλειο",
-    "lat": 35.3484,
-    "lon": 25.1494
-  },
-  {
-    "name": "Δρ. Αταλάντη Μπίλλας",
-    "specialty": "ENT",
-    "availability": false,
-    "city": "Λάρισα",
-    "lat": 39.6445,
-    "lon": 22.4113
-  },
-  {
-    "name": "Δρ. Διονύσιος Κυριαννάκη",
-    "specialty": "Neurology",
-    "availability": false,
-    "city": "Ιωάννινα",
-    "lat": 39.6831,
-    "lon": 20.8351
-  },
-  {
-    "name": "Δρ. Παναγιώτα Αποστολάκη",
-    "specialty": "Pulmonology",
-    "availability": false,
-    "city": "Ιωάννινα",
-    "lat": 39.6446,
-    "lon": 20.8571
-  },
-  {
-    "name": "Δρ. Ίων Θεολόγος",
-    "specialty": "Psychiatry",
-    "availability": true,
-    "city": "Βόλος",
-    "lat": 39.3451,
-    "lon": 22.957
-  },
-  {
-    "name": "Δρ. Αδάμ Παναγιωτακόπουλος",
-    "specialty": "Ophthalmology",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2599,
-    "lon": 21.7541
-  },
-  {
-    "name": "Δρ. Ευανθία Γιαννές",
-    "specialty": "Psychiatry",
-    "availability": false,
-    "city": "Λάρισα",
-    "lat": 39.6397,
-    "lon": 22.4276
-  },
-  {
-    "name": "Δρ. Κρινιώ Ντανώλα",
-    "specialty": "Gastroenterology",
-    "availability": true,
-    "city": "Ηράκλειο",
-    "lat": 35.3445,
-    "lon": 25.1709
-  },
-  {
-    "name": "Δρ. Ροδιά Γκούσκος",
-    "specialty": "Pulmonology",
-    "availability": false,
-    "city": "Πάτρα",
-    "lat": 38.241,
-    "lon": 21.7524
-  },
-  {
-    "name": "Δρ. Σεραφείμ Σαλίχος",
-    "specialty": "Gynecology",
-    "availability": false,
-    "city": "Αλεξανδρούπολη",
-    "lat": 40.8547,
-    "lon": 25.9581
-  },
-  {
-    "name": "Δρ. Θεόδωρος Τσώνης",
-    "specialty": "Gastroenterology",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.6641,
-    "lon": 20.8415
-  },
-  {
-    "name": "Δρ. Μαλαματένια Κωστοπούλου",
-    "specialty": "Urology",
-    "availability": false,
-    "city": "Βόλος",
-    "lat": 39.3672,
-    "lon": 22.9387
-  },
-  {
-    "name": "Δρ. Πηνελόπη Ματεντσίδου",
-    "specialty": "Pulmonology",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2278,
-    "lon": 21.7149
-  },
-  {
-    "name": "Δρ. Διαμαντούλα Μασόπουλος",
-    "specialty": "Psychiatry",
-    "availability": false,
-    "city": "Λάρισα",
-    "lat": 39.6224,
-    "lon": 22.4256
-  },
-  {
-    "name": "Δρ. Κρυστάλλης Αβραμπέκη",
-    "specialty": "Urology",
-    "availability": false,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6519,
-    "lon": 22.9557
-  },
-  {
-    "name": "Δρ. Σταμάτιος Φαλιέρος",
-    "specialty": "General Practice",
-    "availability": true,
-    "city": "Ηράκλειο",
-    "lat": 35.3245,
-    "lon": 25.1601
-  },
-  {
-    "name": "Δρ. Ελένη Σταυρόπουλος",
-    "specialty": "Neurology",
-    "availability": true,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6484,
-    "lon": 22.9593
-  },
-  {
-    "name": "Δρ. Ήλια Βαΐου",
-    "specialty": "Internal Medicine",
-    "availability": true,
-    "city": "Πάτρα",
-    "lat": 38.2392,
-    "lon": 21.74
-  },
-  {
-    "name": "Δρ. Παυσανίας Σμυρνιώτης",
-    "specialty": "Orthopedics",
-    "availability": false,
-    "city": "Αθήνα",
-    "lat": 38.0024,
-    "lon": 23.714
-  },
-  {
-    "name": "Δρ. Πωλίνα Κωνσταντινίδης",
-    "specialty": "Pediatrics",
-    "availability": false,
-    "city": "Θεσσαλονίκη",
-    "lat": 40.6502,
-    "lon": 22.9309
-  },
-  {
-    "name": "Δρ. Ιωάννα Αγραφιώτη",
-    "specialty": "Dermatology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 38.0016,
-    "lon": 23.7079
-  },
-  {
-    "name": "Δρ. Αθανασία Σταμέλου",
-    "specialty": "Gastroenterology",
-    "availability": true,
-    "city": "Βόλος",
-    "lat": 39.3701,
-    "lon": 22.9347
-  },
-  {
-    "name": "Δρ. Ματίνα Πιτερός",
-    "specialty": "General Surgery",
-    "availability": true,
-    "city": "Ιωάννινα",
-    "lat": 39.6768,
-    "lon": 20.8411
-  },
-  {
-    "name": "Δρ. Θεόπιστος Αντωνέας",
-    "specialty": "Endocrinology",
-    "availability": true,
-    "city": "Αθήνα",
-    "lat": 37.9807,
-    "lon": 23.7263
-  },
-  {
-    "name": "Δρ. Τσαμπίκα Μανούκας",
-    "specialty": "General Surgery",
-    "availability": false,
-    "city": "Βόλος",
-    "lat": 39.3676,
-    "lon": 22.9587
-  },
-  {
-    "name": "Δρ. Ζηνοβία Κοττίκας",
-    "specialty": "Internal Medicine",
-    "availability": true,
-    "city": "Ηράκλειο",
-    "lat": 35.3566,
-    "lon": 25.1481
-  },
-  {
-    "name": "Δρ. Ασπασία Διακάκης",
-    "specialty": "ENT",
-    "availability": true,
-    "city": "Λάρισα",
-    "lat": 39.6336,
-    "lon": 22.4035
-  }
+  { "name": "Δρ. Γεώργιος Παπαδόπουλος", "specialty": "Cardiology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Μαρία Νικολάου", "specialty": "Cardiology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Θεόδωρος Αναστασίου", "specialty": "Cardiology", "availability": true, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+  { "name": "Δρ. Ελένη Σταυρίδου", "specialty": "Cardiology", "availability": false, "city": "Ηράκλειο", "lat": 35.3387, "lon": 25.1442 },
+
+  { "name": "Δρ. Ειρήνη Χατζηδάκη", "specialty": "Neurology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Κωνσταντίνος Κυριακίδης", "specialty": "Neurology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Αικατερίνη Παπακώστα", "specialty": "Neurology", "availability": false, "city": "Λάρισα", "lat": 39.6372, "lon": 22.4202 },
+
+  { "name": "Δρ. Δημήτριος Γεωργιάδης", "specialty": "Orthopedics", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Χρήστος Κατσαρός", "specialty": "Orthopedics", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Αλεξάνδρα Ιωαννίδου", "specialty": "Orthopedics", "availability": false, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+
+  { "name": "Δρ. Νικόλαος Μανωλάκης", "specialty": "Pulmonology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Σοφία Παπαϊωάννου", "specialty": "Pulmonology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Ανδρέας Οικονόμου", "specialty": "Pulmonology", "availability": false, "city": "Ηράκλειο", "lat": 35.3387, "lon": 25.1442 },
+
+  { "name": "Δρ. Παναγιώτης Βαρδάκης", "specialty": "Gastroenterology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Σταυρούλα Αλεξοπούλου", "specialty": "Gastroenterology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Ιωάννης Μανιός", "specialty": "Gastroenterology", "availability": false, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+
+  { "name": "Δρ. Αθανάσιος Καλαϊτζής", "specialty": "Internal Medicine", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Δέσποινα Κυριακοπούλου", "specialty": "Internal Medicine", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Στυλιανός Βενιζέλος", "specialty": "Internal Medicine", "availability": true, "city": "Ηράκλειο", "lat": 35.3387, "lon": 25.1442 },
+
+  { "name": "Δρ. Κωνσταντίνος Αντωνίου", "specialty": "General Practice", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Χριστίνα Βασιλείου", "specialty": "General Practice", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Μιχαήλ Σπανός", "specialty": "General Practice", "availability": true, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+  { "name": "Δρ. Αγγελική Γεροντίδου", "specialty": "General Practice", "availability": true, "city": "Λάρισα", "lat": 39.6372, "lon": 22.4202 },
+
+  { "name": "Δρ. Αλέξανδρος Πετρόπουλος", "specialty": "Urology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Φωτεινή Κουτρουμάνη", "specialty": "Urology", "availability": false, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Βασίλειος Παπαδάκης", "specialty": "Urology", "availability": true, "city": "Λάρισα", "lat": 39.6372, "lon": 22.4202 },
+
+  { "name": "Δρ. Αθηνά Κωνσταντινίδου", "specialty": "Dermatology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Γεωργία Λαζαρίδου", "specialty": "Dermatology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Σπυρίδων Φραγκούλης", "specialty": "Dermatology", "availability": false, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+
+  { "name": "Δρ. Αναστασία Μπόμπολα", "specialty": "Psychiatry", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Εμμανουήλ Τζανάκης", "specialty": "Psychiatry", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Ανθή Μαρκοπούλου", "specialty": "Psychiatry", "availability": false, "city": "Ιωάννινα", "lat": 39.6650, "lon": 20.8538 },
+
+  { "name": "Δρ. Πέτρος Καρδαράς", "specialty": "Otolaryngology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Ιωάννα Μανδαλάκη", "specialty": "Otolaryngology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Αργυρώ Σακελλαρίου", "specialty": "Otolaryngology", "availability": false, "city": "Ηράκλειο", "lat": 35.3387, "lon": 25.1442 },
+
+  { "name": "Δρ. Κατερίνα Λάμπρου", "specialty": "Ophthalmology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Παρασκευή Μιχαλοπούλου", "specialty": "Ophthalmology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Γρηγόριος Χατζηιωάννου", "specialty": "Ophthalmology", "availability": false, "city": "Λάρισα", "lat": 39.6372, "lon": 22.4202 },
+
+  { "name": "Δρ. Μαρία Παπαγεωργίου", "specialty": "Gynecology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Ευαγγελία Σταθοπούλου", "specialty": "Gynecology", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Σοφία Καραγιάννη", "specialty": "Gynecology", "availability": false, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+
+  { "name": "Δρ. Χαράλαμπος Μπαρμπούνης", "specialty": "General Surgery", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Νίκη Αναγνωστοπούλου", "specialty": "General Surgery", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Παύλος Κωνσταντόπουλος", "specialty": "General Surgery", "availability": false, "city": "Ηράκλειο", "lat": 35.3387, "lon": 25.1442 },
+
+  { "name": "Δρ. Δήμητρα Καρυπίδου", "specialty": "Pediatrics", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Φίλιππος Σιδηρόπουλος", "specialty": "Pediatrics", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Ελένη Κουτσούκου", "specialty": "Pediatrics", "availability": true, "city": "Πάτρα", "lat": 38.2466, "lon": 21.7346 },
+
+  { "name": "Δρ. Λεωνίδας Σαμαράς", "specialty": "Endocrinology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Παναγιώτα Δράκου", "specialty": "Endocrinology", "availability": false, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+  { "name": "Δρ. Ανδριάνα Χριστοδούλου", "specialty": "Endocrinology", "availability": true, "city": "Ιωάννινα", "lat": 39.6650, "lon": 20.8538 },
+
+  { "name": "Δρ. Σταύρος Τριανταφύλλου", "specialty": "Vascular Surgery", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Βασιλική Ντάφλου", "specialty": "Vascular Surgery", "availability": false, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 },
+
+  { "name": "Δρ. Μανώλης Λυμπέρης", "specialty": "Toxicology", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+
+  { "name": "Δρ. Αλεξία Τσιρογιάννη", "specialty": "Infectious Disease", "availability": true, "city": "Αθήνα", "lat": 37.9838, "lon": 23.7275 },
+  { "name": "Δρ. Νεκταρία Γαλανοπούλου", "specialty": "Infectious Disease", "availability": true, "city": "Θεσσαλονίκη", "lat": 40.6401, "lon": 22.9444 }
 ]

@@ -69,6 +69,11 @@ SPECIALTY_TRANSLATIONS_EL_TO_EN = {
     "Οφθαλμολογία": "Ophthalmology",
     "Γυναικολογία": "Gynecology",
     "Γενική Χειρουργική": "General Surgery",
+    "Παιδιατρική": "Pediatrics",
+    "Ενδοκρινολογία": "Endocrinology",
+    "Αγγειοχειρουργική": "Vascular Surgery",
+    "Τοξικολογία": "Toxicology",
+    "Λοιμωξιολογία": "Infectious Disease",
 }
 
 SPECIALTY_TRANSLATIONS_EN_TO_EL = {v: k for k, v in SPECIALTY_TRANSLATIONS_EL_TO_EN.items()}
@@ -143,6 +148,48 @@ async def translate_to_english(text: str) -> str:
         logger.warning("Symptom translation failed, falling back to original: %s", type(exc).__name__)
         return text
 
+TRANSLATE_TO_GREEK_PROMPT = (
+    "Translate the following English medical text to Greek. "
+    "Use proper Greek medical terminology. "
+    "Return ONLY the Greek translation, no explanation, no markdown, no extra text.\n\n"
+    "{text}"
+)
+
+
+async def translate_to_greek(text: str) -> str:
+    """Translate English medical text to Greek for display to Greek-speaking users."""
+    if not text or not text.strip():
+        return text
+
+    timeout = httpx.Timeout(timeout=15.0)
+    endpoint = f"{NIM_BASE_URL.rstrip('/')}/chat/completions"
+
+    try:
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: httpx.post(
+                endpoint,
+                headers={"Authorization": f"Bearer {NIM_API_KEY}"},
+                json={
+                    "model": NIM_MODEL,
+                    "messages": [
+                        {"role": "user", "content": TRANSLATE_TO_GREEK_PROMPT.format(text=text)}
+                    ],
+                    "max_tokens": 512,
+                    "temperature": 0,
+                },
+                timeout=timeout,
+            ),
+        )
+        response.raise_for_status()
+        translated = response.json()["choices"][0]["message"]["content"].strip()
+        logger.debug("Translated reasoning → Greek: %r → %r", text[:80], translated[:80])
+        return translated
+    except Exception as exc:
+        logger.warning("Reasoning translation to Greek failed: %s", type(exc).__name__)
+        return text
+
 _HUMAN_TEMPLATE = (
     "{patient_profile_section}"
     "Clinical context:\n{context}\n\n"
@@ -157,8 +204,8 @@ _HUMAN_TEMPLATE = (
     "- Only use General Practice when symptoms are truly vague, systemic, or do not fit any specific specialty.\n"
     "- Prefer specific specialties: Cardiology, Neurology, Gastroenterology, Orthopedics, Pulmonology, "
     "Urology, Dermatology, Psychiatry, ENT, Ophthalmology, Gynecology, General Surgery, Vascular Surgery, "
-    "Toxicology, Endocrinology, Infectious Disease, Internal Medicine.\n"
-    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική).\n"
+    "Toxicology, Endocrinology, Infectious Disease, Pediatrics, Internal Medicine.\n"
+    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική, Παιδιατρική).\n"
     "- If output language is English, specialty must be an English name (e.g. Cardiology, Neurology, General Practice).\n"
     "- Do NOT default to MTS level 3 (Urgent). Assign the level that genuinely reflects symptom severity.\n"
     "- Level 1: life-threatening (cardiac arrest, anaphylaxis, severe trauma)\n"
@@ -209,7 +256,7 @@ _HUMAN_TEMPLATE_WITH_FOLLOWUP = (
     "IMPORTANT rules for specialty selection:\n"
     "- Always choose the MOST SPECIFIC specialty that matches the symptoms.\n"
     "- Only use General Practice when symptoms are truly vague, systemic, or do not fit any specific specialty.\n"
-    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική).\n"
+    "- If output language is Greek, specialty must be a Greek name (e.g. Καρδιολογία, Νευρολογία, Γενική Ιατρική, Παιδιατρική).\n"
     "- If output language is English, specialty must be an English name (e.g. Cardiology, Neurology, General Practice).\n"
     "- Do NOT default to MTS level 3 (Urgent). Assign the level that genuinely reflects symptom severity.\n"
     "- Level 1: life-threatening (cardiac arrest, anaphylaxis, severe trauma)\n"

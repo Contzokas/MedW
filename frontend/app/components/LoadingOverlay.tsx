@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useLang } from "@/app/lib/lang-context"
 
 interface LoadingOverlayProps {
@@ -12,9 +13,30 @@ const LOADING_STEPS = {
   el: ["Ανάλυση των συμπτωμάτων σας...", "Συμβουλή με το σύστημα τριμαζ AI...", "Δημιουργία αξιολόγησης...", "Οριστικοποίηση αποτελεσμάτων..."]
 }
 
+const STEP_DELAY_MS = 800
+
 export default function LoadingOverlay({ visible, message }: LoadingOverlayProps) {
   const { lang } = useLang()
   const steps = LOADING_STEPS[lang]
+  const [activeStep, setActiveStep] = useState(0)
+
+  useEffect(() => {
+    if (!visible) {
+      setActiveStep(0)
+      return
+    }
+    setActiveStep(0)
+    const timer = setInterval(() => {
+      setActiveStep((prev) => {
+        if (prev >= steps.length - 1) {
+          clearInterval(timer)
+          return prev
+        }
+        return prev + 1
+      })
+    }, STEP_DELAY_MS)
+    return () => clearInterval(timer)
+  }, [visible, steps.length])
 
   if (!visible) return null
 
@@ -38,25 +60,38 @@ export default function LoadingOverlay({ visible, message }: LoadingOverlayProps
 
           {/* Animated steps */}
           <div className="space-y-2">
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-center gap-2 text-sm text-muted-foreground transition-all duration-500"
-                style={{
-                  opacity: 0.4 + (index * 0.2),
-                  transform: index === 0 ? "scale(1.05)" : "scale(1)"
-                }}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${index === 0 ? "bg-primary animate-pulse" : "bg-muted-foreground/30"}`} />
-                {step}
-              </div>
-            ))}
+            {steps.map((step, index) => {
+              const isActive = index === activeStep
+              const isDone = index < activeStep
+              return (
+                <div
+                  key={index}
+                  className={`flex items-center justify-center gap-2 text-sm transition-all duration-500 ${
+                    isActive
+                      ? "text-foreground scale-105"
+                      : isDone
+                        ? "text-foreground/70"
+                        : "text-muted-foreground/40"
+                  }`}
+                >
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+                      isActive ? "bg-primary animate-pulse scale-125" : isDone ? "bg-primary/60" : "bg-muted-foreground/30"
+                    }`}
+                  />
+                  {step}
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {/* Progress bar */}
         <div className="mt-6 h-1 bg-muted rounded-full overflow-hidden">
-          <div className="h-full bg-primary animate-[loadingProgress_2s_ease-in-out_infinite]" style={{ width: "30%" }} />
+          <div
+            className="h-full bg-primary transition-all duration-700 ease-out"
+            style={{ width: `${((activeStep + 1) / steps.length) * 100}%` }}
+          />
         </div>
       </div>
     </div>
