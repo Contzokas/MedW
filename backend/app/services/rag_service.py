@@ -159,6 +159,8 @@ def _ensure_collection(client: MilvusClient) -> None:
 
 
 def _rerank_sync(query: str, docs: list[str]) -> list[str]:
+    if not NIM_RERANKER_BASE_URL:
+        return docs[:TOP_K]
     last_exception = None
     for attempt in range(_EMBED_MAX_RETRIES):
         try:

@@ -173,11 +173,11 @@ function HomeContent() {
             <div className="triage-card rounded-2xl border border-primary/20 bg-card p-6 sm:p-8 relative">
               {showHistory ? (
                 <HistoryList patientId={patientId} />
-              ) : loading ? (
-                <SkeletonTriageResult />
               ) : result === null ? (
                 <div key={useWizard ? "wizard" : "text"} className="animate-[fadeIn_200ms_ease-out]">
-                {useWizard ? (
+                {useWizard && loading ? (
+                  <SkeletonTriageResult />
+                ) : useWizard ? (
                   <SymptomWizard patientId={patientId} onResult={handleResult} onStartLoading={handleStartLoading} latitude={geo.latitude} longitude={geo.longitude} />
                 ) : (
                   <TriageForm onResult={handleResult} onStartLoading={handleStartLoading} onLoadingDone={handleLoadingDone} onSwitchToWizard={() => { setUseWizard(true); setWizardPulse(false) }} onRedirectActive={setWizardPulse} patientId={patientId} latitude={geo.latitude} longitude={geo.longitude} geoDenied={geo.denied} geoLoading={geo.loading} geoDismissed={geo.dismissed} onRequestLocation={geo.request} />
