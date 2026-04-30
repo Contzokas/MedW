@@ -39,4 +39,4 @@ EOF
 backend/__pycache__/
 backend/.pytest_cache/
 back
-backend/.venv/
+backend/.venv/artifacts/

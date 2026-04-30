@@ -4,19 +4,45 @@ import { Doctor } from "@/app/lib/types"
 import { useLang } from "@/app/lib/lang-context"
 import { toCaps } from "@/app/lib/casing"
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+
 interface DoctorCardProps {
   doctor: Doctor
   redirectUrl: string
+  userLat: number | null
+  userLon: number | null
 }
 
-export default function DoctorCard({ doctor, redirectUrl }: DoctorCardProps) {
-  const { t, lang } = useLang()
+export default function DoctorCard({ doctor, redirectUrl, userLat, userLon }: DoctorCardProps) {
+  const { t } = useLang()
+
+  if (!doctor) return null
+
+  const showDistance = userLat !== null && userLon !== null && doctor.lat !== null && doctor.lon !== null
+  const distanceKm = showDistance ? haversineKm(userLat, userLon, doctor.lat!, doctor.lon!).toFixed(1) : null
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">{toCaps(t.doctor.label, lang)}</p>
+      <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground">{toCaps(t.doctor.label, "el")}</p>
       <p className="mt-1 text-lg font-semibold text-foreground">{doctor.name}</p>
       <p className="text-sm text-foreground">{doctor.specialty}</p>
+
+      {doctor.city && (
+        <p className="mt-0.5 text-sm text-muted-foreground">{doctor.city}</p>
+      )}
+
+      {distanceKm !== null && (
+        <p className="text-sm text-muted-foreground">
+          {t.doctor.distance.replace("{km}", distanceKm)}
+        </p>
+      )}
 
       {doctor.fallback_note !== null && (
         <p className="mt-2 text-sm text-warning">ℹ️ {doctor.fallback_note}</p>

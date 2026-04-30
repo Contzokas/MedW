@@ -5,10 +5,9 @@ pydantic
 langchain==1.2.15
 langchain-core==1.2.29
 langchain-community
-langchain-ollama
-langchain-chroma
-chromadb==1.5.7
-sentence-transformers>=2.2.2,<4.0.0
+langchain-nvidia-ai-endpoints
+pymilvus[milvus_lite]>=2.5.0
 pytest
 pytest-asyncio
 httpx
+aiosqlite
