@@ -2,7 +2,7 @@ import { QueueEntry } from "@/app/lib/types"
 
 interface TriageQueueItemProps {
   entry: QueueEntry
-  onRowClick: (patientId: string) => void
+  onRowClick?: (patientId: string) => void
 }
 
 const MTS_LABELS: Record<number, string> = {
@@ -35,7 +35,7 @@ export default function TriageQueueItem({ entry, onRowClick }: TriageQueueItemPr
   return (
     <tr 
       className={`${rowClass} cursor-pointer hover:bg-accent/50 transition-colors`}
-      onClick={() => onRowClick(entry.patient_id)}
+      onClick={() => onRowClick?.(entry.patient_id)}
     >
       <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
         {formattedTime}
