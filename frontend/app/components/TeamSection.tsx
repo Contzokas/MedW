@@ -14,7 +14,7 @@ const AVATAR_GRADIENTS = [
 ]
 
 const TEAM = [
-  { id: 1, nameKey: "athanasios", roleKey: "ux", imgSrc: "/team/thanos.jpg", gradient: AVATAR_GRADIENTS[0], socials: { linkedin: "https://www.linkedin.com/in/athanasios-neofytos-7a10a92a0/", github: "https://github.com/Thanoufrios" } },
+  { id: 1, nameKey: "athanasios", roleKey: "ux", imgSrc: "https://i.pravatar.cc/150?u=6", gradient: AVATAR_GRADIENTS[0], socials: { linkedin: "https://www.linkedin.com/in/athanasios-neofytos-7a10a92a0/", github: "https://github.com/Thanoufrios" } },
   { id: 2, nameKey: "constantinos", roleKey: "ai", imgSrc: "https://avatars.githubusercontent.com/u/136539747?v=4", gradient: AVATAR_GRADIENTS[1], socials: { linkedin: "https://www.linkedin.com/in/constantinos-tzokas/", github: "https://github.com/Contzokas"} },
   { id: 3, nameKey: "dimitrisD", roleKey: "backend", imgSrc: "https://avatars.githubusercontent.com/u/77115711?v=4", gradient: AVATAR_GRADIENTS[2], socials: { linkedin: "https://www.linkedin.com/in/dimitrios-dimitriadis-40111a309/", github: "https://github.com/dimitriadisdim" } },
   { id: 4, nameKey: "dimitrisP", roleKey: "frontend", imgSrc: "/team/mitsos.jpeg", gradient: AVATAR_GRADIENTS[3], socials: { linkedin: "https://www.linkedin.com/in/dimitris-papamargaritis-4065a028b/", github: "https://github.com/DimitrisPapamargaritis" } },
