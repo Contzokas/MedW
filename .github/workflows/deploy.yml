@@ -231,6 +231,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy [${{ needs.setup.outputs.env }}] to Run:ai (medo)
+    if: false # deployment temporarily disabled
     runs-on: ubuntu-latest
     needs: [setup, build-reranker, build-backend, build-frontend]
     environment: ${{ needs.setup.outputs.env }}
