@@ -364,13 +364,13 @@ Built with ☕ and γύρος by:
 
 | Member | Role |
 |--------|------|
-| **Athanasios Neofytos** | AI Engineer |
-| **Constantinos Tzokas** | Infrastructure & DevOps |
+| **Athanasios Neofytos** | UX/UI Designer |
+| **Constantinos Tzokas** | AI Engineer | 
 | **Dimitris Dimitriadis** | Backend Developer |
-| **Dimitris Papamargaritis** | Data Engineer |
-| **Orestis Bushpreni** | Frontend Developer |
-| **Sotiris Papadopoulos** | Data Scientist |
-| **Stella Alousi** | UX/UI Designer & Project Manager |
+| **Dimitris Papamargaritis** | Frontend Developer |
+| **Orestis Bushpreni** | Infrastructure & DevOps |
+| **Sotiris Papadopoulos** | Data Engineer |
+| **Stella Alousi** | Project Manager |
 
 ---
 
