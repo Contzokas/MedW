@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/Contzokas/MedW/deploy.yml?branch=main&label=CI%2FCD&style=flat-square" alt="CI/CD">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License">
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
   </a>
   <img src="https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js" alt="Next.js">
@@ -376,7 +376,7 @@ Built with ☕ and γύρος by:
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE)
 
 ---
 
